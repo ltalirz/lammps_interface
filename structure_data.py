@@ -29,6 +29,28 @@ from collections import OrderedDict
 from atomic import MASS, ATOMIC_NUMBER, COVALENT_RADII
 from ccdc import CCDC_BOND_ORDERS
 DEG2RAD=np.pi/180.
+# keeping track of some different groups of atoms.
+organic = set(["H", "C", "N", "O", "S"])
+non_metals = set(["H", "He", "C", "N", "O", "F", "Ne",
+                  "P", "S", "Cl", "Ar", "Se", "Br", "Kr",
+                  "I", "Xe", "Rn"])
+noble_gases = set(["He", "Ne", "Ar", "Kr", "Xe", "Rn"])
+metalloids = set(["B", "Si", "Ge", "As", "Sb", "Te", "At"])
+lanthanides = set(["La", "Ce", "Pr", "Nd", "Pm", "Sm", "Eu",
+                   "Gd", "Tb", "Dy", "Ho", "Er", "Tm", "Yb", "Lu"])
+actinides = set(["Ac", "Th", "Pa", "U", "Np", "Pu", "Am", "Cm", "Bk",
+                 "Cf", "Es", "Fm", "Md", "No", "Lr"])
+transition_metals = set(["Sc", "Ti", "V", "Cr", "Mn", "Fe", "Co", "Ni",
+                         "Cu", "Zn", "Y", "Zr", "Nb", "Mo", "Tc", "Ru",
+                         "Rh", "Pd", "Ag", "Cd", "Hf", "Ta", "W", "Re",
+                         "Os", "Ir", "Pt", "Ir", "Pt", "Au", "Hg", "Rf",
+                         "Db", "Sg", "Bh", "Hs", "Mt", "Ds", "Rg", "Cn"])
+alkali = set(["Li", "Na", "K", "Rb", "Cs", "Fr"])
+alkaline_earth = set(["Be", "Mg", "Ca", "Sr", "Ba", "Ra"])
+main_group = set(["Al", "Ga", "Ge", "In", "Sn", "Sb", "Tl", "Pb", "Bi",
+                  "Po", "At", "Cn", "Uut", "Fl", "Uup", "Lv", "Uus"])
+
+metals = main_group | alkaline_earth | alkali | transition_metals | metalloids
 
 class MolecularGraph(nx.Graph):
     """Class to contain all information relating a structure file
@@ -227,27 +249,6 @@ class MolecularGraph(nx.Graph):
         """Computes bonds between atoms based on covalent radii."""
         # here assume bonds exist, populate data with lengths and 
         # symflags if needed.
-        organic = set(["H", "C", "N", "O", "S"])
-        non_metals = set(["H", "He", "C", "N", "O", "F", "Ne",
-                          "P", "S", "Cl", "Ar", "Se", "Br", "Kr",
-                          "I", "Xe", "Rn"])
-        noble_gases = set(["He", "Ne", "Ar", "Kr", "Xe", "Rn"])
-        metalloids = set(["B", "Si", "Ge", "As", "Sb", "Te", "At"])
-        lanthanides = set(["La", "Ce", "Pr", "Nd", "Pm", "Sm", "Eu",
-                           "Gd", "Tb", "Dy", "Ho", "Er", "Tm", "Yb", "Lu"])
-        actinides = set(["Ac", "Th", "Pa", "U", "Np", "Pu", "Am", "Cm", "Bk",
-                         "Cf", "Es", "Fm", "Md", "No", "Lr"])
-        transition_metals = set(["Sc", "Ti", "V", "Cr", "Mn", "Fe", "Co", "Ni",
-                                 "Cu", "Zn", "Y", "Zr", "Nb", "Mo", "Tc", "Ru",
-                                 "Rh", "Pd", "Ag", "Cd", "Hf", "Ta", "W", "Re",
-                                 "Os", "Ir", "Pt", "Ir", "Pt", "Au", "Hg", "Rf",
-                                 "Db", "Sg", "Bh", "Hs", "Mt", "Ds", "Rg", "Cn"])
-        alkali = set(["Li", "Na", "K", "Rb", "Cs", "Fr"])
-        alkaline_earth = set(["Be", "Mg", "Ca", "Sr", "Ba", "Ra"])
-        main_group = set(["Al", "Ga", "Ge", "In", "Sn", "Sb", "Tl", "Pb", "Bi",
-                          "Po", "At", "Cn", "Uut", "Fl", "Uup", "Lv", "Uus"])
-
-        metals = main_group | alkaline_earth | alkali | transition_metals | metalloids
         if (self.number_of_edges() > 0):
             # bonding found in cif file
             sf = []
@@ -338,9 +339,11 @@ class MolecularGraph(nx.Graph):
         unit_repr = np.array([5,5,5], dtype=int)
         atom1 = self.node[n1]
         atom2 = self.node[n2]
-        coord1 = self.coordinates[atom1['index']-1]
-        coord2 = self.coordinates[atom2['index']-1]
-        fcoords = np.dot(cell.inverse, coord2) + supercells
+        #coord1 = self.coordinates[atom1['index']-1]
+        #coord2 = self.coordinates[atom2['index']-1]
+        coord1 = self.node[n1]['cartesian_coordinates']
+        coord2 = self.node[n2]['cartesian_coordinates']
+        fcoords = np.dot(cell._inverse, coord2) + supercells
         
         coords = np.array([np.dot(j, cell.cell) for j in fcoords])
         
@@ -351,6 +354,11 @@ class MolecularGraph(nx.Graph):
         sym = '.' if all([i==0 for i in supercells[image]]) else \
                 "1_%i%i%i"%(tuple(np.array(supercells[image],dtype=int) +
                                   unit_repr))
+        if(dist > 7):
+            #print("BEFORE: ", self[n1][n2]['symflag'])
+            print("WARNING: bonded atoms %i and %i are %.3f Angstroms apart."%(n1,n2,dist) + 
+                    " This probably has something to do with the redefinition of the unitcell "+
+                    "to a supercell. Please contact the developers!")
         return sym
     
     def compute_angle_between(self, l, m, r):
@@ -462,7 +470,8 @@ class MolecularGraph(nx.Graph):
         for n1, n2 in itertools.combinations(self.nodes(), 2):
             id1, id2 = self.node[n1]['index']-1,\
                                 self.node[n2]['index']-1
-            coords1, coords2 = self.coordinates[id1], self.coordinates[id2]
+            #coords1, coords2 = self.coordinates[id1], self.coordinates[id2]
+            coords1, coords2 = self.node[n1]['cartesian_coordinates'], self.node[n2]['cartesian_coordinates']
             try:
                 dist = self.min_img_distance(coords1, coords2, cell)
             except TypeError:
@@ -474,6 +483,14 @@ class MolecularGraph(nx.Graph):
         f = np.dot(self.cell.inverse, coord)
         f -= np.around(f)
         return np.dot(f, self.cell.cell)
+    
+    def in_cell(self, coord):
+        f = np.dot(self.cell.inverse, coord) % 1
+        return np.dot(f, self.cell.cell)
+    
+    def fractional(self, coord):
+        f = np.dot(self.cell.inverse, coord) 
+        return f 
 
     def min_img_distance(self, coords1, coords2, cell):
         one = np.dot(cell.inverse, coords1) % 1
@@ -566,8 +583,7 @@ class MolecularGraph(nx.Graph):
         is there a better way to catch chemical features?
         """ 
         #TODO(pboyd) return if bonds already 'typed' in the .cif file
-        organic = set(["H", "C", "N", "O", "S"])
-
+        double_check = [] 
         for n1, n2, data in self.edges_iter2(data=True):
             elements = [self.node[a]['element'] for a in (n1,n2)]
             hybridization = [self.node[a]['hybridization'] for a in (n1, n2)]
@@ -636,6 +652,7 @@ class MolecularGraph(nx.Graph):
                             car_data['hybridization'] = 'aromatic'
                             oxy_data['hybridization'] = 'aromatic'
                             data['order'] = 1.5
+
                 if "N" in carnelem:
                     at = carnn[carnelem.index("N")]
                     # C=O of amide group
@@ -657,7 +674,7 @@ class MolecularGraph(nx.Graph):
                         else:
                             oxy_data['hybridization'] = 'sp2'
                             data['order'] = 2.0
-            if set(elements) == set(["C", "N"]) and not samering:
+            elif set(elements) == set(["C", "N"]) and not samering:
                 car = n1 if self.node[n1]['element'] == "C" else n2
                 car_data = self.node[car]
                 nit = n2 if self.node[n2]['element'] == "N" else n1
@@ -675,9 +692,8 @@ class MolecularGraph(nx.Graph):
                     if "O" in carnelem:
                         data['order'] = 1.5 # (amide)
                         nit_data['hybridization'] = 'aromatic'
-            if (not self.node[n1]['cycle']) and (not self.node[n2]['cycle']) and (set(elements) <= organic):
+            elif (not self.node[n1]['cycle']) and (not self.node[n2]['cycle']) and (set(elements) <= organic):
                 if set(hybridization) == set(['sp2']):
-                    # check bond length.. probably not a good indicator..
                     try:
                         cr1 = COVALENT_RADII['%s_2'%elements[0]]
                     except KeyError:
@@ -687,8 +703,11 @@ class MolecularGraph(nx.Graph):
                     except KeyError:
                         cr2 = COVALENT_RADII[elements[1]]
                     covrad = cr1 + cr2
-                    if (data['length'] <= covrad*.95):
-                        data['order'] = 2.0
+                    # first pass: assign all to 2.0 bond order
+                    data['order'] = 2.0
+                    double_check += [n1, n2]
+                    #if (data['length'] <= covrad*.95):
+                    #    data['order'] = 2.0
                 elif set(hybridization) == set(['sp']):
                     try:
                         cr1 = COVALENT_RADII['%s_1'%elements[0]]
@@ -698,9 +717,124 @@ class MolecularGraph(nx.Graph):
                         cr2 = COVALENT_RADII['%s_1'%elements[1]]
                     except KeyError:
                         cr2 = COVALENT_RADII[elements[1]]
-                    covrad = cr1 + cr2 
-                    if (data['length'] <= covrad*.95):
-                        data['order'] = 3.0
+                    # first pass: assign all to 3.0 bond order
+                    double_check += [n1, n2]
+                    data['order'] = 3.0
+                    #covrad = cr1 + cr2 
+                    #if (data['length'] <= covrad*.95):
+                    #    data['order'] = 3.0
+        # second pass, check organic unsaturated bonds to make
+        # sure alkyl chains are alternating etc.
+        while double_check:
+            n = double_check.pop()
+            # rewind this atom to a 'terminal' connected atom
+            for i in self.recurse_bonds_to_end(n, pool=[], visited=[]):
+                start = i
+                try:
+                    idn = double_check.index(i)
+                    del double_check[idn]
+                except ValueError:
+                    pass
+            # iterate over all linear chains
+            # BE CAREFUL about overwriting bond orders here, the recursion
+            # can have duplicate bonds for each 'k' iteration since it iterates over
+            # all possible linear chains. So if the molecule is branched, there
+            # will be multiple recursions over the same set of bonds.
+            for k in self.recurse_linear_chains(start, visited=[], excluded=[]):
+                bond_orders = []
+                # first pass, store all the bond orders
+                for idx in range(len(k)-1):
+                    n1 = k[idx]
+                    n2 = k[idx+1]
+                    bond = self[n1][n2]
+                    bond_orders.append(bond['order'])
+                # second pass, check continuity
+                for idx in range(len(k)-1):
+                    n1 = k[idx]
+                    n2 = k[idx+1]
+                    data1 = self.node[n1]
+                    data2 = self.node[n2]
+                    
+                    hyb1 = data1['hybridization']
+                    hyb2 = data2['hybridization']
+
+                    elem1 = data1['element']
+                    elem2 = data2['element']
+                    if(idx == 0):
+                        order = bond_orders[idx]
+                        next_order = bond_orders[idx+1]
+                        if (hyb1 == 'sp2') and (hyb2 == 'sp2'):
+                            bond_orders[idx] = 2.
+                    elif (idx < len(k)-2):
+                        prev_order = bond_orders[idx-1]
+                        next_order = bond_orders[idx+1]
+                        order = bond_orders[idx]
+                        if (hyb1 == 'sp2') and (hyb2 == 'sp2'):
+                            if (prev_order == 2.) and (next_order == 1):
+                                bond_orders[idx-1] = 1.5
+                                bond_orders[idx] = 1.5
+                            elif (prev_order == 2.) and (next_order == 2.):
+                                bond_orders[idx] = 1.
+                        elif (hyb1 == 'sp') and (hyb2 == 'sp'):
+                            if (prev_order == 3.) and (next_order == 3.):
+                                bond_orders[idx] = 1.
+                    else:
+                        prev_order = bond_orders[idx-1]
+                        order = bond_orders[idx]
+                        if (hyb1 == 'sp2') and (hyb2 == 'sp2'):
+                            if (prev_order == 2.) and (order == 2):
+                                if set([elem1, elem2]) == set(["C", "O"]):
+                                    onode = n2 if self.node[n2]['element'] == "O" else n1
+                                    # this very specific case is a enol
+                                    if self.degree(onode) == 1:
+                                        bond_orders[idx] = 1.5
+                                        bond_orders[idx-1] = 1.5
+                        elif (hyb1 == 'sp') and (hyb2 == 'sp'):
+                            if (prev_order == 3.):
+                                bond_orders[idx] = 1.
+
+                for idx in range(len(k)-1):
+                    n1 = k[idx]
+                    n2 = k[idx+1]
+                    bond = self[n1][n2]
+                    # update bond orders.
+                    bond['order'] = bond_orders[idx]
+
+                #print([self.node[r]['element'] for r in k])
+    
+    def recurse_linear_chains(self, node, visited=[], excluded=[]):
+        """Messy recursion function to return all unique chains from a set of atoms between two 
+        metals (or terminal atoms in the case of molecules)"""
+        if self.node[node]['element'] == 'H':
+            yield
+        neighbors = [i for i in self.neighbors(node) if i not in excluded and self.node[i]['element'] != "H"]
+        if (not neighbors) and (node in excluded) and (not visited):
+            return
+        elif (not neighbors) and (node in excluded):
+            nde = visited.pop()
+        elif (not neighbors) and (not (node in excluded)):
+            excluded.append(node)
+            visited.append(node)
+            yield visited
+            nde = visited.pop()
+        else:
+            excluded.append(node)
+            visited.append(node)
+            nde = neighbors[0]
+        for x in self.recurse_linear_chains(nde, visited, excluded):
+            yield x
+
+    def recurse_bonds_to_end(self, node, pool=[], visited=[]):
+        if self.node[node]['element'] == 'H':
+            return
+        visited.append(node)
+        neighbors = [i for i in self.neighbors(node) if i not in visited and self.node[i]['element'] != "H"]
+        pool += neighbors
+        yield node
+        if (not pool) or (self.node[node]['element'] in list(metals)):
+            return
+        for x in self.recurse_bonds_to_end(pool[0], pool[1:], visited):
+            yield x
 
     def atomic_node_sanity_check(self):
         """Check for specific keyword/value pairs. Exit if non-existent"""
@@ -791,14 +925,39 @@ class MolecularGraph(nx.Graph):
     def show(self):
         nx.draw(self)
 
-    def img_offset(self, cells, cell, maxcell, flag):
+    def img_offset(self, cells, cell, maxcell, flag, redefine, n1=0):
         unit_repr = np.array([5, 5, 5], dtype=int)
         if(flag == '.'):
             return cells.index(tuple([tuple([i]) for i in cell]))
-        ocell = cell + np.array([int(j) for j in flag[2:]]) - unit_repr
-        # get the image cell of this bond
+        translation = np.array([int(j) for j in flag[2:]]) - unit_repr
+        ocell = np.array(cell + translation, dtype=np.float64)
+
+        # have to find the off-diagonal values, and what their
+        # multiples are to determine the image cell of this
+        # bond.
+        rd = redefine - np.identity(3)*maxcell
         imgcell = ocell % maxcell
-        # determine the atom indices from the image cell
+        olde_imgcell = imgcell
+        newcell = cell + np.dot(cell, redefine)%maxcell
+        newocell = (newcell + translation) #% maxcell
+        rd2 = rd
+        # check if the newcell translation spans a periodic boundary
+        if (np.any(newocell >= maxcell, axis=0)) or (np.any(newocell < 0.)):
+            
+            # get indices of where the newocell is spanning a pbc
+            indexes = np.where(newocell - maxcell >= 0)[0].tolist() + np.where(newocell < 0)[0].tolist()
+
+            # determine if the translation spans a lattice vector which is a linear combination
+            # of the other vectors, in which case, make a correction in the image cell
+            # this is checked by finding which lattice indices are spanning the cell, then
+            # checking if these vectors are a linear combination of the other ones by
+            # summing the columns together.
+            # this ONLY works if b and c are lin combs of a and a is the unit vector
+            newrd = np.sum(rd2[indexes], axis=0)%maxcell
+            #newrd = np.dot(newocell, redefine)%maxcell
+            if np.any(newrd != 0):
+                imgcell = (newocell - np.dot(newocell, redefine)) % maxcell
+
         return cells.index(tuple([tuple([i]) for i in imgcell]))
 
     def update_symflag(self, cell, symflag, mincell, maxcell):
@@ -957,8 +1116,44 @@ class MolecularGraph(nx.Graph):
         for j in set(no_cluster):
             print ("No recognizable %s clusters for %i elements %s"%(type.lower(), no_cluster.count(j),  j))
 
+    def redefine_lattice(self, redefinition, lattice):
+        """Redefines the lattice based on the old lattice vectors. This was designed to convert
+        non-orthogonal cells to orthogonal boxes, but it could in principle be used to 
+        convert any cell to any other cell. (As long as the redefined lattice
+        are integer multiples of the old vectors)
 
-    def build_supercell(self, sc, lattice, track_molecule=False, molecule_len=0):
+        """
+        #print(redefinition)
+        #redefinition = np.array([[1., 0., 0.], [ -2., 2.,0.], [ -1., 3., 2.]])
+        # determine how many replicas of the atoms is necessary to produce the supercell.
+        vol_change = np.prod(np.diag(redefinition))
+        if vol_change > 20:
+            print("ERROR: The volume change is %i times greater than the unit cell. "%(vol_change) +
+                    "I cannot process structures of this size!")
+            sys.exit()
+        
+        print("The redefined cell will be %i times larger than the original."%(int(vol_change)))
+
+        # replicate supercell
+        sc = (tuple([int(i) for i in np.diag(redefinition)]))
+        self.build_supercell(sc, lattice, redefine=redefinition)
+        # re-define the cell
+        old_cell = np.multiply(self.cell._cell.T, sc).T
+        self.cell.set_cell(np.dot(redefinition, self.cell._cell))
+        # the node cartesian_coordinates must be shifted by the periodic boundaries.
+        for node, data in self.nodes_iter(data=True):
+            coord = data['cartesian_coordinates']
+            data['cartesian_coordinates'] = self.in_cell(coord) 
+
+        # the bonds which span a periodic boundary will change
+        for n1, n2, data in self.edges_iter2(data=True):
+            flag = self.compute_bond_image_flag(n1, n2, self.cell)
+            data['symflag'] = flag #'.' 
+
+        # not sure what this may break, but have to assume this new cell is the 'original'
+        self.store_original_size()
+
+    def build_supercell(self, sc, lattice, track_molecule=False, molecule_len=0, redefine=np.identity(3)):
         """Construct a graph with nodes supporting the size of the 
         supercell (sc)
         Oh man.. so ugly.        
@@ -984,19 +1179,22 @@ class MolecularGraph(nx.Graph):
             offset = count * unitatomlen
             mol_offset = count * molecule_len
 
-            cartesian_offset = np.dot(newcell, lattice.cell) 
+            cartesian_offset = np.dot(newcell, lattice.cell)
+            # Initial setup of new image in the supercell.
             if (count == 0):
                 graph_image = self
             else:
                 # rename nodes
                 graph_image = nx.relabel_nodes(deepcopy(orig_copy), {unit_node_ids[i-1]: offset+unit_node_ids[i-1] for i in range(1, totatomlen+1)})
                 graph_image.sorted_edge_dict = self.sorted_edge_dict.copy()
+                # rename the edges with the offset associated with this supercell.
                 for k,v in list(graph_image.sorted_edge_dict.items()):
                     newkey = (k[0] + offset, k[1] + offset) 
                     newval = (v[0] + offset, v[1] + offset)
                     del graph_image.sorted_edge_dict[k]
                     graph_image.sorted_edge_dict.update({newkey:newval})
 
+            # keep track of original index value from the unit cell.
             for i in range(1, totatomlen+1):
                 graph_image.node[unit_node_ids[i-1]+offset]['image'] = unit_node_ids[i-1]
             if track_molecule:
@@ -1023,8 +1221,8 @@ class MolecularGraph(nx.Graph):
                         order_bc = graph_image.sorted_edge_dict[(node, cid)]
                         if order_bc != (node, cid) and e_bc['symflag'] != '.':
                             bc_symflag = "1_%i%i%i"%(tuple(np.array([10,10,10]) - np.array([int(j) for j in e_bc['symflag'][2:]]))) 
-                        os_a = self.img_offset(cells, newcell, maxcell, ba_symflag) * unitatomlen
-                        os_c = self.img_offset(cells, newcell, maxcell, bc_symflag) * unitatomlen
+                        os_a = self.img_offset(cells, newcell, maxcell, ba_symflag, redefine) * unitatomlen
+                        os_c = self.img_offset(cells, newcell, maxcell, bc_symflag, redefine) * unitatomlen
                         data['angles'].pop((a,c))
                         data['angles'][(a + os_a, c + os_c)] = val
 
@@ -1051,9 +1249,9 @@ class MolecularGraph(nx.Graph):
                         if order_bd != (node, did) and e_bd['symflag'] != '.':
                             bd_symflag = "1_%i%i%i"%(tuple([10 - int(j) for j in e_bd['symflag'][2:]])) 
 
-                        os_a = self.img_offset(cells, newcell, maxcell, ba_symflag) * unitatomlen
-                        os_c = self.img_offset(cells, newcell, maxcell, bc_symflag) * unitatomlen
-                        os_d = self.img_offset(cells, newcell, maxcell, bd_symflag) * unitatomlen
+                        os_a = self.img_offset(cells, newcell, maxcell, ba_symflag, redefine) * unitatomlen
+                        os_c = self.img_offset(cells, newcell, maxcell, bc_symflag, redefine) * unitatomlen
+                        os_d = self.img_offset(cells, newcell, maxcell, bd_symflag, redefine) * unitatomlen
                         data['impropers'].pop((a,c,d))
                         data['impropers'][(a + os_a, c + os_c, d + os_d)] = val
 
@@ -1062,6 +1260,7 @@ class MolecularGraph(nx.Graph):
                     pass
             
             # update nodes and edges to account for bonding to periodic images.
+            #unique_translations = {}
             for n1, n2, data in graph_image.edges_iter2(data=True):
                 # flag boundary crossings, and determine updated nodes.
                 # check symmetry flags if they need to be updated,
@@ -1078,12 +1277,22 @@ class MolecularGraph(nx.Graph):
                 # dihedrals are difficult if the edge spans one of the terminal atoms..
 
                 if (data['symflag'] != '.'):
-                    os_id = self.img_offset(cells, newcell, maxcell, data['symflag']) 
+                    # DEBUGGING
+                    unit_repr = np.array([5, 5, 5], dtype=int)
+                    translation = tuple(np.array([int(j) for j in data['symflag'][2:]]) - unit_repr)
+                    #unique_translations.setdefault(translation,0)
+                    #unique_translations[translation] += 1
+                    # DEBUGGING
+                    os_id = self.img_offset(cells, newcell, maxcell, data['symflag'], redefine, n1) 
                     offset_c = os_id * unitatomlen
                     img_n2 = offset_c + n2_orig
+                    #if (n1 == 1712):
+                    #    print(os_id)
+                    #    print(newcell)
+                    #    print(redefine)
                     # pain...
                     opposite_flag = "1_%i%i%i"%(tuple(np.array([10,10,10]) - np.array([int(j) for j in data['symflag'][2:]]))) 
-                    rev_n1_img = self.img_offset(cells, newcell, maxcell, opposite_flag) * unitatomlen + n1_orig 
+                    rev_n1_img = self.img_offset(cells, newcell, maxcell, opposite_flag, redefine) * unitatomlen + n1_orig 
                     # dihedral check
                     try:
                         for (a, d), val in list(data['dihedrals'].items()):
@@ -1100,14 +1309,14 @@ class MolecularGraph(nx.Graph):
                             if order_n1_a != (n1, a+offset) and edge_n1_a['symflag'] != '.':
                                 n1a_symflag = "1_%i%i%i"%(tuple(np.array([10,10,10]) - np.array([int(j) for j in edge_n1_a['symflag'][2:]])))
                             if (edge_n1_a['symflag'] != '.'):
-                                offset_a = self.img_offset(cells, newcell, maxcell, n1a_symflag) * unitatomlen
+                                offset_a = self.img_offset(cells, newcell, maxcell, n1a_symflag, redefine) * unitatomlen
                             # check to make sure edge between n2, c is not crossing an image
                             offset_d = offset_c
 
                             if order_n2_d != (n2, d+offset) and edge_n2_d['symflag'] != '.':
                                 n2d_symflag = "1_%i%i%i"%(tuple(np.array([10,10,10]) - np.array([int(j) for j in edge_n2_d['symflag'][2:]])))
                             if (edge_n2_d['symflag'] != '.'):
-                                offset_d = self.img_offset(cells, np.array(cells[os_id]).flatten(), maxcell, n2d_symflag) * unitatomlen
+                                offset_d = self.img_offset(cells, np.array(cells[os_id]).flatten(), maxcell, n2d_symflag, redefine) * unitatomlen
 
                             aid, did = offset_a + a, offset_d + d
                             copyover = data['dihedrals'].pop((a,d))
@@ -1137,14 +1346,14 @@ class MolecularGraph(nx.Graph):
                             if order_n1_a != (n1, a+offset) and edge_n1_a['symflag'] != '.':
                                 n1a_symflag = "1_%i%i%i"%(tuple(np.array([10,10,10]) - np.array([int(j) for j in edge_n1_a['symflag'][2:]])))
                             if (edge_n1_a['symflag'] != '.'):
-                                offset_a = self.img_offset(cells, newcell, maxcell, n1a_symflag) * unitatomlen
+                                offset_a = self.img_offset(cells, newcell, maxcell, n1a_symflag, redefine) * unitatomlen
                             # check to make sure edge between n2, c is not crossing an image
                             offset_d = offset
 
                             if order_n2_d != (n2, d+offset) and edge_n2_d['symflag'] != '.':
                                 n2d_symflag = "1_%i%i%i"%(tuple(np.array([10,10,10]) - np.array([int(j) for j in edge_n2_d['symflag'][2:]])))
                             if (edge_n2_d['symflag'] != '.'):
-                                offset_d = self.img_offset(cells, newcell, maxcell, n2d_symflag) * unitatomlen
+                                offset_d = self.img_offset(cells, newcell, maxcell, n2d_symflag, redefine) * unitatomlen
 
                             aid, did = offset_a + a, offset_d + d
                             copyover = data['dihedrals'].pop((a,d))
@@ -1171,7 +1380,7 @@ class MolecularGraph(nx.Graph):
             self.add_edge(n1, n2, **data)
             self.sorted_edge_dict.update({(n1,n2):(n1,n2)})
             self.sorted_edge_dict.update({(n2,n1):(n1,n2)})
-
+        #print(list(unique_translations.keys()))
     def unwrap_node_coordinates(self, cell):
         """Must be done before supercell generation.
         This is a recursive method iterating over all edges.
@@ -1436,7 +1645,7 @@ def write_RASPA_CIF(graph, cell):
     #                                CIF.geom_bond_site_symmetry_2(sym))
     #    c.add_data("bonds", _ccdc_geom_bond_type=
     #                                CIF.ccdc_geom_bond_type(type))
-    
+     
     print('Output cif file written to %s.cif'%c.name)
     file = open("%s.cif"%c.name, "w")
     file.writelines(str(c))
@@ -1710,6 +1919,8 @@ class Cell(object):
         self._cell = np.array(value).reshape((3,3))
         self.__mkparam()
         self.__mklammps()
+        # remake cell so a in x, b in xy and c in xyz
+        self.__mkcell()
         self._inverse = np.linalg.inv(self.cell.T)
 
     # Property so that params are updated when cell is set
@@ -1739,17 +1950,22 @@ class Cell(object):
         diag = np.diag(self.cell)
         #print(np.ceil(cutoff/diag*2.))
         return tuple(int(i) for i in np.ceil(cutoff/diag*2.))
-        #a_cross_b = np.cross(self.cell[0], self.cell[1])
-        #b_cross_c = np.cross(self.cell[1], self.cell[2])
-        #c_cross_a = np.cross(self.cell[2], self.cell[0])
 
-        #volume = np.dot(self.cell[0], b_cross_c)
+    def orthogonal_transformation(self):
+        """Compute the transformation from the original unit cell to a supercell which
+        has 90 degree angles between it's basis vectors. This is somewhat approximate,
+        and the angles will not be EXACTLY 90 deg.
 
-        #widths = [volume / np.linalg.norm(b_cross_c),
-        #          volume / np.linalg.norm(c_cross_a),
-        #          volume / np.linalg.norm(a_cross_b)]
+        """
+        absmat = np.abs(self._inverse.T)
+        zero_tol = 0.01
+        # round all near - zero values to zero
+        absmat[np.where(np.allclose(absmat, 0., atol=zero_tol))] = 0.
+        divs = np.array([np.min(absmat[i, np.nonzero(absmat[i])]) for i in range(3)])
 
-        #return tuple(int(math.ceil(2*cutoff/x)) for x in widths)
+        M = np.around(self._inverse.T / divs[:,None])
+        MN = M.copy()
+        return MN
 
     def update_supercell(self, tuple):
         self._cell = np.multiply(self._cell.T, tuple).T
