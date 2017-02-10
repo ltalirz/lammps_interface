@@ -1468,6 +1468,7 @@ def from_CIF(cifname):
     for atom_data in zip(*[data[i] for i in atheads]):
         kwargs = {a:j.strip() for a, j in zip(atheads, atom_data)}
         mg.add_atomic_node(**kwargs)
+        
 
     # add bond edges, if they exist
     try:
