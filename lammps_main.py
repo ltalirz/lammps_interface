@@ -1367,18 +1367,11 @@ class LammpsSimulation(object):
             
         if (self.options.minimize):
             box_min = cell_move 
-            min_style = "cg"
-            min_eval = 1e-6   # HKUST-1 will not minimize past 1e-11
+            min_style = "sd"
+            #min_eval = 1e-6   # HKUST-1 will not minimize past 1e-11
+            min_eval = 1e-3 
             max_iterations = 100000 # if the minimizer can't reach a minimum in this many steps,
                                     # change the min_eval to something higher.
-            #inp_str += "%-15s %s\n"%("min_style","fire")
-            #inp_str += "%-15s %i %s\n"%("compute", 1, "all msd com yes")
-            #inp_str += "%-15s %-10s %s\n"%("variable", "Dx", "equal c_1[1]")
-            #inp_str += "%-15s %-10s %s\n"%("variable", "Dy", "equal c_1[2]")
-            #inp_str += "%-15s %-10s %s\n"%("variable", "Dz", "equal c_1[3]")
-            #inp_str += "%-15s %-10s %s\n"%("variable", "MSD", "equal c_1[4]")
-            #inp_str += "%-15s %s %s\n"%("fix", "output all print 1", "\"$(vol),$(cella),$(cellb),$(cellc),${Dx},${Dy},${Dz},${MSD}\"" +
-            #                                " file %s.min.csv title \"Vol,CellA,CellB,CellC,Dx,Dy,Dz,MSD\" screen no"%(self.name))
             inp_str += "%-15s %s\n"%("min_style", min_style)
             inp_str += "%-15s %s\n"%("print", "\"MinStep,CellMinStep,AtomMinStep,FinalStep,Energy,EDiff\"" + 
                                               " file %s.min.csv screen no"%(self.name))
@@ -1390,12 +1383,12 @@ class LammpsSimulation(object):
             fix = self.fixcount() 
             inp_str += "%-15s %s\n"%("min_style", min_style)
             inp_str += "%-15s %s\n"%("fix","%i all box/relax %s 0.0 vmax 0.01"%(fix, box_min))
-            inp_str += "%-15s %s\n"%("minimize","1.0e-15 1.0e-15 10000 100000")
+            inp_str += "%-15s %s\n"%("minimize","%.2e %.2e 10000 100000"%(min_eval**2, min_eval**2))
             inp_str += "%-15s %s\n"%("unfix", "%i"%fix)
-            inp_str += "%-15s %s\n"%("min_style", "fire")
+            inp_str += "%-15s %s\n"%("min_style", "cg")
             inp_str += "%-15s %-10s %s\n"%("variable", "tempstp", "equal $(step)")
             inp_str += "%-15s %-10s %s\n"%("variable", "CellMinStep", "equal ${tempstp}")
-            inp_str += "%-15s %s\n"%("minimize","1.0e-15 1.0e-15 10000 100000")
+            inp_str += "%-15s %s\n"%("minimize","%.2e %.2e 10000 100000"%(min_eval**2, min_eval**2))
             inp_str += "%-15s %-10s %s\n"%("variable", "AtomMinStep", "equal ${tempstp}")
             inp_str += "%-15s %-10s %s\n"%("variable", "temppe", "equal $(pe)")
             inp_str += "%-15s %-10s %s\n"%("variable", "min_E", "equal abs(${prev_E}-${temppe})")
@@ -1426,8 +1419,12 @@ class LammpsSimulation(object):
             if(self.options.npt):
                 neqstps*=2
             npdstps = self.options.nprodstp
-            inp_str += "%-15s %s\n"%("fix","%i all ave/histo/weight 1 %i %i 2 40 250 c_%i[1] c_%i[2] mode vector file %s.xrd"%(
-                                            pxrd_id, npdstps, (npdstps + neqstps), pxrd_cid, pxrd_cid, self.name))
+            low_angle = 2
+            high_angle = 40
+            xrdstep_size = 0.05
+            nxrdsteps = int((high_angle - low_angle) / xrdstep_size)
+            inp_str += "%-15s %s\n"%("fix","%i all ave/histo/weight 1 %i %i %i %i %i c_%i[1] c_%i[2] mode vector file %s.xrd"%(
+                                            pxrd_id, npdstps, (npdstps + neqstps), low_angle, high_angle, nxrdsteps,  pxrd_cid, pxrd_cid, self.name))
 
         # delete bond types etc, for molecules that are rigid
         if self.options.insert_molecule:

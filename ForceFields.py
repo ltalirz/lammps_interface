@@ -2185,10 +2185,19 @@ class UFF(ForceField):
         auff, buff, cuff = a_data['force_field_type'], b_data['force_field_type'], c_data['force_field_type']
         
         theta0 = UFF_DATA[buff][1]
-        # just check if the central node is a metal, then apply a rigid angle term.
         # NB: Functional form may change dynamics, but at this point we will not
         # concern ourselves if the force constants are big.
-        if (self.keep_metal_geometry) and (b_data['atomic_number'] in METALS):
+        metal_check = False
+        # special check to see if we should lock an organic molecule's angles in place.
+        # this is important for bridging oxygens etc
+        b_natnum = [self.graph.node[i]['atomic_number'] for i in self.graph.neighbors(b)]
+        met_count = len([i for i in b_natnum if i in METALS])
+        if not (b_data['atomic_number'] in METALS) and met_count > 1:
+            metal_check = True
+        elif b_data['atomic_number'] in METALS:
+            metal_check = True
+        if (self.keep_metal_geometry) and (metal_check):
+
             theta0 = self.graph.compute_angle_between(a, b, c)
             # should put this angle in the general - non-linear case
             # unless the angle is 0 or 180 deg - then linear case.
@@ -2631,10 +2640,20 @@ class Dreiding(ForceField):
         btype = b_data['force_field_type']
         theta0 = DREIDING_DATA[btype][1]
         
-        if (self.keep_metal_geometry) and (b_data['atomic_number'] in METALS):
+        metal_check = False
+        # special check to see if we should lock an organic molecule's angles in place.
+        # this is important for bridging oxygens etc
+        b_natnum = [self.graph.node[i]['atomic_number'] for i in self.graph.neighbors(b)]
+        met_count = len([i for i in b_natnum if i in METALS])
+        if not (b_data['atomic_number'] in METALS) and met_count > 1:
+            metal_check = True
+        elif b_data['atomic_number'] in METALS:
+            metal_check = True
+
+        if (self.keep_metal_geometry) and metal_check: 
             theta0 = self.graph.compute_angle_between(a, b, c)
             data['potential'] = AnglePotential.CosineSquared()
-            K = 0.5*K/(np.sin(theta0*DEG2RAD))**2
+            K = 0.5*K #/(np.sin(theta0*DEG2RAD))**2 # if theta0 is close to 90, this K value can become enormous!
             data['potential'].K = K
             data['potential'].theta0 = theta0
             return 1
@@ -3042,7 +3061,7 @@ class Dreiding(ForceField):
             # one can edit these values for bookkeeping.
             potential.Rin = 9.0
             potential.Rout = 11.0
-            potential.a_cut = 30.0
+            potential.a_cut = 90.0
             return potential
 
         return hbond_pair

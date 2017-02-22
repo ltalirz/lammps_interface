@@ -547,7 +547,15 @@ class MolecularGraph(nx.Graph):
                     self.node[label].update({'hybridization':'sp3'})
             elif element == "O":
                 if len(neighbours) >= 2:
-                    self.node[label].update({'hybridization':'sp3'})
+                    n_elems = [self.node[k]['element'] for k in neighbours]
+                    # if O is bonded to a metal, assume sp2 - like ... 
+                    # there's probably many cases where this fails,
+                    # but carboxylate groups, bridging hydroxy groups
+                    # make this true.
+                    if (set(n_elems) & metals):
+                        self.node[label].update({'hybridization':'sp2'})
+                    else:
+                        self.node[label].update({'hybridization':'sp3'})
                 elif len(neighbours) == 1:
                     self.node[label].update({'hybridization':'sp2'})
                 else:
@@ -1131,8 +1139,9 @@ class MolecularGraph(nx.Graph):
         vol_change = np.prod(np.diag(redefinition))
         if vol_change > 20:
             print("ERROR: The volume change is %i times greater than the unit cell. "%(vol_change) +
-                    "I cannot process structures of this size!")
-            sys.exit()
+                    "I cannot process structures of this size! I am making a non-orthogonal simulation.")
+            #sys.exit()
+            return
         
         print("The redefined cell will be %i times larger than the original."%(int(vol_change)))
 
@@ -1960,14 +1969,17 @@ class Cell(object):
         and the angles will not be EXACTLY 90 deg.
 
         """
-        absmat = np.abs(self._inverse.T)
-        zero_tol = 0.01
+        zero_itol = 0.002 # tolerance for zero in the inverse matrix 
+        M = self._inverse.T.copy()
+        M[np.where(np.abs(M) < zero_itol)] = 0.
+        absmat = np.abs(M)
         # round all near - zero values to zero
-        absmat[np.where(np.allclose(absmat, 0., atol=zero_tol))] = 0.
+        absmat[np.where(absmat < zero_itol)] = 0.
         divs = np.array([np.min(absmat[i, np.nonzero(absmat[i])]) for i in range(3)])
 
-        M = np.around(self._inverse.T / divs[:,None])
-        MN = M.copy()
+        # This is a way to round very small entries in the inverse matrix, so that
+        # supercells are not unwieldly
+        MN = np.around(M / divs[:,None])
         return MN
 
     def update_supercell(self, tuple):
