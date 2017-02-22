@@ -2968,8 +2968,8 @@ class Dreiding(ForceField):
             jneigh = [graph.node[q]['element'] for q in graph.neighbors(node2)]
             if(ff1 == "N_3") or (ff1 == "N_R" and ineigh.count("H") == 2):
                 # tertiary amine
-                if ((ineigh.count("H") < 3) and (len(ineigh) == 4)or
-                        ineigh.count("H")<2 and (len(ineigh) == 3)):
+                if (((ineigh.count("H") < 3) and (len(ineigh) == 4))or
+                        (ineigh.count("H")<2 and (len(ineigh) == 3))):
                     if(ff2 == "Cl_"):
                         D0 = 3.23
                         R0 = 3.575
