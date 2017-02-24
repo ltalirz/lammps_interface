@@ -119,6 +119,17 @@ class Options(object):
                                       + " an isothermal-isobaric simulation. This will use "+
                                       "values from TEMP and PRESSURE, NEQSTP, and NPRODSTP to "+
                                       "produce the input file.")
+        simulation_group.add_argument("--pxrd", action="store_true",
+                                      dest="pxrd",
+                                      default=False,
+                                      help="Request that a powder pattern be "
+                                      + "computed for the simulation. Due to limitations "+
+                                      "in the package in LAMMPS, only orthogonal "+
+                                      "cells can be used. A warning will be printed "+
+                                      "when this is requested, and the input file will "+
+                                      "assume the simulation will proceed as orthogonal." + 
+                                      " One can use the '-O' option to try and orthogonalize their "+
+                                      "unit cell if desired. (may not work)")
         simulation_group.add_argument("--nvt", action="store_true",
                                       dest="nvt",
                                       default=False,

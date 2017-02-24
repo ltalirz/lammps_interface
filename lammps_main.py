@@ -783,12 +783,19 @@ class LammpsSimulation(object):
         string += "%19.6f %10.6f %s %s\n"%(0., self.cell.lx, "xlo", "xhi")
         string += "%19.6f %10.6f %s %s\n"%(0., self.cell.ly, "ylo", "yhi")
         string += "%19.6f %10.6f %s %s\n"%(0., self.cell.lz, "zlo", "zhi")
-        #if not (np.allclose(np.array([self.cell.xy, self.cell.xz, self.cell.yz]), 0.0)):
-        #    string += "%19.6f %10.6f %10.6f %s %s %s\n"%(self.cell.xy, self.cell.xz, self.cell.yz, "xy", "xz", "yz")
-        string += "%19.6f %10.6f %10.6f %s %s %s\n"%(self.cell.xy, 
-                                                     self.cell.xz, 
-                                                     self.cell.yz, 
-                                                     "xy", "xz", "yz")
+        # currently the only reason to eliminate the skew from a simulation is
+        # if pxrd is requested. Better make sure that the xy, xz, and yz are 0 or near 0!
+        if self.options.pxrd:
+            if not (np.allclose(np.array([self.cell.xy, self.cell.xz, self.cell.yz]), 0.0)):
+                print("WARNING: the cell is not orthogonal! with xy = %8.4f, xz = %8.4f and yz = %8.4f"%(self.cell.xy,
+                                            self.cell.xz, self.cell.yz))
+                print("Making simulation input anyway, but proceed with caution!")
+            string += "# %19.6f %10.6f %10.6f %s %s %s\n"%(self.cell.xy, self.cell.xz, self.cell.yz, "xy", "xz", "yz")
+        else:
+            string += "%19.6f %10.6f %10.6f %s %s %s\n"%(self.cell.xy, 
+                                                         self.cell.xz, 
+                                                         self.cell.yz, 
+                                                         "xy", "xz", "yz")
     
         # Let's track the forcefield potentials that haven't been calc'd or user specified
         no_bond = []
@@ -1184,6 +1191,10 @@ class LammpsSimulation(object):
     def fixcount(self, count=[]):
         count.append(1)
         return (len(count))
+    
+    def computecount(self, count=[]):
+        count.append(1)
+        return (len(count))
 
     def construct_input_file(self):
         """Input file construction based on user-defined inputs.
@@ -1261,7 +1272,11 @@ class LammpsSimulation(object):
                 else:
                     inp_str += " %i"%(x[0])
             inp_str += "\n"
-
+        
+        # cell move is to flag how the box is able to move during the simulation
+        cell_move="tri"
+        if self.options.pxrd:
+            cell_move="aniso"
 
         framework_atoms = self.graph.nodes()
         if(self.molecules)and(len(self.molecule_types.keys()) < 32):
@@ -1351,19 +1366,12 @@ class LammpsSimulation(object):
             f.close()
             
         if (self.options.minimize):
-            box_min = "aniso"
-            min_style = "cg"
-            min_eval = 1e-6   # HKUST-1 will not minimize past 1e-11
+            box_min = cell_move 
+            min_style = "sd"
+            #min_eval = 1e-6   # HKUST-1 will not minimize past 1e-11
+            min_eval = 1e-3 
             max_iterations = 100000 # if the minimizer can't reach a minimum in this many steps,
                                     # change the min_eval to something higher.
-            #inp_str += "%-15s %s\n"%("min_style","fire")
-            #inp_str += "%-15s %i %s\n"%("compute", 1, "all msd com yes")
-            #inp_str += "%-15s %-10s %s\n"%("variable", "Dx", "equal c_1[1]")
-            #inp_str += "%-15s %-10s %s\n"%("variable", "Dy", "equal c_1[2]")
-            #inp_str += "%-15s %-10s %s\n"%("variable", "Dz", "equal c_1[3]")
-            #inp_str += "%-15s %-10s %s\n"%("variable", "MSD", "equal c_1[4]")
-            #inp_str += "%-15s %s %s\n"%("fix", "output all print 1", "\"$(vol),$(cella),$(cellb),$(cellc),${Dx},${Dy},${Dz},${MSD}\"" +
-            #                                " file %s.min.csv title \"Vol,CellA,CellB,CellC,Dx,Dy,Dz,MSD\" screen no"%(self.name))
             inp_str += "%-15s %s\n"%("min_style", min_style)
             inp_str += "%-15s %s\n"%("print", "\"MinStep,CellMinStep,AtomMinStep,FinalStep,Energy,EDiff\"" + 
                                               " file %s.min.csv screen no"%(self.name))
@@ -1375,12 +1383,12 @@ class LammpsSimulation(object):
             fix = self.fixcount() 
             inp_str += "%-15s %s\n"%("min_style", min_style)
             inp_str += "%-15s %s\n"%("fix","%i all box/relax %s 0.0 vmax 0.01"%(fix, box_min))
-            inp_str += "%-15s %s\n"%("minimize","1.0e-15 1.0e-15 10000 100000")
+            inp_str += "%-15s %s\n"%("minimize","%.2e %.2e 10000 100000"%(min_eval**2, min_eval**2))
             inp_str += "%-15s %s\n"%("unfix", "%i"%fix)
-            inp_str += "%-15s %s\n"%("min_style", "fire")
+            inp_str += "%-15s %s\n"%("min_style", "cg")
             inp_str += "%-15s %-10s %s\n"%("variable", "tempstp", "equal $(step)")
             inp_str += "%-15s %-10s %s\n"%("variable", "CellMinStep", "equal ${tempstp}")
-            inp_str += "%-15s %s\n"%("minimize","1.0e-15 1.0e-15 10000 100000")
+            inp_str += "%-15s %s\n"%("minimize","%.2e %.2e 10000 100000"%(min_eval**2, min_eval**2))
             inp_str += "%-15s %-10s %s\n"%("variable", "AtomMinStep", "equal ${tempstp}")
             inp_str += "%-15s %-10s %s\n"%("variable", "temppe", "equal $(pe)")
             inp_str += "%-15s %-10s %s\n"%("variable", "min_E", "equal abs(${prev_E}-${temppe})")
@@ -1394,9 +1402,31 @@ class LammpsSimulation(object):
             inp_str += "%-15s %s\n"%("jump", "SELF loop_min")
             inp_str += "%-15s %s\n"%("label", "break_min")
 
-           # inp_str += "%-15s %s\n"%("unfix", "output") 
-        # delete bond types etc, for molecules that are rigid
+           # inp_str += "%-15s %s\n"%("unfix", "output")
+        # this probably won't work if molecules are being inserted...
+        if self.options.pxrd:
+            # currently a copper source, but this can be changed later.
+            pxrd_cid = self.computecount()
+            atomic_str = " ".join([self.unique_atom_types[key][1]['element'] 
+                                for key in sorted(self.unique_atom_types.keys())])
+            # probably some more replacements here, but will change when they come up.
+            # full list of valid atoms found here: http://lammps.sandia.gov/doc/compute_xrd.html
+            atomic_str = atomic_str.replace("Zn", "Zn2+")
+            atomic_str = atomic_str.replace("Al", "Al3+")
+            inp_str += "%-15s %s\n"%("compute","%i all xrd 1.541838 %s 2Theta 2 40 c 1 1 1 LP 1"%(pxrd_cid, atomic_str))
+            pxrd_id = self.fixcount()
+            neqstps = self.options.neqstp
+            if(self.options.npt):
+                neqstps*=2
+            npdstps = self.options.nprodstp
+            low_angle = 2
+            high_angle = 40
+            xrdstep_size = 0.05
+            nxrdsteps = int((high_angle - low_angle) / xrdstep_size)
+            inp_str += "%-15s %s\n"%("fix","%i all ave/histo/weight 1 %i %i %i %i %i c_%i[1] c_%i[2] mode vector file %s.xrd"%(
+                                            pxrd_id, npdstps, (npdstps + neqstps), low_angle, high_angle, nxrdsteps,  pxrd_cid, pxrd_cid, self.name))
 
+        # delete bond types etc, for molecules that are rigid
         if self.options.insert_molecule:
             inp_str += "%-15s %s %s.molecule\n"%("molecule", self.options.insert_molecule, self.options.insert_molecule)
         
@@ -1421,12 +1451,19 @@ class LammpsSimulation(object):
         if (self.options.random_vel):
             inp_str += "%-15s %s\n"%("velocity", "all create %.2f %i"%(self.options.temp, np.random.randint(1,3000000)))
         
-        if (self.options.nvt):
+        if (self.options.nvt) or (self.options.npt):
+            if(self.options.nvt):
+                siml='nvt'
+            elif(self.options.npt):
+                siml='npt'
             inp_str += "%-15s %-10s %s\n"%("variable", "dt", "equal %.2f"%(1.0))
             inp_str += "%-15s %-10s %s\n"%("variable", "tdamp", "equal 100*${dt}")
             molecule_fixes = []
             mollist = sorted(list(self.molecule_types.keys()))
 
+            if (self.options.npt):
+                inp_str += "%-15s %-10s %s\n"%("variable", "pdamp", "equal 1000*${dt}")
+            # always start with nvt langevin
             if self.options.insert_molecule:
                 id = self.fixcount()
                 molecule_fixes.append(id)
@@ -1486,13 +1523,13 @@ class LammpsSimulation(object):
                 molecule_fixes.append(id)
                 inp_str += "%-15s %s\n"%("fix", "%i fram nve"%id)
 
+            # add a shift of the cell as the deposit of molecules tends to shift things.
+            id = self.fixcount()
+            inp_str += "%-15s %i all momentum 1 linear 1 1 1 angular\n"%("fix", id)
             # deposit within nvt equilibrium phase.  TODO(pboyd): This entire input file formation Needs to be re-thought.
             if self.options.deposit:
                 deposit = self.options.deposit * np.prod(np.array(self.supercell)) 
                 
-                # add a shift of the cell as the deposit of molecules tends to shift things.
-                id = self.fixcount()
-                inp_str += "%-15s %i all momentum 1 linear 1 1 1 angular\n"%("fix", id)
                 id = self.fixcount() 
                 # define a region the size of the unit cell.
                 every = self.options.neqstp/2/deposit
@@ -1524,19 +1561,25 @@ class LammpsSimulation(object):
                 id = self.fixcount()
                 molecule_fixes.append(id)
                 if self.template_molecule.rigid:
-                    inp_str += "%-15s %s\n"%("fix", "%i %s rigid/nvt/small molecule temp %.2f %.2f ${tdamp} mol %s"%(id, 
+                    inp_str += "%-15s %s"%("fix", "%i %s rigid/%s/small molecule temp %.2f %.2f ${tdamp}"%(id, 
                                                                                             self.options.insert_molecule,
+                                                                                            siml,
                                                                                             self.options.temp, 
-                                                                                            self.options.temp,
-                                                                                            self.options.insert_molecule
-                                                                                            ))
+                                                                                            self.options.temp))
+                    if self.options.npt:
+                        inp_str += " %s"%("%s %.2f %.2f ${pdamp}"%(cell_move, self.options.pressure, self.options.pressure))
+                    inp_str += " mol %s\n"%(self.options.insert_molecule)
                 else:
                     # no idea if this will work..
-                    inp_str += "%-15s %s\n"%("fix", "%i %s nvt %.2f %.2f ${tdamp}"%(id, 
+                    inp_str += "%-15s %s"%("fix", "%i %s %s %.2f %.2f ${tdamp}"%(id, 
                                                                                         self.options.insert_molecule,
+                                                                                        siml,
                                                                                         self.options.temp, 
                                                                                         self.options.temp
                                                                                         ))
+                    if self.options.npt:
+                        inp_str += " %s"%("%s %.2f %.2f ${pdamp}"%(cell_move, self.options.pressure, self.options.pressure))
+                    inp_str += "\n"
 
 
             for molid in mollist:
@@ -1544,26 +1587,43 @@ class LammpsSimulation(object):
                 molecule_fixes.append(id)
                 rep = self.subgraphs[self.molecule_types[molid][0]]
                 if(rep.rigid):
-                    inp_str += "%-15s %s\n"%("fix", "%i %s rigid/nvt/small molecule temp %.2f %.2f ${tdamp}"%(id, 
-                                                                                            str(molid), 
+                    inp_str += "%-15s %s"%("fix", "%i %s rigid/%s/small molecule temp %.2f %.2f ${tdamp}"%(id, 
+                                                                                            str(molid),
+                                                                                            siml,
                                                                                             self.options.temp, 
                                                                                             self.options.temp
                                                                                             ))
+                    if self.options.npt:
+                        inp_str += " %s"%("%s %.2f %.2f ${pdamp}"%(cell_move, self.options.pressure, self.options.pressure))
+                    inp_str += "\n"
                 else:
-                    inp_str += "%-15s %s\n"%("fix", "%i %s nvt temp %.2f %.2f ${tdamp}"%(id, 
-                                                                                   str(molid), 
+                    inp_str += "%-15s %s"%("fix", "%i %s %s temp %.2f %.2f ${tdamp}"%(id, 
+                                                                                   str(molid),
+                                                                                   siml,
                                                                                    self.options.temp, 
                                                                                    self.options.temp
                                                                                    ))
+                    if self.options.npt:
+                        inp_str += " %s"%("%s %.2f %.2f ${pdamp}"%(cell_move, self.options.pressure, self.options.pressure))
+                    inp_str += "\n"
+
             if self.framework:
                 id = self.fixcount()
                 molecule_fixes.append(id)
-                inp_str += "%-15s %s\n"%("fix", "%i %s nvt temp %.2f %.2f ${tdamp}"%(id, 
-                                                                                   "fram", 
+                inp_str += "%-15s %s"%("fix", "%i %s %s temp %.2f %.2f ${tdamp}"%(id, 
+                                                                                   "fram",
+                                                                                   siml,
                                                                                    self.options.temp, 
                                                                                    self.options.temp
                                                                                    ))
+                if self.options.npt:
+                    inp_str += " %s"%("%s %.2f %.2f ${pdamp}"%(cell_move, self.options.pressure, self.options.pressure))
+                inp_str += "\n"
             
+            # do another round of equilibration if npt is requested.
+            if (self.options.npt):
+                inp_str += "%-15s %i\n"%("run", self.options.neqstp)
+
             inp_str += "%-15s %i\n"%("thermo", 1)
             inp_str += "%-15s %i\n"%("run", self.options.nprodstp)
             
@@ -1571,21 +1631,6 @@ class LammpsSimulation(object):
                 fid = molecule_fixes.pop(0)
                 inp_str += "%-15s %i\n"%("unfix", fid)
 
-        #TODO(pboyd): add molecule commands to npt simulations.. this needs to be separated!
-        if (self.options.npt):
-            id = self.fixcount()
-            inp_str += "%-15s %-10s %s\n"%("variable", "dt", "equal %.2f"%(1.0))
-            inp_str += "%-15s %-10s %s\n"%("variable", "pdamp", "equal 1000*${dt}")
-            inp_str += "%-15s %-10s %s\n"%("variable", "tdamp", "equal 100*${dt}")
-
-            inp_str += "%-15s %s\n"%("fix", "%i all npt temp %.2f %.2f ${tdamp} tri %.2f %.2f ${pdamp}"%(id, self.options.temp, self.options.temp,
-                                                                                                        self.options.pressure, self.options.pressure))
-            inp_str += "%-15s %i\n"%("thermo", 0)
-            inp_str += "%-15s %i\n"%("run", self.options.neqstp)
-            inp_str += "%-15s %i\n"%("thermo", 1)
-            inp_str += "%-15s %i\n"%("run", self.options.nprodstp)
-
-            inp_str += "%-15s %i\n"%("unfix", id) 
 
         if(self.options.bulk_moduli):
             min_style=True
@@ -1747,7 +1792,9 @@ class LammpsSimulation(object):
             inp_str += "\n%-15s %s\n"%("next", "sim_temp")
             inp_str += "%-15s %s\n"%("jump", "SELF loop_thermal")
             inp_str += "%-15s %-10s %s\n"%("variable", "sim_temp", "delete")
-
+        
+        if self.options.pxrd:
+            inp_str += "%-15s %i\n"%("unfix", pxrd_id) 
         if self.options.dump_dcd: 
             inp_str += "%-15s %s\n"%("undump", "%s_dcdmov"%(self.name))
         elif self.options.dump_xyz:
