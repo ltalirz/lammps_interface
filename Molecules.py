@@ -195,6 +195,54 @@ class CO2(Molecule):
             elif n == 3:
                 self.node[n]['cartesian_coordinates'] = self.O_coord[1]
 
+class N2(Molecule):
+    """Nitrogen parent class, containing functions applicable
+    to all N2 models.
+
+    """
+    
+    @property
+    def N_coord(self):
+        """Define the nitrogen coordinates assuming the mid-bond is centered at '0'.
+        angle gives the two nitrogen atoms an orientation that deviates randomly
+        from the default (lying along the x-axis).
+
+        """
+        try:
+            return self._N_coord
+        except AttributeError:
+            self._N_coord = self.RNN*np.array([[-1., 0., 0.],[1., 0., 0.]]) 
+            axis = np.random.rand(3)
+            angle = 180.*np.random.rand()
+            # rotate using the angle provided.
+            R = self.rotation_matrix(axis, np.radians(angle))
+            self._N_coord = np.dot(self._N_coord, R.T)
+            return self._N_coord
+    
+    def approximate_positions(self, M_pos=None, N_pos1=None, N_pos2=None):
+        """Input a set of approximate positions for the centre and
+        nitrogens of N2, and determine the lowest RMSD
+        that would give the idealized model.
+
+        """
+        N1 = self.N_coord[0]
+        N2 = self.N_coord[1]
+        M = N2 + (N1 - N2) / 2.
+        if M_pos is None:
+            M_pos = N_pos2 + (N_pos1 - N_pos2)/ 2.
+        v1 = np.array([M, N1, N2])
+        v2 = np.array([M_pos, N_pos1, N_pos2])
+        R = self.rotation_from_vectors(v1, v2)
+        self.M_coord = M_pos
+        self._N_coord = np.dot(self._N_coord, R.T) + M_pos
+        for n in self.nodes_iter():
+            if n == 1:
+                self.node[n]['cartesian_coordinates'] = self.M_coord
+            elif n == 2:
+                self.node[n]['cartesian_coordinates'] = self.N_coord[0]
+            elif n == 3:
+                self.node[n]['cartesian_coordinates'] = self.N_coord[1]
+
 class Water(Molecule):
     """Water parent class, containing functions applicable
     to all water models.
@@ -459,6 +507,54 @@ class EPM2_CO2(CO2):
         kw.update({'length':self.RCO})
         kw.update({'weight': 1})
         kw.update({'order': 2})
+        kw.update({'symflag': flag})
+        kw.update({'potential': None})
+        
+        self.sorted_edge_dict.update({(1,2): (1, 2), (2, 1):(1, 2)})
+        self.sorted_edge_dict.update({(1,3): (1, 3), (3, 1):(1, 3)})
+        self.add_edge(1, 2, key=self.number_of_edges()+1, **kw) 
+        self.add_edge(1, 3, key=self.number_of_edges()+1, **kw)
+        self.compute_all_angles()
+
+class N2_TraPPE(N2):
+    RNN = 1.10
+
+    def __init__(self, **kwargs):
+        """ N2 TraPPE three site nitrogen
+        dx.doi.org/10.1002/aic.690470719
+        
+        """
+        nx.Graph.__init__(self, **kwargs)
+        MolecularGraph.__init__(self)
+        self.rigid = True
+        self.M_coord = np.array([0., 0., 0.])
+
+        for idx, ff_type in enumerate(["X", "Nx", "Nx"]):
+            element = ff_type[0]
+            if idx == 0:
+                coord = self.M_coord
+            elif idx == 1:
+                coord = self.N_coord[0]
+            elif idx == 2:
+                coord = self.N_coord[1]
+            data = ({"mass":N2_TraPPE_atoms[ff_type][0],
+                     "charge":N2_TraPPE_atoms[ff_type][3],
+                     "molid":1,
+                     "element":element,
+                     "force_field_type":ff_type,
+                     "h_bond_donor":False,
+                     "h_bond_potential":None,
+                     "tabulated_potential":None,
+                     "table_potential":None,
+                     "cartesian_coordinates":coord
+                     })
+            self.add_node(idx+1, **data)
+
+        flag = "1_555"
+        kw = {}
+        kw.update({'length':self.RNN})
+        kw.update({'weight': 1})
+        kw.update({'order': 3})
         kw.update({'symflag': flag})
         kw.update({'potential': None})
         

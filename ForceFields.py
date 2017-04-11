@@ -4437,3 +4437,109 @@ class EPM2_CO2(ForceField):
             data['force_field_type'] = fftype 
             data['mass'] = EPM2_atoms[fftype][0] 
             data['charge'] = EPM2_atoms[fftype][3]
+
+class N2_TraPPE(ForceField):
+
+    def __init__(self, graph=None, **kwargs):
+        self.pair_in_data = True
+        for key, value in kwargs.items():
+            setattr(self, key, value)
+        
+        if (graph is not None):
+            self.graph = graph
+            self.graph.rigid = True
+            self.detect_ff_terms()
+            self.compute_force_field_terms()
+
+    def bond_term(self, edge):
+        """Harmonic term
+        
+        E = 0.5 * K * (R - Req)^2
+        
+        just a placeholder in LAMMPS.
+        The bond is rigid 
+        therefore an unambiguous extra flag must be
+        added here to ensure the potential is not 
+        grouped with identical (however unlikely) potentials
+        which are not rigid.
+
+        """
+        n1, n2, data = edge
+
+        n1data = self.graph.node[n1]
+        n2data = self.graph.node[n2]
+        data['potential'] = BondPotential.Harmonic()
+        data['potential'].R0 = 1.149 
+        data['potential'].K = 450000.0 # strong bond potential to ensure that the structure
+                                       # will not deviate far from its intended form
+                                       # during a minimization
+        data['potential'].special_flag = "rigid"
+        return 1
+
+    def angle_term(self, angle):
+        """Harmonic angle term.
+
+        E = 0.5 * K * (theta - theta0)^2
+
+        """
+        a, b, c, data = angle
+        a_data, b_data, c_data = self.graph.node[a], self.graph.node[b], self.graph.node[c] 
+        atype = a_data['force_field_type']
+        btype = b_data['force_field_type']
+        ctype = c_data['force_field_type']
+       
+        assert (b_data['element'] == "X")
+        assert (a_data['element'] == "N")
+        assert (c_data['element'] == "N")
+        data['potential'] = AnglePotential.Harmonic()
+        data['potential'].theta0 = N2_TraPPE_angles["_".join([atype,btype,ctype])][1]  
+        data['potential'].K = N2_TraPPE_angles["_".join([atype,btype,ctype])][0]/2. 
+        data['potential'].special_flag = "rigid"
+        return 1
+
+    def dihedral_term(self, dihedral):
+        """
+        No dihedral potential in N2 TraPPE model.
+
+        """
+        return None
+
+    def improper_term(self, improper):
+        """
+        No improper potential in N2 TraPPE model.
+
+        """
+        return None
+    
+    def pair_terms(self, node, data, cutoff):
+        """ 
+        Lennard - Jones potential for Nx and X.
+
+        """
+        data['pair_potential'] = PairPotential.LjCutCoulLong()
+        data['pair_potential'].eps = N2_TraPPE_atoms[data['force_field_type']][2]
+        data['pair_potential'].sig = N2_TraPPE_atoms[data['force_field_type']][1]
+        data['pair_potential'].cutoff = cutoff
+
+    def special_commands(self):
+        st = [
+              "%-15s %s"%("pair_modify", "tail yes")
+             ] 
+        return st
+
+    def detect_ff_terms(self):
+        """N2 consists of N, not too difficult. 
+
+        """
+        for node, data in self.graph.nodes_iter(data=True):
+            if data['element'] == "N":
+                fftype = "Nx"
+            elif data['element'] == "X":
+                fftype = "X"
+            else: 
+                print("ERROR: could not find the proper force field type for atom %i"%(data['index'])+
+                        " with element: '%s'"%(data['element']))
+                sys.exit()
+            data['force_field_type'] = fftype 
+            data['mass'] = N2_TraPPE_atoms[fftype][0] 
+            data['charge'] = N2_TraPPE_atoms[fftype][3]
