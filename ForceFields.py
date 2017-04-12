@@ -7,7 +7,7 @@ from Dubbeldam import Dub_atoms, Dub_bonds, Dub_angles, Dub_dihedrals, Dub_impro
 #from FMOFCu import FMOFCu_angles, FMOFCu_dihedrals, FMOFCu_opbends, FMOFCu_atoms, FMOFCu_bonds
 from MOFFF import MOFFF_angles, MOFFF_dihedrals, MOFFF_opbends, MOFFF_atoms, MOFFF_bonds
 from water_models import SPC_E_atoms, TIP3P_atoms, TIP4P_atoms, TIP5P_atoms
-from gas_models import EPM2_atoms, EPM2_angles
+from gas_models import EPM2_atoms, EPM2_angles, N2_TraPPE_atoms, N2_TraPPE_angles
 from lammps_potentials import BondPotential, AnglePotential, DihedralPotential, ImproperPotential, PairPotential
 from atomic import METALS
 import math
@@ -4469,7 +4469,7 @@ class N2_TraPPE(ForceField):
         n1data = self.graph.node[n1]
         n2data = self.graph.node[n2]
         data['potential'] = BondPotential.Harmonic()
-        data['potential'].R0 = 1.149 
+        data['potential'].R0 = 0.5500
         data['potential'].K = 450000.0 # strong bond potential to ensure that the structure
                                        # will not deviate far from its intended form
                                        # during a minimization

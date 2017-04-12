@@ -1,6 +1,6 @@
 import numpy as np
 from water_models import SPC_E_atoms, TIP3P_atoms, TIP4P_atoms, TIP5P_atoms
-from gas_models import EPM2_atoms
+from gas_models import EPM2_atoms, N2_TraPPE_atoms
 from structure_data import MolecularGraph
 import networkx as nx
 
@@ -211,7 +211,7 @@ class N2(Molecule):
         try:
             return self._N_coord
         except AttributeError:
-            self._N_coord = self.RNN*np.array([[-1., 0., 0.],[1., 0., 0.]]) 
+            self._N_coord = self.RNN/2.*np.array([[-1., 0., 0.],[1., 0., 0.]]) 
             axis = np.random.rand(3)
             angle = 180.*np.random.rand()
             # rotate using the angle provided.

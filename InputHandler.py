@@ -282,7 +282,7 @@ class Options(object):
                                               dest="insert_molecule",
                                               help="Prepeare an insertion of this molecule type."+
                                                    " Default is no molecule insertion. Current options are "+
-                                                   "TIP5P_Water, TIP4P_Water, SPC_E, TIP3P."+
+                                                   "TIP5P_Water, TIP4P_Water, SPC_E, TIP3P, EPM2_CO2, N2_TraPPE."+
                                                    " More to come ;)")
         
         molecule_insertion_group.add_argument("--deposit",
