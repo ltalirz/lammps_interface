@@ -7,6 +7,7 @@ import networkx as nx
 class Molecule(MolecularGraph):
     #TODO(pboyd):add bonding calculations for the atoms in each molecular template.
     #            so we can add bond/angle/dihedral/improper potentials later on.
+    rigid_fix = -1
     def rotation_from_vectors(self, v1, v2):
         """Obtain rotation matrix from sets of vectors.
         the original set is v1 and the vectors to rotate

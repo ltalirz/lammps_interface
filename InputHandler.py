@@ -119,6 +119,41 @@ class Options(object):
                                       + " an isothermal-isobaric simulation. This will use "+
                                       "values from TEMP and PRESSURE, NEQSTP, and NPRODSTP to "+
                                       "produce the input file.")
+        simulation_group.add_argument("--gcmc", action="store_true",
+                                      dest="gcmc",
+                                      default=False,
+                                      help="Request a gcmc simulation for a molecule defined by "
+                                      + "INSERT_MOLECULE. This will use "+
+                                      "values from TEMP and PRESSURE, NEQSTP, and NPRODSTP to "+
+                                      "produce the input file. Default is 'off'")
+        simulation_group.add_argument("--gcmc-every", action="store",
+                                      dest="gcmc_every",
+                                      default=10,
+                                      type=int,
+                                      help="Invoke the GCMC fix every this many MD timesteps. "+
+                                      "Default is 10 (ignored if GCMC=False).")
+        simulation_group.add_argument("--gcmc-exch", action="store",
+                                      dest="gcmc_exch",
+                                      default=100,
+                                      type=int,
+                                      help="Perform this many insertion/deletions on average "+
+                                      "each time the GCMC fix is invoked (which is controlled by "+
+                                      "the GCMC_EVERY variable). Default is 100.")
+        simulation_group.add_argument("--gcmc-mc", action="store",
+                                      dest="gcmc_mc",
+                                      default=100,
+                                      type=int,
+                                      help="Perform this many Monte Carlo moves on average "+
+                                      "each time the GCMC fix is invoked (which is controlled by "+
+                                      "the GCMC_EVERY variable). Default is 100.")
+        simulation_group.add_argument("--gcmc-disp", action="store",
+                                      dest="gcmc_disp",
+                                      default=1.0,
+                                      type=float,
+                                      help="Maximum distance (in Angstroms) a particle will move "+
+                                      "during a Monte Carlo displacement. Default is 1.0 Angstrom. "+
+                                      "Only relevant if the GCMC fix is invoked.") 
+
         simulation_group.add_argument("--pxrd", action="store_true",
                                       dest="pxrd",
                                       default=False,

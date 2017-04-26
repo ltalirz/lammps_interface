@@ -1203,6 +1203,13 @@ class LammpsSimulation(object):
         up into logical sub-sections.
         
         """
+        # sanity check - right now if gcmc is true, insert_molecule must be
+        # true. Currently inserts molecule templates only
+        if self.options.gcmc:
+            if not self.options.insert_molecule:
+                print("ERROR: Cannot perform GCMC without a molecule template.")
+                sys.exit(1)
+
         inp_str = ""
         
         inp_str += "%-15s %s\n"%("log","log.%s append"%(self.name))
@@ -1467,8 +1474,11 @@ class LammpsSimulation(object):
             if self.options.insert_molecule:
                 id = self.fixcount()
                 molecule_fixes.append(id)
-                if self.template_molecule.rigid:
-                    insert_rigid_id = id
+                if(self.template_molecule.rigid):
+                    if self.template_molecule.rigid_fix < 0:
+                        id=self.fixcount()
+                        molecule_fixes.append(id)
+                        self.template_molecule.rigid_fix = id
                     inp_str += "%-15s %s\n"%("fix", "%i %s rigid/small molecule langevin %.2f %.2f ${tdamp} %i mol %s"%(id, 
                                                                                             self.options.insert_molecule,
                                                                                             self.options.temp, 
@@ -1510,6 +1520,53 @@ class LammpsSimulation(object):
                     id = self.fixcount()
                     molecule_fixes.append(id)
                     inp_str += "%-15s %s\n"%("fix", "%i %i nve"%(id,molid))
+
+            gcmc_str = ""
+            if (self.options.gcmc):
+                gcmc_fix = self.fixcount()
+                molecule_fixes.append(gcmc_fix)
+                # chem. pot. is ignored when the 'pressure' keyword is set. We will default to this.
+                mu = 0.5
+                # N - invoke fix every N (MD) steps
+                N = self.options.gcmc_every
+                # X - average number of GCMC exchanges to attempt every N steps.
+                X = self.options.gcmc_exch
+                # M - average number of MC moves to attempt every N steps.
+                M = self.options.gcmc_mc
+
+                gcmc_str += "%15s %i %s %s %i %i %i %i %i %.2f %.2f %.2f "%('fix', gcmc_fix, self.options.insert_molecule, 
+                                         'gcmc', N, X, M, 0, np.random.randint(1,3000000), 
+                                        self.options.temp, mu, self.options.gcmc_disp)
+                gcmc_str += "%s %s"%('mol', self.options.insert_molecule)
+                # splitting this string up, it's long
+                gcmc_str += "%s %.2f "%('pressure',self.options.pressure)
+                # fugacity coeff defaults to 1. but I'm putting it verbosely here
+                # so that people will know it is a keyword.
+                # The day I put an EOS in this code to compute this coefficient will
+                # be the day I make long rueful regrets bout my life choices.
+                gcmc_str += "%s %.2f "%('fugacity_coeff',1.0)
+                gcmc_str += "%s %s"%('group', self.options.insert_molecule)
+
+                if(self.template_molecule.rigid):
+                    if self.template_molecule.rigid_fix < 0:
+                        id=self.fixcount()
+                        molecule_fixes.append(id)
+                        self.template_molecule.rigid_fix = id
+                    gcmc_str += "%s %i "%('rigid', self.template_molecule.rigid_fix)
+               
+                # currently shake is not associated with a molecule but with the 
+                # potentials in the simulation. This should be modified..
+                # but here I'm assuming the shake will be matched with the 
+                # desired insertion molecule.
+                if(self.fix_shake):
+                    gcmc_str += "%s %i "%('shake', shk_fix)
+
+                # its dissapointing that LAMMPS will compute the full energy each time a molecule
+                # is inserted/deleted/moved in this fix (because of charge interactions)
+                # ewald summations can be modified to permit partial energy calculations too...
+                gcmc_str += "\n"
+                inp_str += gcmc_str
+                # needs fix_modify dynamic/dof yes for rigid/small/nvt or rigid/small/npt fix
             if self.framework:
                 id = self.fixcount()
                 molecule_fixes.append(id)
@@ -1547,7 +1604,7 @@ class LammpsSimulation(object):
                 molecule_fixes.append(id)
                 # need rigid fixid
                 if self.template_molecule.rigid:
-                    inp_str += " rigid %i\n"%(insert_rigid_id)
+                    inp_str += " rigid %i\n"%(self.template_molecule.rigid_fix)
                 else:
                     inp_str += "\n"
 
@@ -1558,10 +1615,13 @@ class LammpsSimulation(object):
                 inp_str += "%-15s %i\n"%("unfix", fid)
             
             if self.options.insert_molecule:
-                id = self.fixcount()
-                molecule_fixes.append(id)
                 if self.template_molecule.rigid:
-                    inp_str += "%-15s %s"%("fix", "%i %s rigid/%s/small molecule temp %.2f %.2f ${tdamp}"%(id, 
+                    if self.template_molecule.rigid_fix < 0:
+                        id=self.fixcount()
+                        molecule_fixes.append(id)
+                        self.template_molecule.rigid_fix = id
+                    inp_str += "%-15s %s"%("fix", "%i %s rigid/%s/small molecule temp %.2f %.2f ${tdamp}"%(
+                                                                                            self.template_molecule.rigid_fix, 
                                                                                             self.options.insert_molecule,
                                                                                             siml,
                                                                                             self.options.temp, 
@@ -1571,16 +1631,27 @@ class LammpsSimulation(object):
                     inp_str += " mol %s\n"%(self.options.insert_molecule)
                 else:
                     # no idea if this will work..
-                    inp_str += "%-15s %s"%("fix", "%i %s %s %.2f %.2f ${tdamp}"%(id, 
-                                                                                        self.options.insert_molecule,
-                                                                                        siml,
-                                                                                        self.options.temp, 
-                                                                                        self.options.temp
-                                                                                        ))
+                    mol_nvt=self.fixcount()
+                    inp_str += "%-15s %s"%("fix", "%i %s %s %.2f %.2f ${tdamp}"%(mol_nvt, 
+                                                                                 self.options.insert_molecule,
+                                                                                 siml,
+                                                                                 self.options.temp, 
+                                                                                 self.options.temp
+                                                                                 ))
                     if self.options.npt:
                         inp_str += " %s"%("%s %.2f %.2f ${pdamp}"%(cell_move, self.options.pressure, self.options.pressure))
                     inp_str += "\n"
-
+                if self.options.gcmc:
+                    # recall the last gcmc_str
+                    inp_str += gcmc_str
+                    molecule_fixes.append(gcmc_fix)
+                    if self.template_molecule.rigid:
+                        inp_str += "%-15s %i %s %s\n"%('fix_modify', self.template_molecule.rigid_fix, 'dynamic/dof', 'yes')
+                    else:
+                        mdtemp_cid = self.computecount()
+                        inp_str += "%-15s %i %s %s\n"%('compute', mdtemp_cid, 'all', 'temp')
+                        inp_str += "%-15s %i %s %s\n"%('compute_modify', mdtemp_cid, 'dynamic/dof', 'yes')
+                        inp_str += "%-15s %i %s %i\n"%('fix_modify' mol_nvt, 'temp', mdtemp_cid)
 
             for molid in mollist:
                 id = self.fixcount()
