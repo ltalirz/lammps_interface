@@ -1534,10 +1534,10 @@ class LammpsSimulation(object):
                 # M - average number of MC moves to attempt every N steps.
                 M = self.options.gcmc_mc
 
-                gcmc_str += "%15s %i %s %s %i %i %i %i %i %.2f %.2f %.2f "%('fix', gcmc_fix, self.options.insert_molecule, 
+                gcmc_str += "%-15s %i %s %s %i %i %i %i %i %.2f %.2f %.2f "%('fix', gcmc_fix, self.options.insert_molecule, 
                                          'gcmc', N, X, M, 0, np.random.randint(1,3000000), 
                                         self.options.temp, mu, self.options.gcmc_disp)
-                gcmc_str += "%s %s"%('mol', self.options.insert_molecule)
+                gcmc_str += "%s %s "%('mol', self.options.insert_molecule)
                 # splitting this string up, it's long
                 gcmc_str += "%s %.2f "%('pressure',self.options.pressure)
                 # fugacity coeff defaults to 1. but I'm putting it verbosely here
@@ -1545,7 +1545,7 @@ class LammpsSimulation(object):
                 # The day I put an EOS in this code to compute this coefficient will
                 # be the day I make long rueful regrets bout my life choices.
                 gcmc_str += "%s %.2f "%('fugacity_coeff',1.0)
-                gcmc_str += "%s %s"%('group', self.options.insert_molecule)
+                gcmc_str += "%s %s "%('group', self.options.insert_molecule)
 
                 if(self.template_molecule.rigid):
                     if self.template_molecule.rigid_fix < 0:
@@ -1651,7 +1651,7 @@ class LammpsSimulation(object):
                         mdtemp_cid = self.computecount()
                         inp_str += "%-15s %i %s %s\n"%('compute', mdtemp_cid, 'all', 'temp')
                         inp_str += "%-15s %i %s %s\n"%('compute_modify', mdtemp_cid, 'dynamic/dof', 'yes')
-                        inp_str += "%-15s %i %s %i\n"%('fix_modify' mol_nvt, 'temp', mdtemp_cid)
+                        inp_str += "%-15s %i %s %i\n"%('fix_modify', mol_nvt, 'temp', mdtemp_cid)
 
             for molid in mollist:
                 id = self.fixcount()
