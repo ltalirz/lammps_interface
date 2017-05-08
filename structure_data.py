@@ -2007,10 +2007,17 @@ class Cell(object):
         is not considering the 'unit cell' for each cell dimension.
 
         """
+        a_cross_b = cross(self.cell[0], self.cell[1])
+        b_cross_c = cross(self.cell[1], self.cell[2])
+        c_cross_a = cross(self.cell[2], self.cell[0])
 
-        diag = np.diag(self.cell)
-        #print(np.ceil(cutoff/diag*2.))
-        return tuple(int(i) for i in np.ceil(cutoff/diag*2.))
+        volume = dot(self.cell[0], b_cross_c)
+
+        widths = [volume / norm(b_cross_c),
+                  volume / norm(c_cross_a),
+                  volume / norm(a_cross_b)]
+
+        return tuple(int(ceil(2*cutoff/x)) for x in widths)
 
     def orthogonal_transformation(self):
         """Compute the transformation from the original unit cell to a supercell which
