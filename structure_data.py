@@ -2007,15 +2007,15 @@ class Cell(object):
         is not considering the 'unit cell' for each cell dimension.
 
         """
-        a_cross_b = cross(self.cell[0], self.cell[1])
-        b_cross_c = cross(self.cell[1], self.cell[2])
-        c_cross_a = cross(self.cell[2], self.cell[0])
+        a_cross_b = np.cross(self.cell[0], self.cell[1])
+        b_cross_c = np.cross(self.cell[1], self.cell[2])
+        c_cross_a = np.cross(self.cell[2], self.cell[0])
 
-        volume = dot(self.cell[0], b_cross_c)
+        #volume = np.dot(self.cell[0], b_cross_c)
 
-        widths = [volume / norm(b_cross_c),
-                  volume / norm(c_cross_a),
-                  volume / norm(a_cross_b)]
+        widths = [np.dot(self.cell[0], b_cross_c) / norm(b_cross_c),
+                  np.dot(self.cell[1], c_cross_a) / norm(c_cross_a),
+                  np.dot(self.cell[2], a_cross_b) / norm(a_cross_b)]
 
         return tuple(int(ceil(2*cutoff/x)) for x in widths)
 
