@@ -2013,11 +2013,11 @@ class Cell(object):
 
         #volume = np.dot(self.cell[0], b_cross_c)
 
-        widths = [np.dot(self.cell[0], b_cross_c) / norm(b_cross_c),
-                  np.dot(self.cell[1], c_cross_a) / norm(c_cross_a),
-                  np.dot(self.cell[2], a_cross_b) / norm(a_cross_b)]
+        widths = [np.dot(self.cell[0], b_cross_c) / np.linalg.norm(b_cross_c),
+                  np.dot(self.cell[1], c_cross_a) / np.linalg.norm(c_cross_a),
+                  np.dot(self.cell[2], a_cross_b) / np.linalg.norm(a_cross_b)]
 
-        return tuple(int(ceil(2*cutoff/x)) for x in widths)
+        return tuple(int(math.ceil(2*cutoff/x)) for x in widths)
 
     def orthogonal_transformation(self):
         """Compute the transformation from the original unit cell to a supercell which
