@@ -22,7 +22,6 @@ class CIF(object):
         loopread = False
         blockread = False
         self.block_order = []
-
         for line in filelines:
             #line=line.replace("\n", "")
             # why not strip here?
@@ -55,14 +54,12 @@ class CIF(object):
                     key, val = line.strip().split()
                 except ValueError:
                     key, val = line.strip().split()[:2]
-                if val.endswith("(0)"):
-                    val = val[:-3]
                 self.add_data(block, **{key.strip():self.general_label(val)})
             
             if blockread and (line.startswith("loop_") or line.startswith("_") or not line):
                 blockread = False
 
-            if line == "loop_":
+            if line == "loop_" or line == "loop":
                 loopcount += 1
                 loopentries[loopcount] = []
                 loopread = True
