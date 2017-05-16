@@ -1457,6 +1457,16 @@ class MolecularGraph(nx.Graph):
         cliques.sort(key=len)
         return cliques[-1] 
 
+# END MolecularGraph class
+
+# New class to extend MolecularGraph and turn it into a slab
+class SlabGraph(MolecularGraph):
+    def __init__(self):
+        pass
+    
+    def __str__(self):
+        pass
+
 def del_parenth(string):
     return re.sub(r'\([^)]*\)', '' , string)
 
