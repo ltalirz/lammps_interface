@@ -521,7 +521,7 @@ class MolecularGraph(nx.Graph):
                 except nx.exception.NetworkXNoPath:
                     pass
                 self.add_edge(node, n, **edge)
-                #FIXME MW edit to only store cycles < len(10)
+                #FIXME MW edit to only store cycles < len(20)
                 # should be a harmless edit but maybe need to test
                 if(len(cycle) <= 10):
                     cycles += cycle
@@ -576,10 +576,18 @@ class MolecularGraph(nx.Graph):
         # convert to aromatic
         # probably not a good test for aromaticity..
         arom = set(["C", "N", "O", "S"])
+        # NOTE MW adding Si so that cycles are identified in zeolites
+        arom_zeo = set(["O", "S", "Si"])
         for cycle in cycles:
             elements = [self.node[k]['element'] for k in cycle]
             neigh = [self.degree(k) for k in cycle]
             if np.all(np.array(neigh) <= 3) and set(elements) <= arom:
+                for a in cycle:
+                    self.node[a]['hybridization'] = 'aromatic'
+                    self.node[a]['cycle'] = True
+                    self.node[a]['rings'].append(cycle)
+            # also need to check about zeolite rings
+            elif np.all(np.array(neigh) <= 4) and set(elements) <= arom_zeo:
                 for a in cycle:
                     self.node[a]['hybridization'] = 'aromatic'
                     self.node[a]['cycle'] = True
@@ -1457,15 +1465,130 @@ class MolecularGraph(nx.Graph):
         cliques.sort(key=len)
         return cliques[-1] 
 
+
 # END MolecularGraph class
 
 # New class to extend MolecularGraph and turn it into a slab
 class SlabGraph(MolecularGraph):
-    def __init__(self):
-        pass
+    def __init__(self,graph):
+        self.slabgraph=graph
     
     def __str__(self):
         pass
+
+    def check_if_zeolite(self):
+
+        zeo_types = set(["Si","O","Al"])
+        for node, data in self.slabgraph.nodes_iter(data=True):
+            if(set(data['element'])>zeo_types):
+                print("Warning! Structure determined not to be zeolite! Undefined behavior...")
+
+
+    def condense_graph(self):
+        """
+        If we have a zeolite graph, condense it to a Si only graph
+        """
+
+        # store the node indices of all removed O's
+        self.removed_nodes = set()
+        self.removed_edges = set()
+        self.added_edges = set()
+
+        for node, data in self.slabgraph.nodes_iter(data=True):
+            if(data['element']=="O"): 
+
+                neighbors=self.slabgraph.neighbors(node)
+
+
+                if(len(neighbors)==2):
+                    # normal O coordination environment
+                    # remove both edges to Si
+                    self.removed_edges.add((neighbors[0],node))
+                    self.removed_edges.add((neighbors[1],node))
+                
+                    # create an edge between the adjacent Si
+                    self.added_edges.add((neighbors[0],neighbors[1]))
+                elif(len(neighbors)==1):
+                    # the arbitrary initial slab config can have dangling O's
+                    # remove both edges to Si
+                    self.removed_edges.add((neighbors[0],node))
+
+                    # no edge to add to the all Si graph
+                else:
+                    # a disconnected O existed in the intial ase truncation
+                    # do nothing but remove the node
+                    pass
+                
+                # remove the O node
+                self.removed_nodes.add(node)
+
+        # remove Si-O or Al-O edges
+        for edge in self.removed_edges:
+            self.slabgraph.remove_edge(edge[0],edge[1])            
+    
+            # the sorted edge dict is used by write_CIF but IS NOT updated when modifying
+            # the Nx graph data structure, hence we need to manually add here
+            del self.slabgraph.sorted_edge_dict[(edge[0],edge[1])]
+            del self.slabgraph.sorted_edge_dict[(edge[1],edge[0])]
+            #if(edge[0]<edge[1]):
+            #    del self.slabgraph.sorted_edge_dict[(edge[0],edge[1])]
+            #else:
+            #    del self.slabgraph.sorted_edge_dict[(edge[1],edge[0])]
+
+        # Add Si-Si/Si-Al/Al-Al,etc edges
+        edge_data={ 'order':1, 'length': 4.0, 'symflag':'--' } 
+        for edge in self.added_edges:
+            self.slabgraph.add_edge(*edge,attr_dict=edge_data)
+
+            # the sorted edge dict is used by write_CIF but IS NOT updated when modifying
+            # the Nx graph data structure, hence we need to manually add here
+            if(edge[0]<edge[1]):
+                self.slabgraph.sorted_edge_dict[(edge[0],edge[1])] = edge
+            else:
+                self.slabgraph.sorted_edge_dict[(edge[1],edge[0])] = edge
+
+        # Remove Si nodes
+        for node in self.removed_nodes:
+            self.slabgraph.remove_node(node)
+
+        #print((193,232) in self.removed_edges)
+        #print((232,193) in self.removed_edges)
+        #print((193,232) in self.added_edges)
+        #print((232,193) in self.added_edges)
+        #print((193,232) in self.slabgraph.sorted_edge_dict)
+        #print((232,193) in self.slabgraph.sorted_edge_dict)
+        #print(self.slabgraph.sorted_edge_dict[(232,193)])
+        #print((80,216) in self.slabgraph.sorted_edge_dict)
+        #print((216,80) in self.slabgraph.sorted_edge_dict)
+        # if necessary recompute cycle properties
+        self.slabgraph.compute_init_typing()
+      
+        print(self.slabgraph.name)      
+
+    def write_slabgraph_cif(self,cell):
+        write_CIF(self.slabgraph,cell)
+
+    def enumerate_all_primitive_rings(self):
+        """
+        Iterate through all minimal cycles and get statistics
+        """
+
+        max_cycle_length=0
+        min_cycle_length=1000000
+        total_rings=0
+        for node, data in self.slabgraph.nodes_iter(data=True):
+            print("Node %d is a part of all cycles:"%(node))
+            for ring in data['rings']:
+                print(ring)
+                if(len(ring) > max_cycle_length):
+                    max_cycle_length=len(ring)
+                if(len(ring) < min_cycle_length):
+                    min_cycle_length=len(ring)
+                total_rings+=1
+
+        print("Min cycle length: " + str(min_cycle_length))
+        print("Max cycle length: " + str(max_cycle_length))
+        print("Total rings: "      + str(total_rings))
 
 def del_parenth(string):
     return re.sub(r'\([^)]*\)', '' , string)
