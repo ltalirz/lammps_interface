@@ -1,6 +1,6 @@
 import numpy as np
 from water_models import SPC_E_atoms, TIP3P_atoms, TIP4P_atoms, TIP5P_atoms
-from gas_models import EPM2_atoms, N2_TraPPE_atoms
+from gas_models import EPM2_atoms, TraPPE_atoms
 from structure_data import MolecularGraph
 import networkx as nx
 
@@ -339,6 +339,95 @@ class Water(Molecule):
             elif n == 5:
                 self.node[n]['cartesian_coordinates'] = self.dummy[1]
 
+class SPC_E_Water(Water):
+    ROH = 1.0000
+    HOH = 109.47
+    
+    def __init__(self, **kwargs):
+        """ Class that provides a template molecule for TIP3P Water.
+
+        Geometric features are evaluated to ensure the proper
+        configuration to support TIP3P 
+
+        Initially set up a default TIP3P water configuration,
+        then update if needed if superposing a TIP3P particle
+        on an existing water.
+
+        """
+        nx.Graph.__init__(self, **kwargs)
+        self.O_coord = np.array([0., 0., 0.])
+        self.rigid = True
+        for idx, ff_type in enumerate(["OW", "HW", "HW"]):
+
+            element = ff_type[0]
+            if idx == 0:
+                coord = self.O_coord
+            elif idx == 1:
+                coord = self.H_coord[0]
+            elif idx == 2:
+                coord = self.H_coord[1]
+            data = ({"mass":SPC_E_atoms[ff_type][0],
+                     "charge":SPC_E_atoms[ff_type][3],
+                     "molid":1,
+                     "element":element,
+                     "force_field_type":ff_type,
+                     "h_bond_donor":False,
+                     "h_bond_potential":None,
+                     "tabulated_potential":None,
+                     "table_potential":None,
+                     "cartesian_coordinates":coord
+                     })
+            self.add_node(idx+1, **data)
+    # no dummies in SPC_E, but this needs to be here to make the water
+    # template work.
+    @property
+    def dummy(self):
+        return 
+
+class TIP3P_Water(Water):
+    ROH = 0.9572
+    HOH = 104.52
+    
+    def __init__(self, **kwargs):
+        """ Class that provides a template molecule for TIP3P Water.
+
+        Geometric features are evaluated to ensure the proper
+        configuration to support TIP3P 
+
+        Initially set up a default TIP3P water configuration,
+        then update if needed if superposing a TIP3P particle
+        on an existing water.
+
+        """
+        nx.Graph.__init__(self, **kwargs)
+        self.O_coord = np.array([0., 0., 0.])
+        self.rigid = True
+        for idx, ff_type in enumerate(["OW", "HW", "HW"]):
+
+            element = ff_type[0]
+            if idx == 0:
+                coord = self.O_coord
+            elif idx == 1:
+                coord = self.H_coord[0]
+            elif idx == 2:
+                coord = self.H_coord[1]
+            data = ({"mass":TIP3P_atoms[ff_type][0],
+                     "charge":TIP3P_atoms[ff_type][3],
+                     "molid":1,
+                     "element":element,
+                     "force_field_type":ff_type,
+                     "h_bond_donor":False,
+                     "h_bond_potential":None,
+                     "tabulated_potential":None,
+                     "table_potential":None,
+                     "cartesian_coordinates":coord
+                     })
+            self.add_node(idx+1, **data)
+    # no dummies in TIP3P, but this needs to be here to make the water
+    # template work.
+    @property
+    def dummy(self):
+        return 
 
 class TIP4P_Water(Water):
     ROH = 0.9572
@@ -517,6 +606,52 @@ class EPM2_CO2(CO2):
         self.add_edge(1, 3, key=self.number_of_edges()+1, **kw)
         self.compute_all_angles()
 
+class CO2_TraPPE(CO2):
+    RCO = 1.160
+    def __init__(self, **kwargs):
+        """ TraPPE CO2 particle
+
+        """
+        nx.Graph.__init__(self, **kwargs)
+        MolecularGraph.__init__(self)
+        self.rigid = True
+        self.C_coord = np.array([0., 0., 0.])
+        
+        for idx, ff_type in enumerate(["Cx", "Ox", "Ox"]):
+            element = ff_type[0]
+            if idx == 0:
+                coord = self.C_coord
+            elif idx == 1:
+                coord = self.O_coord[0]
+            elif idx == 2:
+                coord = self.O_coord[1]
+            data = ({"mass":EPM2_atoms[ff_type][0],
+                     "charge":EPM2_atoms[ff_type][3],
+                     "molid":1,
+                     "element":element,
+                     "force_field_type":ff_type,
+                     "h_bond_donor":False,
+                     "h_bond_potential":None,
+                     "tabulated_potential":None,
+                     "table_potential":None,
+                     "cartesian_coordinates":coord
+                     })
+            self.add_node(idx+1, **data)
+
+        flag = "1_555"
+        kw = {}
+        kw.update({'length':self.RCO})
+        kw.update({'weight': 1})
+        kw.update({'order': 2})
+        kw.update({'symflag': flag})
+        kw.update({'potential': None})
+        
+        self.sorted_edge_dict.update({(1,2): (1, 2), (2, 1):(1, 2)})
+        self.sorted_edge_dict.update({(1,3): (1, 3), (3, 1):(1, 3)})
+        self.add_edge(1, 2, key=self.number_of_edges()+1, **kw) 
+        self.add_edge(1, 3, key=self.number_of_edges()+1, **kw)
+        self.compute_all_angles()
+
 class N2_TraPPE(N2):
     RNN = 1.10
 
@@ -530,7 +665,7 @@ class N2_TraPPE(N2):
         self.rigid = True
         self.M_coord = np.array([0., 0., 0.])
 
-        for idx, ff_type in enumerate(["X", "Nx", "Nx"]):
+        for idx, ff_type in enumerate(["Xn", "Nx", "Nx"]):
             element = ff_type[0]
             if idx == 0:
                 coord = self.M_coord
@@ -538,8 +673,8 @@ class N2_TraPPE(N2):
                 coord = self.N_coord[0]
             elif idx == 2:
                 coord = self.N_coord[1]
-            data = ({"mass":N2_TraPPE_atoms[ff_type][0],
-                     "charge":N2_TraPPE_atoms[ff_type][3],
+            data = ({"mass":TraPPE_atoms[ff_type][0],
+                     "charge":TraPPE_atoms[ff_type][3],
                      "molid":1,
                      "element":element,
                      "force_field_type":ff_type,
