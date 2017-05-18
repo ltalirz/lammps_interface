@@ -19,6 +19,9 @@ from uff import UFF_DATA
 import networkx as nx
 import operator
 
+from stoerwagnercustom import stoer_wagner_custom
+from writeNodesEdges import writeObjects
+
 try:
     import networkx as nx
     from networkx.algorithms import approximation
@@ -1472,6 +1475,9 @@ class MolecularGraph(nx.Graph):
 class SlabGraph(MolecularGraph):
     def __init__(self,graph):
         self.slabgraph=graph
+        #a=0,b=1,c=2
+        self.vacuum_direc=2
+        self.num_nodes=self.slabgraph.number_of_nodes()
     
     def __str__(self):
         pass
@@ -1483,6 +1489,32 @@ class SlabGraph(MolecularGraph):
             if(set(data['element'])>zeo_types):
                 print("Warning! Structure determined not to be zeolite! Undefined behavior...")
 
+    def draw_slabgraph(self):
+        numberNodes, numberEdges = 100, 500
+        H = nx.gnm_random_graph(numberNodes,numberEdges)
+        #print 'nodes:', H.nodes()
+        #print 'edges:', H.edges()
+        # return a dictionary of positions keyed by node
+        pos = nx.random_layout(H,dim=3)
+        # convert to list of positions (each is a list)
+        xyz = [list(pos[i]) for i in pos]
+        print(xyz)
+        degree = H.degree().values()
+        print(H.edges())
+        print(degree)
+
+        degree=[]
+        xyz=[]
+        for node,data in self.slabgraph.nodes_iter(data=True):
+            print(data['cartesian_coordinates'])
+            xyz.append(list(data['cartesian_coordinates']))
+            if(data['element']=="Si"):
+                degree.append(5)
+            elif(data['element']=="X"):
+                degree.append(20)
+        writeObjects(xyz, edges=self.slabgraph.edges(), scalar=degree, name='degree', fileout='network')    
+        print(type(xyz))
+        print(type(xyz[0]))
 
     def condense_graph(self):
         """
@@ -1565,6 +1597,191 @@ class SlabGraph(MolecularGraph):
       
         print(self.slabgraph.name)      
 
+    def normalize_bulk_edge_weights(self):
+        """
+        Make sure weight for all existing edges in graph is 1
+        """
+
+        for n1,n2,data in self.slabgraph.edges_iter(data=True):
+            self.slabgraph[n1][n2]['weight']=1
+
+
+    def identify_undercoordinated_surface_nodes(self):
+
+        self.surface_nodes=[]
+        self.surface_nodes_0=[]
+        self.surface_nodes_max=[]
+        self.bulk_nodes=[]
+
+        for node,data in self.slabgraph.nodes_iter(data=True):
+            if(data['element']=="O"):
+                print("Error! O's have to be removed from graph first")
+
+            neighbors=self.slabgraph.neighbors(node)
+
+            if(len(neighbors)<4):
+                self.surface_nodes.append(node)
+                data['element']='X'
+                # For now rough approximation to distinguish nodes between the 2 surfaces
+                # TODO better
+                if(self.vacuum_direc==0):
+                    if(float(data['_atom_site_fract_x'])<0.5):
+                        self.surface_nodes_0.append(node)
+                    else:
+                        self.surface_nodes_max.append(node)
+                elif(self.vacuum_direc==1):
+                    if(float(data['_atom_site_fract_y'])<0.5):
+                        self.surface_nodes_0.append(node)
+                    else:
+                        self.surface_nodes_max.append(node)
+                elif(self.vacuum_direc==2):
+                    if(float(data['_atom_site_fract_z'])<0.5):
+                        self.surface_nodes_0.append(node)
+                    else:
+                        self.surface_nodes_max.append(node)
+            else:
+                self.bulk_nodes.append(node)
+
+    def connect_super_surface_nodes(self):
+        """
+        Choose the first node on surface "0"
+        Connect all other surface_0->bulk connections to this first node
+        Remove all other surface_0 nodes
+        """
+
+        self.super_surface_node_0=self.surface_nodes_0[0]
+        print("First node listed on 0 surface = %s%d"%(self.slabgraph.node[self.super_surface_node_0]['element'],
+                                                       self.super_surface_node_0))
+
+        for i in range(1,len(self.surface_nodes_0)):
+            n1=self.surface_nodes_0[i]
+            for n2 in self.slabgraph.neighbors(n1):
+                if(n2 in self.bulk_nodes):
+                    edge=(self.super_surface_node_0,n2)
+                    self.slabgraph.add_edge(*edge,weight=1)
+    
+            self.slabgraph.remove_node(n1)
+        
+    
+        self.super_surface_node_max=self.surface_nodes_max[0]
+        print("First node listed on max surface = %s%d"%(self.slabgraph.node[self.super_surface_node_max]['element'],
+                                                         self.super_surface_node_max))
+
+        for i in range(1,len(self.surface_nodes_max)):
+            n1=self.surface_nodes_max[i]
+            for n2 in self.slabgraph.neighbors(n1):
+                if(n2 in self.bulk_nodes):
+                    edge=(self.super_surface_node_max,n2)
+                    self.slabgraph.add_edge(*edge,weight=1)
+    
+            self.slabgraph.remove_node(n1)
+           
+        print("Neighbors of 214: %s"%str(self.slabgraph.neighbors(214))) 
+                    
+    def create_slab_tree(self):
+        """
+        Turn the slabgraph into a tree
+        """
+
+        self.slabgraphtree = nx.bfs_tree(self.slabgraph, self.super_surface_node_0)
+        self.iterative_BFS_tree_structure(self.super_surface_node_0)
+
+    def iterative_BFS_tree_structure(self, v):                                  
+        """                                                                     
+        Construct a dict with key that indexes depth of BFS tree,               
+        and the value is a set of all nodes at that depth                       
+        """                                                                     
+        print("\n\nPRINTING SLAB GRAPH AT EACH LEVEL OF TREE DEPTH")                       
+        print("--------------------------------------")                         
+                                                                                
+                                                                                
+        # intitialize first level                                               
+        stack = set()                                                           
+        stack.add(v)                                                            
+        curr_depth = 0                                                          
+                                                                                
+        self.BFS_tree_dict = {                                                  
+                                curr_depth: set(stack)                          
+                             }                                                  
+                                                                                
+        curr_depth += 1                                                         
+                                                                                
+                                                                                
+        # Move through every depth level in tree                                
+        while(len(stack) != 0):                                                 
+                                                                                
+            # iterate over all up_nodes in stack                                
+            for up_node in stack.copy():                                        
+                                                                                
+                # get all down nodes from this up_node                          
+                for down_node in self.slabgraphtree.successors_iter(up_node):            
+                    stack.add(down_node)                                        
+                                                                                
+                # after we've gotten all down nodes, remove this up node        
+                stack.remove(up_node)                                           
+                                                                                
+            # add this depth and all nodes to the graph                         
+            if(len(stack) != 0):                                                
+                self.BFS_tree_dict[curr_depth] = set(stack)                     
+                curr_depth += 1                                                 
+                                                                                
+                                                                                
+                                                                                
+        print("Depth of BFS tree: " + str(len(self.BFS_tree_dict.keys())))      
+        for i in range(len(self.BFS_tree_dict.keys())):                         
+            print("Level " + str(i) + ": " + str(len(self.BFS_tree_dict[i])))   
+            print(self.BFS_tree_dict[i])
+
+        for edge in self.slabgraphtree.edges_iter():
+            self.slabgraphtree.edge[edge[0]][edge[1]]['capacity']=1.0
+            #print(edge)
+            #print(self.slabgraphtree.edge[edge[0]][edge[1]]['capacity'])
+
+ 
+
+
+
+    def add_surface_edges(self):
+        """
+        Make sure all existing edges in graph have weight of 1
+        Add weights of infinity to all "surface edges in graph"
+        """
+
+        self.surface_edges=[]
+
+        edge_data={ 'order':1000000, 'length': 4.0, 'symflag':'--' } 
+        for i in range(1,len(self.surface_nodes)):
+            edge=(self.surface_nodes[0],self.surface_nodes[i])
+            self.surface_edges.append(edge)
+            self.slabgraph.add_edge(*edge,weight=1000000,attr_dict=edge_data)
+
+
+    def add_bulk_loop_edges(self):
+        """
+        If node is not a surface node, add a loop to itself with high weight
+        """
+        self.bulk_loop_edges=[]
+        edge_data={ 'order':1000000, 'length': 4.0, 'symflag':'--' } 
+        for i in range(0,len(self.bulk_nodes)):
+            edge=(self.bulk_nodes[i],self.surface_nodes[0])
+            self.bulk_loop_edges.append(edge)
+            self.slabgraph.add_edge(*edge,weight=1000000,attr_dict=edge_data)
+
+
+    def stoer_wagner_slab_cut(self):
+        cut_value, partition = stoer_wagner_custom(self.slabgraph)
+        print(cut_value)        
+        print(partition)
+
+
+    def stoer_wagner_slab_tree_cut(self):
+        cut_value, partition = nx.minimum_cut(self.slabgraphtree,
+                                              self.super_surface_node_0,
+                                              self.super_surface_node_max)
+        print(cut_value)        
+        print(partition)
+
+
     def write_slabgraph_cif(self,cell):
         write_CIF(self.slabgraph,cell)
 
@@ -1589,6 +1806,9 @@ class SlabGraph(MolecularGraph):
         print("Min cycle length: " + str(min_cycle_length))
         print("Max cycle length: " + str(max_cycle_length))
         print("Total rings: "      + str(total_rings))
+
+
+# END SLAB GRAPH CLASS
 
 def del_parenth(string):
     return re.sub(r'\([^)]*\)', '' , string)
