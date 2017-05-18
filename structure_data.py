@@ -1499,22 +1499,35 @@ class SlabGraph(MolecularGraph):
         # convert to list of positions (each is a list)
         xyz = [list(pos[i]) for i in pos]
         print(xyz)
+        print(type(xyz))
+        print(type(xyz[0]))
+        print(type(xyz[0][0]))
         degree = H.degree().values()
-        print(H.edges())
-        print(degree)
+        print(type(degree))
+        print(type(degree[0]))
+        writeObjects(xyz, edges=H.edges(), scalar=degree, name='degree', fileout='network')    
 
         degree=[]
         xyz=[]
         for node,data in self.slabgraph.nodes_iter(data=True):
-            print(data['cartesian_coordinates'])
+            #print(data['cartesian_coordinates'])
             xyz.append(list(data['cartesian_coordinates']))
             if(data['element']=="Si"):
                 degree.append(5)
             elif(data['element']=="X"):
                 degree.append(20)
-        writeObjects(xyz, edges=self.slabgraph.edges(), scalar=degree, name='degree', fileout='network')    
+        #writeObjects(xyz, edges=self.slabgraph.edges(), scalar=degree, name='degree', fileout='network')    
         print(type(xyz))
         print(type(xyz[0]))
+        print(type(xyz[0][0]))
+        print(type(degree))
+        print(type(degree[0]))
+
+        f=open('test.xyz','w')
+        f.write("%d\n\n"%(len(xyz)))
+        for elem in xyz:
+            f.write("Si %.5f %.5f %.5f\n"%(elem[0],elem[1],elem[2]))
+        f.close()
 
     def condense_graph(self):
         """
@@ -1522,9 +1535,9 @@ class SlabGraph(MolecularGraph):
         """
 
         # store the node indices of all removed O's
-        self.removed_nodes = set()
-        self.removed_edges = set()
-        self.added_edges = set()
+        self.removed_nodes = nx.Graph()
+        self.removed_edges = []
+        self.added_edges = []
 
         for node, data in self.slabgraph.nodes_iter(data=True):
             if(data['element']=="O"): 
@@ -1535,15 +1548,15 @@ class SlabGraph(MolecularGraph):
                 if(len(neighbors)==2):
                     # normal O coordination environment
                     # remove both edges to Si
-                    self.removed_edges.add((neighbors[0],node))
-                    self.removed_edges.add((neighbors[1],node))
+                    self.removed_edges.append((neighbors[0],node))
+                    self.removed_edges.append((neighbors[1],node))
                 
                     # create an edge between the adjacent Si
-                    self.added_edges.add((neighbors[0],neighbors[1]))
+                    self.added_edges.append((neighbors[0],neighbors[1]))
                 elif(len(neighbors)==1):
                     # the arbitrary initial slab config can have dangling O's
                     # remove both edges to Si
-                    self.removed_edges.add((neighbors[0],node))
+                    self.removed_edges.append((neighbors[0],node))
 
                     # no edge to add to the all Si graph
                 else:
@@ -1552,7 +1565,7 @@ class SlabGraph(MolecularGraph):
                     pass
                 
                 # remove the O node
-                self.removed_nodes.add(node)
+                self.removed_nodes.add_node(node,data)
 
         # remove Si-O or Al-O edges
         for edge in self.removed_edges:
@@ -1593,7 +1606,9 @@ class SlabGraph(MolecularGraph):
         #print((80,216) in self.slabgraph.sorted_edge_dict)
         #print((216,80) in self.slabgraph.sorted_edge_dict)
         # if necessary recompute cycle properties
-        self.slabgraph.compute_init_typing()
+
+        # TODO if we want to take some cycle building based approach
+        #self.slabgraph.compute_init_typing()
       
         print(self.slabgraph.name)      
 
@@ -1646,45 +1661,89 @@ class SlabGraph(MolecularGraph):
         """
         Choose the first node on surface "0"
         Connect all other surface_0->bulk connections to this first node
+        Each added node has weight 1 
         Remove all other surface_0 nodes
         """
 
         self.super_surface_node_0=self.surface_nodes_0[0]
-        print("First node listed on 0 surface = %s%d"%(self.slabgraph.node[self.super_surface_node_0]['element'],
-                                                       self.super_surface_node_0))
-
+        print("First node listed on 0 surface = %s%d"%(
+            self.slabgraph.node[self.super_surface_node_0]['element'],
+            self.super_surface_node_0))
+        num_connected_to_0=0
         for i in range(1,len(self.surface_nodes_0)):
             n1=self.surface_nodes_0[i]
+            #print("Surface node: %d"%n1)
             for n2 in self.slabgraph.neighbors(n1):
                 if(n2 in self.bulk_nodes):
+                    #print("Bulk node: %d"%n2)
                     edge=(self.super_surface_node_0,n2)
-                    self.slabgraph.add_edge(*edge,weight=1)
+                    # instead of adding duplicate edges, increase edge weight
+                    if edge not in self.slabgraph.edges():
+                        self.slabgraph.add_edge(*edge,weight=1)
+                    else:
+                        self.slabgraph[edge[0]][edge[1]]['weight']+=1
+                    num_connected_to_0+=1
     
             self.slabgraph.remove_node(n1)
+
+        # calculate total weight along the super node
+        self.super_surface_node_0_weight=0 
+        for node in self.slabgraph.neighbors(self.super_surface_node_0):
+            self.super_surface_node_0_weight+=\
+                self.slabgraph[self.super_surface_node_0][node]['weight']
+
+        print("%d edges added to super_surface_node_0"%(num_connected_to_0))
+        print("edges to super_surface_node_max: %s"%\
+              str(self.slabgraph.edges(self.super_surface_node_0,data=True)))
+        print("%d neighbors of super_surface_node_max"%\
+              (len(self.slabgraph.neighbors(self.super_surface_node_0))))
+        print("Total weight out: %d"%self.super_surface_node_0_weight)
+
         
     
         self.super_surface_node_max=self.surface_nodes_max[0]
-        print("First node listed on max surface = %s%d"%(self.slabgraph.node[self.super_surface_node_max]['element'],
-                                                         self.super_surface_node_max))
+        print("First node listed on max surface = %s%d"%\
+              (self.slabgraph.node[self.super_surface_node_max]['element'],
+              self.super_surface_node_max))
 
+        num_connected_to_max=0
         for i in range(1,len(self.surface_nodes_max)):
             n1=self.surface_nodes_max[i]
             for n2 in self.slabgraph.neighbors(n1):
                 if(n2 in self.bulk_nodes):
                     edge=(self.super_surface_node_max,n2)
-                    self.slabgraph.add_edge(*edge,weight=1)
+                    # instead of adding duplicate edges, increase edge weight
+                    if edge not in self.slabgraph.edges():
+                        self.slabgraph.add_edge(*edge,weight=1)
+                    else:
+                        self.slabgraph[edge[0]][edge[1]]['weight']+=1
+                    num_connected_to_max+=1
     
             self.slabgraph.remove_node(n1)
-           
+
+        # calculate total weight along the super node
+        self.super_surface_node_max_weight=0 
+        for node in self.slabgraph.neighbors(self.super_surface_node_max):
+            self.super_surface_node_max_weight+=\
+                self.slabgraph[self.super_surface_node_max][node]['weight']
+
+        print("%d edges added to super_surface_node_max"%(num_connected_to_max))
+        print("edges to super_surface_node_0: %s"%\
+              str(self.slabgraph.edges(self.super_surface_node_max)))
+        print("%d neighbors of super_surface_node_max"%\
+              (len(self.slabgraph.neighbors(self.super_surface_node_max))))
+        print("Total weight out: %d"%self.super_surface_node_max_weight)
+
+
         print("Neighbors of 214: %s"%str(self.slabgraph.neighbors(214))) 
                     
     def create_slab_tree(self):
         """
         Turn the slabgraph into a tree
         """
-
         self.slabgraphtree = nx.bfs_tree(self.slabgraph, self.super_surface_node_0)
         self.iterative_BFS_tree_structure(self.super_surface_node_0)
+
 
     def iterative_BFS_tree_structure(self, v):                                  
         """                                                                     
@@ -1732,12 +1791,38 @@ class SlabGraph(MolecularGraph):
             print("Level " + str(i) + ": " + str(len(self.BFS_tree_dict[i])))   
             print(self.BFS_tree_dict[i])
 
+
+        # Doesn't seem to be a way to override the 1 parent rule in any default
+        # tree generator function in networkx, therefore need to go back in manually
+        for i in range(len(self.BFS_tree_dict.keys())-1):
+            #print("LEvel %d:"%i)
+            for n1 in self.BFS_tree_dict[i]:
+                for n2 in self.BFS_tree_dict[i+1]:
+                    directed_edge=(n1, n2)
+                    rev_directed_edge=(n2, n1)
+                    if(directed_edge not in self.slabgraphtree.edges()):
+                        if(directed_edge in self.slabgraph.edges() or
+                           rev_directed_edge in self.slabgraph.edges()):
+                            #print("Adding directed edge: %s"%str(directed_edge))
+                            self.slabgraphtree.add_edge(*directed_edge)
+
         for edge in self.slabgraphtree.edges_iter():
-            self.slabgraphtree.edge[edge[0]][edge[1]]['capacity']=1.0
+            self.slabgraphtree.edge[edge[0]][edge[1]]['capacity']=\
+                float(self.slabgraph.edge[edge[0]][edge[1]]['weight'])
+
+            # However, if one node in the edge is the super surface node,
+            # reset the capacity to the max weight of the supernode
+            if(edge[0] == self.super_surface_node_0 or \
+               edge[1] == self.super_surface_node_0):
+
+                self.slabgraphtree.edge[edge[0]][edge[1]]['capacity'] = \
+                    self.super_surface_node_0_weight
+            elif(edge[0] == self.super_surface_node_max or \
+                 edge[1] == self.super_surface_node_max):
+                self.slabgraphtree.edge[edge[0]][edge[1]]['capacity'] = \
+                    self.super_surface_node_max_weight
             #print(edge)
             #print(self.slabgraphtree.edge[edge[0]][edge[1]]['capacity'])
-
- 
 
 
 
@@ -1774,12 +1859,137 @@ class SlabGraph(MolecularGraph):
         print(partition)
 
 
+    def kcutsets_slab_cut(self):
+        cutsets = list(nx.all_node_cuts(self.slabgraph))
+        print(len(cutsets))
+        for cutset in cutsets:
+            print(cutset)
+
+    def minimum_edge_slab_cut(self):
+
+        edge_cut_set=nx.minimum_edge_cut(self.slabgraph,
+                                         s=self.super_surface_node_0,
+                                         t=self.super_surface_node_max)
+
+        print(len(edge_cut_set))
+        print(str(edge_cut_set))
+
+    def minimum_edge_slab_tree_cut(self):
+
+        edge_cut_set=nx.minimum_edge_cut(self.slabgraphtree,
+                                         s=self.super_surface_node_0,
+                                         t=self.super_surface_node_max)
+
+        print(len(edge_cut_set))
+        print(str(edge_cut_set))
+
+
     def stoer_wagner_slab_tree_cut(self):
-        cut_value, partition = nx.minimum_cut(self.slabgraphtree,
-                                              self.super_surface_node_0,
-                                              self.super_surface_node_max)
-        print(cut_value)        
-        print(partition)
+
+        print("\n\nStoer-Wagner minimum cut on directed slab graph...")
+        # uses stoer-wagner to do max flow (and indirectly min cut)
+        # given source and target node
+        self.cut_value1, self.partition1 = nx.minimum_cut(
+                self.slabgraphtree,
+                self.super_surface_node_0,
+                self.super_surface_node_max,
+                flow_func=nx.algorithms.flow.shortest_augmenting_path)
+
+        # wichever partition is the biggest is the one we keep
+        # for now I am hoping that the algo always finds the symmetrically unique
+        # cut CLOSEST to either the sink or source node
+        if(len(self.partition1[0])>len(self.partition1[1])):
+            self.keep_partition_1=self.partition1[0].copy()
+            self.remove_partition_1=self.partition1[1].copy()
+        else:
+            self.keep_partition_1=self.partition1[1].copy()
+            self.remove_partition_1=self.partition1[0].copy()
+
+        print("\nForward tree cut value, partiotioning")
+        print(self.cut_value1)        
+        print(self.partition1)
+
+        # now reverse the tree and reverse the source and target nodes
+        self.slabgraphtreeREV=self.slabgraphtree.reverse(copy=True)
+        self.cut_value2, self.partition2 = nx.minimum_cut(
+                self.slabgraphtreeREV,
+                self.super_surface_node_max,
+                self.super_surface_node_0,
+                flow_func=nx.algorithms.flow.shortest_augmenting_path)
+
+        # determine which are the removal/keep partitions
+        if(len(self.partition2[0])>len(self.partition2[1])):
+            self.keep_partition_2=self.partition2[0].copy()
+            self.remove_partition_2=self.partition2[1].copy()
+        else:
+            self.keep_partition_2=self.partition2[1].copy()
+            self.remove_partition_2=self.partition2[0].copy()
+
+        print("\nReverse tree cut value, partiotioning")
+        print(self.cut_value2)        
+        print(self.partition2)
+
+
+    def remove_surface_partitions(self):
+        """
+        Takes two partitions to remove from the slab graph
+        one for each surface
+        """
+
+        
+        self.all_remove = self.remove_partition_1 | self.remove_partition_2
+
+        print("\n\nAll metal nodes to remove:")
+        print(self.all_remove)
+
+        for node in self.all_remove:
+            self.slabgraph.remove_node(node)
+
+    def add_all_connecting_nodes(self):
+       
+        print("\n\nAdd back in the missing O's")
+
+        # these are all the removed oxygens 
+        self.final_added_nodes = set()
+        self.final_added_edges = []
+
+        for edge in self.removed_edges:
+            n1 = edge[0]
+            n2 = edge[1]
+       
+            if n1 in self.slabgraph.nodes():
+                if(n1 not in self.final_added_nodes):
+                    self.slabgraph.add_node(n2, self.removed_nodes.node[n2])
+                    self.final_added_nodes.add(n2)
+                    #print("Added!")
+                    #print(self.slabgraph.node[n2])
+                    #print(self.slabgraph.node[n2]['element'])
+                    #print(self.final_added_nodes)
+            elif n2 in self.slabgraph.nodes():
+                if(n2 not in self.final_added_nodes):
+                    self.slabgraph.add_node(n1, self.removed_nodes.node[n1])
+                    self.final_added_nodes.add(n1)
+                    #print("Added!")
+                    #print(self.slabgraph.node[n1])
+                    #print(self.slabgraph.node[n1]['element'])
+                    #print(self.final_added_nodes)
+
+                
+
+        # NOTE doesn't work
+        #for node in self.removed_nodes:
+        #    # for each neighbor of node in the parent class Molecular Graph
+        #    for neigh in self.neighbors(node):
+        #        if neigh in self.slabgraph.nodes():
+        #            self.final_added_nodes.append(self.graph.get_node(neigh))
+
+
+        #for node in self.final_added_nodes:
+        #    print(node)
+        #    self.slabgraph.add_node(node)
+                    
+
+        
 
 
     def write_slabgraph_cif(self,cell):
