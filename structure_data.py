@@ -1,4 +1,4 @@
-#/usr/bin/env python
+#/isr/bin/env python
 from datetime import date
 import numpy as np
 from scipy.spatial import distance
@@ -1993,7 +1993,7 @@ class SlabGraph(MolecularGraph):
 
 
     def write_slabgraph_cif(self,cell):
-        write_CIF(self.slabgraph,cell)
+        write_CIF(self.slabgraph,cell,bond_block=False)
 
     def enumerate_all_primitive_rings(self):
         """
@@ -2070,7 +2070,7 @@ def from_CIF(cifname):
     mg.cell = cell
     return cell, mg
 
-def write_CIF(graph, cell):
+def write_CIF(graph, cell, bond_block=True):
     """Currently used for debugging purposes"""
     c = CIF(name="%s.debug"%graph.name)
     # data block
@@ -2131,25 +2131,26 @@ def write_CIF(graph, cell):
             c.add_data("atoms", _atom_type_partial_charge="0.0")
     # bond block
     # must re-sort them based on bond type (Mat Sudio)
-    tosort = [(data['order'], (n1, n2, data)) for n1, n2, data in graph.edges_iter2(data=True)]
-    for ord, (n1, n2, data) in sorted(tosort, key=lambda tup: tup[0]):
-        type = CCDC_BOND_ORDERS[data['order']]
-        dist = data['length'] 
-        sym = data['symflag']
+    if(bond_block):
+        tosort = [(data['order'], (n1, n2, data)) for n1, n2, data in graph.edges_iter2(data=True)]
+        for ord, (n1, n2, data) in sorted(tosort, key=lambda tup: tup[0]):
+            type = CCDC_BOND_ORDERS[data['order']]
+            dist = data['length'] 
+            sym = data['symflag']
 
 
-        label1 = "%s%i"%(graph.node[n1]['element'], n1)
-        label2 = "%s%i"%(graph.node[n2]['element'], n2) 
-        c.add_data("bonds", _geom_bond_atom_site_label_1=
-                                    CIF.geom_bond_atom_site_label_1(label1))
-        c.add_data("bonds", _geom_bond_atom_site_label_2=
-                                    CIF.geom_bond_atom_site_label_2(label2))
-        c.add_data("bonds", _geom_bond_distance=
-                                    CIF.geom_bond_distance(dist))
-        c.add_data("bonds", _geom_bond_site_symmetry_2=
-                                    CIF.geom_bond_site_symmetry_2(sym))
-        c.add_data("bonds", _ccdc_geom_bond_type=
-                                    CIF.ccdc_geom_bond_type(type))
+            label1 = "%s%i"%(graph.node[n1]['element'], n1)
+            label2 = "%s%i"%(graph.node[n2]['element'], n2) 
+            c.add_data("bonds", _geom_bond_atom_site_label_1=
+                                        CIF.geom_bond_atom_site_label_1(label1))
+            c.add_data("bonds", _geom_bond_atom_site_label_2=
+                                        CIF.geom_bond_atom_site_label_2(label2))
+            c.add_data("bonds", _geom_bond_distance=
+                                        CIF.geom_bond_distance(dist))
+            c.add_data("bonds", _geom_bond_site_symmetry_2=
+                                        CIF.geom_bond_site_symmetry_2(sym))
+            c.add_data("bonds", _ccdc_geom_bond_type=
+                                        CIF.ccdc_geom_bond_type(type))
     
     print('Output cif file written to %s.cif'%c.name)
     file = open("%s.cif"%c.name, "w")
