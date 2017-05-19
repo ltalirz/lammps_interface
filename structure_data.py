@@ -1529,6 +1529,29 @@ class SlabGraph(MolecularGraph):
             f.write("Si %.5f %.5f %.5f\n"%(elem[0],elem[1],elem[2]))
         f.close()
 
+    def remove_erroneous_disconnected_comps(self):
+        """
+        Remove erroneous disconnected components created by ASE
+        Doesn't happy except for extremely high miller faces w/ASE but nonetheless
+        we should handle it and remove them, and alert the user
+        """
+
+        if not nx.is_connected(self.slabgraph):
+            # get a list of unconnected networks
+            sub_graphs = list(nx.connected_component_subgraphs(self.slabgraph))
+
+            main_graph = sub_graphs[0]
+
+            # find the largest network in that list
+            for sg in sub_graphs:
+                if len(sg.nodes()) > len(main_graph.nodes()):
+                    main_graph = sg
+
+            self.slabgraph = main_graph
+
+            print("WARNING! You passed in a graph with disconnected components...\
+                  Assuming the largest component is the slab and continuing...")
+
     def condense_graph(self):
         """
         If we have a zeolite graph, condense it to a Si only graph
@@ -1573,8 +1596,14 @@ class SlabGraph(MolecularGraph):
     
             # the sorted edge dict is used by write_CIF but IS NOT updated when modifying
             # the Nx graph data structure, hence we need to manually add here
-            del self.slabgraph.sorted_edge_dict[(edge[0],edge[1])]
-            del self.slabgraph.sorted_edge_dict[(edge[1],edge[0])]
+            try:
+                del self.slabgraph.sorted_edge_dict[(edge[0],edge[1])]
+            except:
+                pass
+            try:
+                del self.slabgraph.sorted_edge_dict[(edge[1],edge[0])]
+            except:
+                pass
             #if(edge[0]<edge[1]):
             #    del self.slabgraph.sorted_edge_dict[(edge[0],edge[1])]
             #else:
@@ -1657,6 +1686,8 @@ class SlabGraph(MolecularGraph):
             else:
                 self.bulk_nodes.append(node)
 
+
+
     def connect_super_surface_nodes(self):
         """
         Choose the first node on surface "0"
@@ -1735,76 +1766,86 @@ class SlabGraph(MolecularGraph):
         print("Total weight out: %d"%self.super_surface_node_max_weight)
 
 
-        print("Neighbors of 214: %s"%str(self.slabgraph.neighbors(214))) 
                     
     def create_slab_tree(self):
         """
         Turn the slabgraph into a tree
         """
+        #self.slabgraphtree = nx.bfs_tree(self.slabgraph, self.super_surface_node_0)
         self.slabgraphtree = nx.bfs_tree(self.slabgraph, self.super_surface_node_0)
         self.iterative_BFS_tree_structure(self.super_surface_node_0)
+
+   
 
 
     def iterative_BFS_tree_structure(self, v):                                  
         """                                                                     
         Construct a dict with key that indexes depth of BFS tree,               
         and the value is a set of all nodes at that depth                       
-        """                                                                     
-        print("\n\nPRINTING SLAB GRAPH AT EACH LEVEL OF TREE DEPTH")                       
-        print("--------------------------------------")                         
-                                                                                
-                                                                                
-        # intitialize first level                                               
-        stack = set()                                                           
-        stack.add(v)                                                            
-        curr_depth = 0                                                          
-                                                                                
-        self.BFS_tree_dict = {                                                  
-                                curr_depth: set(stack)                          
-                             }                                                  
-                                                                                
-        curr_depth += 1                                                         
-                                                                                
-                                                                                
-        # Move through every depth level in tree                                
-        while(len(stack) != 0):                                                 
-                                                                                
-            # iterate over all up_nodes in stack                                
-            for up_node in stack.copy():                                        
-                                                                                
-                # get all down nodes from this up_node                          
-                for down_node in self.slabgraphtree.successors_iter(up_node):            
-                    stack.add(down_node)                                        
-                                                                                
-                # after we've gotten all down nodes, remove this up node        
-                stack.remove(up_node)                                           
-                                                                                
-            # add this depth and all nodes to the graph                         
-            if(len(stack) != 0):                                                
-                self.BFS_tree_dict[curr_depth] = set(stack)                     
-                curr_depth += 1                                                 
-                                                                                
-                                                                                
-                                                                                
-        print("Depth of BFS tree: " + str(len(self.BFS_tree_dict.keys())))      
-        for i in range(len(self.BFS_tree_dict.keys())):                         
-            print("Level " + str(i) + ": " + str(len(self.BFS_tree_dict[i])))   
-            print(self.BFS_tree_dict[i])
+        """                                                  
+
+        if(nx.is_tree(self.slabgraphtree)):                   
+            print("\n\nPRINTING SLAB GRAPH AT EACH LEVEL OF TREE DEPTH")                       
+            print("--------------------------------------")                         
+                                                                                    
+                                                                                    
+            # intitialize first level                                               
+            stack = set()                                                           
+            stack.add(v)                                                            
+            curr_depth = 0                                                          
+                                                                                    
+            self.BFS_tree_dict = {                                                  
+                                    curr_depth: set(stack)                          
+                                 }                                                  
+                                                                                    
+            curr_depth += 1                                                         
+                                                                                    
+                                                                                    
+            # Move through every depth level in tree                                
+            while(len(stack) != 0):                                                 
+                                                                                    
+                # iterate over all up_nodes in stack                                
+                for up_node in stack.copy():                                        
+                                                                                    
+                    # get all down nodes from this up_node                          
+                    for down_node in self.slabgraphtree.successors_iter(up_node):            
+                        stack.add(down_node)                                        
+                                                                                    
+                    # after we've gotten all down nodes, remove this up node        
+                    stack.remove(up_node)                                           
+                                                                                    
+                # add this depth and all nodes to the graph                         
+                if(len(stack) != 0):                                                
+                    self.BFS_tree_dict[curr_depth] = set(stack)                     
+                    curr_depth += 1                                                 
+                                                                                    
+                                                                                    
+                                                                                    
+            print("Depth of BFS tree: " + str(len(self.BFS_tree_dict.keys())))      
+            for i in range(len(self.BFS_tree_dict.keys())):                         
+                print("Level " + str(i) + ": " + str(len(self.BFS_tree_dict[i])))   
+                print(self.BFS_tree_dict[i])
 
 
-        # Doesn't seem to be a way to override the 1 parent rule in any default
-        # tree generator function in networkx, therefore need to go back in manually
-        for i in range(len(self.BFS_tree_dict.keys())-1):
-            #print("LEvel %d:"%i)
-            for n1 in self.BFS_tree_dict[i]:
-                for n2 in self.BFS_tree_dict[i+1]:
-                    directed_edge=(n1, n2)
-                    rev_directed_edge=(n2, n1)
-                    if(directed_edge not in self.slabgraphtree.edges()):
-                        if(directed_edge in self.slabgraph.edges() or
-                           rev_directed_edge in self.slabgraph.edges()):
-                            #print("Adding directed edge: %s"%str(directed_edge))
-                            self.slabgraphtree.add_edge(*directed_edge)
+            # Doesn't seem to be a way to override the 1 parent rule in any default
+            # tree generator function in networkx, therefore need to go back in manually
+            for i in range(len(self.BFS_tree_dict.keys())-1):
+                #print("LEvel %d:"%i)
+                for n1 in self.BFS_tree_dict[i]:
+                    for n2 in self.BFS_tree_dict[i+1]:
+                        directed_edge=(n1, n2)
+                        rev_directed_edge=(n2, n1)
+                        if(directed_edge not in self.slabgraphtree.edges()):
+                            if(directed_edge in self.slabgraph.edges() or
+                               rev_directed_edge in self.slabgraph.edges()):
+                                #print("Adding directed edge: %s"%str(directed_edge))
+                                self.slabgraphtree.add_edge(*directed_edge)
+
+        else:
+            # we already have made sure one child can have multiple parents
+            pass
+        
+        self.slabgraphtree=self.slabgraph.to_directed()
 
         for edge in self.slabgraphtree.edges_iter():
             self.slabgraphtree.edge[edge[0]][edge[1]]['capacity']=\
@@ -1821,10 +1862,77 @@ class SlabGraph(MolecularGraph):
                  edge[1] == self.super_surface_node_max):
                 self.slabgraphtree.edge[edge[0]][edge[1]]['capacity'] = \
                     self.super_surface_node_max_weight
+
             #print(edge)
             #print(self.slabgraphtree.edge[edge[0]][edge[1]]['capacity'])
 
 
+    def redirect_slab_tree_by_coordinate_directionality(self,start="min"):
+        """
+        Redirect the edges in the directed version of the slab graph
+        solely based on the fractional coordinate that represents the
+        crystallographic position perpendicular to the surface (parallel to the
+        vacuum)
+
+        if start=='min', the parent node must have a vacuum_coord < child node
+        if start=='max', the parent node must have a vacuum_coord > child node
+        """
+
+        edges_to_reverse=[]
+        for edge in self.slabgraphtree.edges_iter():
+            n1=edge[0]
+            n2=edge[1]
+
+            to_reverse=False
+            
+            if(self.vacuum_direc==0):
+                if(self.slabgraph.node[n1]['_atom_site_fract_x']<
+                   self.slabgraph.node[n2]['_atom_site_fract_x']):
+                    if(start=="max"):
+                        to_reverse=True
+                else:
+                    if(start=="min"):
+                        to_reverse=True
+            elif(self.vacuum_direc==1):
+                if(self.slabgraph.node[n1]['_atom_site_fract_y']<
+                   self.slabgraph.node[n2]['_atom_site_fract_y']):
+                    if(start=="max"):
+                        to_reverse=True
+                else:
+                    if(start=="min"):
+                        to_reverse=True
+            elif(self.vacuum_direc==2):
+                if(self.slabgraph.node[n1]['_atom_site_fract_z']<
+                   self.slabgraph.node[n2]['_atom_site_fract_z']):
+                    if(start=="max"):
+                        to_reverse=True
+                else:
+                    if(start=="min"):
+                        to_reverse=True
+                        
+            # Take special care to ensure the correct directionality each edge 
+            # betweeen the super surface node and the first bulk node
+            if(start=="min"):
+                if(n2 == self.super_surface_node_0):
+                    to_reverse=True
+            elif(start=="max"):
+                if(n1 == self.super_surface_node_max):
+                    to_reverse=True
+    
+            if(to_reverse):
+                data=self.slabgraphtree[n1][n2].copy()
+                edges_to_reverse.append((n1,n2,data))
+
+
+
+        for n1,n2,data in edges_to_reverse:
+            print("Reversing! ",n1,n2, data)
+            self.slabgraphtree.remove_edge(n1,n2)
+            self.slabgraphtree.add_edge(n2,n1,data)
+                        
+            
+    def create_weighted_barrier_in_slab_center(self):
+        pass
 
     def add_surface_edges(self):
         """
@@ -1892,8 +2000,8 @@ class SlabGraph(MolecularGraph):
         self.cut_value1, self.partition1 = nx.minimum_cut(
                 self.slabgraphtree,
                 self.super_surface_node_0,
-                self.super_surface_node_max,
-                flow_func=nx.algorithms.flow.shortest_augmenting_path)
+                self.super_surface_node_max)#,
+                #flow_func=nx.algorithms.flow.shortest_augmenting_path)
 
         # wichever partition is the biggest is the one we keep
         # for now I am hoping that the algo always finds the symmetrically unique
@@ -1907,15 +2015,16 @@ class SlabGraph(MolecularGraph):
 
         print("\nForward tree cut value, partiotioning")
         print(self.cut_value1)        
-        print(self.partition1)
+        print(self.partition1[0])
+        print(self.partition1[1])
 
         # now reverse the tree and reverse the source and target nodes
         self.slabgraphtreeREV=self.slabgraphtree.reverse(copy=True)
         self.cut_value2, self.partition2 = nx.minimum_cut(
                 self.slabgraphtreeREV,
                 self.super_surface_node_max,
-                self.super_surface_node_0,
-                flow_func=nx.algorithms.flow.shortest_augmenting_path)
+                self.super_surface_node_0)#,
+                #flow_func=nx.algorithms.flow.shortest_augmenting_path)
 
         # determine which are the removal/keep partitions
         if(len(self.partition2[0])>len(self.partition2[1])):
@@ -1927,7 +2036,8 @@ class SlabGraph(MolecularGraph):
 
         print("\nReverse tree cut value, partiotioning")
         print(self.cut_value2)        
-        print(self.partition2)
+        print(self.partition2[0])
+        print(self.partition2[1])
 
 
     def remove_surface_partitions(self):
@@ -1989,11 +2099,14 @@ class SlabGraph(MolecularGraph):
         #    self.slabgraph.add_node(node)
                     
 
-        
+    def write_silanol_surface_density(self,cell):
+
+        print("Surface silanol density: %.5f"%(self.cut_value1/(cell.a*cell.b)))
+        print("Surface silanol density: %.5f"%(self.cut_value2/(cell.a*cell.b)))   
 
 
-    def write_slabgraph_cif(self,cell):
-        write_CIF(self.slabgraph,cell,bond_block=False)
+    def write_slabgraph_cif(self,cell,bond_block=True,descriptor="debug"):
+        write_CIF(self.slabgraph,cell,bond_block,descriptor)
 
     def enumerate_all_primitive_rings(self):
         """
@@ -2070,9 +2183,9 @@ def from_CIF(cifname):
     mg.cell = cell
     return cell, mg
 
-def write_CIF(graph, cell, bond_block=True):
+def write_CIF(graph, cell, bond_block=True,descriptor="debug"):
     """Currently used for debugging purposes"""
-    c = CIF(name="%s.debug"%graph.name)
+    c = CIF(name="%s.%s"%(graph.name,descriptor))
     # data block
     c.add_data("data", data_=graph.name)
     c.add_data("data", _audit_creation_date=
