@@ -19,7 +19,6 @@ from uff import UFF_DATA
 import networkx as nx
 import operator
 
-from stoerwagnercustom import stoer_wagner_custom
 from writeNodesEdges import writeObjects
 
 try:
@@ -1962,7 +1961,7 @@ class SlabGraph(MolecularGraph):
 
 
     def stoer_wagner_slab_cut(self):
-        cut_value, partition = stoer_wagner_custom(self.slabgraph)
+        cut_value, partition = nx.stoer_wagner(self.slabgraph)
         print(cut_value)        
         print(partition)
 
