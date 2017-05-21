@@ -19,7 +19,7 @@ from uff import UFF_DATA
 import networkx as nx
 import operator
 
-from writeNodesEdges import writeObjects
+#irom writeNodesEdges import writeObjects
 
 try:
     import networkx as nx
@@ -1488,45 +1488,45 @@ class SlabGraph(MolecularGraph):
             if(set(data['element'])>zeo_types):
                 print("Warning! Structure determined not to be zeolite! Undefined behavior...")
 
-    def draw_slabgraph(self):
-        numberNodes, numberEdges = 100, 500
-        H = nx.gnm_random_graph(numberNodes,numberEdges)
-        #print 'nodes:', H.nodes()
-        #print 'edges:', H.edges()
-        # return a dictionary of positions keyed by node
-        pos = nx.random_layout(H,dim=3)
-        # convert to list of positions (each is a list)
-        xyz = [list(pos[i]) for i in pos]
-        print(xyz)
-        print(type(xyz))
-        print(type(xyz[0]))
-        print(type(xyz[0][0]))
-        degree = H.degree().values()
-        print(type(degree))
-        print(type(degree[0]))
-        writeObjects(xyz, edges=H.edges(), scalar=degree, name='degree', fileout='network')    
+    #def draw_slabgraph(self):
+    #    numberNodes, numberEdges = 100, 500
+    #    H = nx.gnm_random_graph(numberNodes,numberEdges)
+    #    #print 'nodes:', H.nodes()
+    #    #print 'edges:', H.edges()
+    #    # return a dictionary of positions keyed by node
+    #    pos = nx.random_layout(H,dim=3)
+    #    # convert to list of positions (each is a list)
+    #    xyz = [list(pos[i]) for i in pos]
+    #    print(xyz)
+    #    print(type(xyz))
+    #    print(type(xyz[0]))
+    #    print(type(xyz[0][0]))
+    #    degree = H.degree().values()
+    #    print(type(degree))
+    #    print(type(degree[0]))
+    #    writeObjects(xyz, edges=H.edges(), scalar=degree, name='degree', fileout='network')    
 
-        degree=[]
-        xyz=[]
-        for node,data in self.slabgraph.nodes_iter(data=True):
-            #print(data['cartesian_coordinates'])
-            xyz.append(list(data['cartesian_coordinates']))
-            if(data['element']=="Si"):
-                degree.append(5)
-            elif(data['element']=="X"):
-                degree.append(20)
-        #writeObjects(xyz, edges=self.slabgraph.edges(), scalar=degree, name='degree', fileout='network')    
-        print(type(xyz))
-        print(type(xyz[0]))
-        print(type(xyz[0][0]))
-        print(type(degree))
-        print(type(degree[0]))
+    #    degree=[]
+    #    xyz=[]
+    #    for node,data in self.slabgraph.nodes_iter(data=True):
+    #        #print(data['cartesian_coordinates'])
+    #        xyz.append(list(data['cartesian_coordinates']))
+    #        if(data['element']=="Si"):
+    #            degree.append(5)
+    #        elif(data['element']=="X"):
+    #            degree.append(20)
+    #    #writeObjects(xyz, edges=self.slabgraph.edges(), scalar=degree, name='degree', fileout='network')    
+    #    print(type(xyz))
+    #    print(type(xyz[0]))
+    #    print(type(xyz[0][0]))
+    #    print(type(degree))
+    #    print(type(degree[0]))
 
-        f=open('test.xyz','w')
-        f.write("%d\n\n"%(len(xyz)))
-        for elem in xyz:
-            f.write("Si %.5f %.5f %.5f\n"%(elem[0],elem[1],elem[2]))
-        f.close()
+    #    f=open('test.xyz','w')
+    #    f.write("%d\n\n"%(len(xyz)))
+    #    for elem in xyz:
+    #        f.write("Si %.5f %.5f %.5f\n"%(elem[0],elem[1],elem[2]))
+    #    f.close()
 
     def remove_erroneous_disconnected_comps(self):
         """
