@@ -1973,9 +1973,16 @@ def main():
     #sim.slabgraph.redirect_slab_tree_by_coordinate_directionality()
     sim.slabgraph.stoer_wagner_slab_tree_cut(weight_barrier=True)
     sim.slabgraph.remove_surface_partitions()
+
+    # This should give us a visualization of the all si graph
+    #sim.slabgraph.draw_slabgraph()
+
+    # Add back in all missing oxygens
     sim.slabgraph.add_all_connecting_nodes()
 
-    #sim.slabgraph.draw_slabgraph()
+    # add missing hydrogen caps
+    sim.slabgraph.add_missing_hydrogens()
+
     sim.slabgraph.write_slabgraph_cif(cell,bond_block=False,descriptor="deH")
     sim.slabgraph.write_silanol_surface_density(cell)
 

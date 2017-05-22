@@ -19,7 +19,12 @@ from uff import UFF_DATA
 import networkx as nx
 import operator
 
-#irom writeNodesEdges import writeObjects
+try:
+    from writeNodesEdges import writeObjects
+
+except:
+    print("Warning! vtk for python necessary for graph debugging necessary. Code will\
+           ImportError if you try to create a slab")
 
 try:
     import networkx as nx
@@ -1473,6 +1478,7 @@ class MolecularGraph(nx.Graph):
 # New class to extend MolecularGraph and turn it into a slab
 class SlabGraph(MolecularGraph):
     def __init__(self,graph):
+        self.refgraph=graph.copy()
         self.slabgraph=graph
         #a=0,b=1,c=2
         self.vacuum_direc=2
@@ -1488,45 +1494,85 @@ class SlabGraph(MolecularGraph):
             if(set(data['element'])>zeo_types):
                 print("Warning! Structure determined not to be zeolite! Undefined behavior...")
 
-    #def draw_slabgraph(self):
-    #    numberNodes, numberEdges = 100, 500
-    #    H = nx.gnm_random_graph(numberNodes,numberEdges)
-    #    #print 'nodes:', H.nodes()
-    #    #print 'edges:', H.edges()
-    #    # return a dictionary of positions keyed by node
-    #    pos = nx.random_layout(H,dim=3)
-    #    # convert to list of positions (each is a list)
-    #    xyz = [list(pos[i]) for i in pos]
-    #    print(xyz)
-    #    print(type(xyz))
-    #    print(type(xyz[0]))
-    #    print(type(xyz[0][0]))
-    #    degree = H.degree().values()
-    #    print(type(degree))
-    #    print(type(degree[0]))
-    #    writeObjects(xyz, edges=H.edges(), scalar=degree, name='degree', fileout='network')    
+    def reset_node_edge_labelling(self,graph):
 
-    #    degree=[]
-    #    xyz=[]
-    #    for node,data in self.slabgraph.nodes_iter(data=True):
-    #        #print(data['cartesian_coordinates'])
-    #        xyz.append(list(data['cartesian_coordinates']))
-    #        if(data['element']=="Si"):
-    #            degree.append(5)
-    #        elif(data['element']=="X"):
-    #            degree.append(20)
-    #    #writeObjects(xyz, edges=self.slabgraph.edges(), scalar=degree, name='degree', fileout='network')    
-    #    print(type(xyz))
-    #    print(type(xyz[0]))
-    #    print(type(xyz[0][0]))
-    #    print(type(degree))
-    #    print(type(degree[0]))
+        new_graph = graph.copy()
+        pass
+        
 
-    #    f=open('test.xyz','w')
-    #    f.write("%d\n\n"%(len(xyz)))
-    #    for elem in xyz:
-    #        f.write("Si %.5f %.5f %.5f\n"%(elem[0],elem[1],elem[2]))
-    #    f.close()
+    def draw_slabgraph(self):
+
+        print("\n\nAttempting to output graph as VTK file for visualization debugging")
+        numberNodes, numberEdges = 100, 500
+        H = nx.gnm_random_graph(numberNodes,numberEdges)
+        #print 'nodes:', H.nodes()
+        #print 'edges:', H.edges()
+        # return a dictionary of positions keyed by node
+        pos = nx.random_layout(H,dim=3)
+        # convert to list of positions (each is a list)
+        xyz = [list(pos[i]) for i in pos]
+        print(xyz)
+        print(H.edges())
+        print(type(xyz))
+        print(type(xyz[0]))
+        print(type(xyz[0][0]))
+        degree = H.degree().values()
+        print(type(degree))
+        print(degree)
+        #print(type(degree[0]))
+        writeObjects(xyz, edges=H.edges(), scalar=degree, name='degree', fileout='network')    
+
+        degree=[]
+        xyz=[]
+        node_convert_dict={}
+        node_convert_dict_rev={}
+        iterate=0
+        for node,data in self.slabgraph.nodes_iter(data=True):
+            #xyz.append([np.float64(data['cartesian_coordinates'][0]),
+            #            np.float64(data['cartesian_coordinates'][1]),
+            #            np.float64(data['cartesian_coordinates'][2])])
+            xyz.append([np.float64(data['_atom_site_fract_x']),
+                        np.float64(data['_atom_site_fract_y']),
+                        np.float64(data['_atom_site_fract_z'])])
+            if(data['element']=="Si"):
+                degree.append(5)
+            elif(data['element']=="X"):
+                degree.append(20)
+            else:
+                degree.append(1)
+
+            node_convert_dict[iterate]=node
+            node_convert_dict_rev[node]=iterate
+            iterate+=1
+
+        duplicate_edges=[]
+        for edge in self.slabgraph.edges():
+            n1=edge[0]
+            n2=edge[1]
+            duplicate_edges.append((node_convert_dict_rev[n1],
+                                    node_convert_dict_rev[n2]))
+
+
+
+        #writeObjects(xyz, edges=self.slabgraph.edges(), scalar=degree, name='degree', fileout='network')    
+        writeObjects(xyz, edges=duplicate_edges, scalar=degree, name='degree', fileout='network')    
+        print(type(xyz))
+        print(type(xyz[0]))
+        print(type(xyz[0][0]))
+        print(type(degree))
+        print(degree)
+        print(xyz)
+        print(self.slabgraph.edges())
+        print(duplicate_edges)
+        #print(type(degree[0]))
+
+        print(len(degree))
+        print(len(xyz))
+        f=open('test.xyz','w')
+        f.write("%d\n\n"%(len(xyz)))
+        for elem in xyz:
+            f.write("Si %.5f %.5f %.5f\n"%(elem[0],elem[1],elem[2]))
+        f.close()
 
     def remove_erroneous_disconnected_comps(self):
         """
@@ -1776,6 +1822,7 @@ class SlabGraph(MolecularGraph):
         #self.iterative_BFS_tree_structure(self.super_surface_node_0)
 
         self.slabgraphtree=self.slabgraph.to_directed()
+        #self.change_capacity_weight_of_super_surface_edges(super_surface_weight='max')
         self.change_capacity_weight_of_super_surface_edges(super_surface_weight='max')
    
 
@@ -2216,6 +2263,7 @@ class SlabGraph(MolecularGraph):
             if n1 in self.slabgraph.nodes():
                 if(n1 not in self.final_added_nodes):
                     self.slabgraph.add_node(n2, self.removed_nodes.node[n2])
+                    self.slabgraph.add_edge(n1,n2)
                     self.final_added_nodes.add(n2)
                     #print("Added!")
                     #print(self.slabgraph.node[n2])
@@ -2224,12 +2272,14 @@ class SlabGraph(MolecularGraph):
             elif n2 in self.slabgraph.nodes():
                 if(n2 not in self.final_added_nodes):
                     self.slabgraph.add_node(n1, self.removed_nodes.node[n1])
+                    self.slabgraph.add_edge(n1,n2)
                     self.final_added_nodes.add(n1)
                     #print("Added!")
                     #print(self.slabgraph.node[n1])
                     #print(self.slabgraph.node[n1]['element'])
                     #print(self.final_added_nodes)
 
+        print("Final added O's:" + str(self.final_added_nodes))
                 
 
         # NOTE doesn't work
@@ -2243,6 +2293,35 @@ class SlabGraph(MolecularGraph):
         #for node in self.final_added_nodes:
         #    print(node)
         #    self.slabgraph.add_node(node)
+
+    def add_missing_hydrogens(self):
+        
+        # check if an O was added on the surface
+
+        print("\n\nAdding back in H's")
+        H_to_add=[]
+
+        for node in self.final_added_nodes:
+            neighs=self.slabgraph.neighbors(node)
+            #print(self.slabgraph.neighbors(node))
+
+            # identify any 1c Oxygen, this is the one we need to cap
+            if(len(neighs)==1):
+
+                print("O: %d, neigh: %d"%(node,neighs[0]))
+                # now we need to make sure that the removed actually corresponds
+                # to a Si removed in the original structure
+                if(neighs[0] in self.all_remove):
+                    ref_node=neighs[0]
+                else:
+                    print("Algorithm error! attempting to add a hydrogen when\
+                           there was no corresponding Si in the original structure!")
+                    sys.exit()
+        
+                print("Ref node: %d"%ref_node)
+
+                
+                
                     
 
     def write_silanol_surface_density(self,cell):
