@@ -366,8 +366,9 @@ class LammpsSimulation(object):
         self.graph = graph
 
         try:
-            if(not self.options.force_field == "UFF") and (not self.options.force_field == "Dreiding"):
-                self.graph.find_metal_sbus = True # true for UFF4MOF, BTW_FF and Dubbeldam
+            if(not self.options.force_field == "UFF") and (not self.options.force_field == "Dreiding") and \
+                    (not self.options.force_field == "UFF4MOF"):
+                self.graph.find_metal_sbus = True # true for BTW_FF and Dubbeldam
             if (self.options.force_field == "Dubbeldam"):
                 self.graph.find_organic_sbus = True
 
@@ -434,7 +435,8 @@ class LammpsSimulation(object):
     def assign_force_fields(self):
         
         attr = {'graph':self.graph, 'cutoff':self.options.cutoff, 'h_bonding':self.options.h_bonding,
-                'keep_metal_geometry':self.options.fix_metal, 'bondtype':self.options.dreid_bond_type}
+                'keep_metal_geometry':self.options.fix_metal, 'bondtype':self.options.dreid_bond_type,
+                'eps_scale_factor':self.options.eps_scale_factor}
         param = getattr(ForceFields, self.options.force_field)(**attr)
 
         self.special_commands += param.special_commands()
@@ -1236,7 +1238,9 @@ class LammpsSimulation(object):
         inp_str += "\n"
         inp_str += "%-15s %s\n"%("box tilt","large")
         inp_str += "%-15s %s\n"%("read_data","data.%s"%(self.name))
-    
+   
+        "compute chunk/atom molecule"
+
         if(not self.pair_in_data):
             inp_str += "#### Pair Coefficients ####\n"
             for pair,data in sorted(self.unique_pair_types.items()):

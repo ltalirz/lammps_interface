@@ -7,9 +7,11 @@ from Dubbeldam import Dub_atoms, Dub_bonds, Dub_angles, Dub_dihedrals, Dub_impro
 #from FMOFCu import FMOFCu_angles, FMOFCu_dihedrals, FMOFCu_opbends, FMOFCu_atoms, FMOFCu_bonds
 from MOFFF import MOFFF_angles, MOFFF_dihedrals, MOFFF_opbends, MOFFF_atoms, MOFFF_bonds
 from water_models import SPC_E_atoms, TIP3P_atoms, TIP4P_atoms, TIP5P_atoms
-from gas_models import EPM2_atoms, EPM2_angles, N2_TraPPE_atoms, N2_TraPPE_angles
+from gas_models import EPM2_atoms, EPM2_angles, TraPPE_atoms, TraPPE_angles
 from lammps_potentials import BondPotential, AnglePotential, DihedralPotential, ImproperPotential, PairPotential
 from atomic import METALS
+from atomic import organic, non_metals, noble_gases, metalloids, lanthanides, actinides, transition_metals
+from atomic import alkali, alkaline_earth, main_group, metals
 import math
 import numpy as np
 from operator import mul
@@ -1131,11 +1133,11 @@ class BTW_FF(ForceField):
         data['potential'].aa.theta3 = Theta3
         return 1
 
-    def pair_terms( self, node , data, cutoff):
+    def pair_terms(self, node, data, cutoff):
         """
         Buckingham equation in MM3 type is used!
         """
-        eps = BTW_atoms[data['force_field_type']][4]
+        eps = BTW_atoms[data['force_field_type']][4]*self.eps_scale_factor
         sig = BTW_atoms[data['force_field_type']][3]
 
         data['pair_potential']=PairPotential.BuckCoulLong()
@@ -1591,7 +1593,7 @@ class MOF_FF(ForceField):
         
         Also, Table for short range coulombic interactions
         """
-        eps = MOFFF_atoms[data['force_field_type']][4]
+        eps = MOFFF_atoms[data['force_field_type']][4] * self.eps_scale_factor
         sig = MOFFF_atoms[data['force_field_type']][3]
 
         data['pair_potential'] = PairPotential.Buck()
@@ -2069,7 +2071,7 @@ class FMOFCu(ForceField):
         data['potential'].aa.theta3 = Theta3
         return 1
 
-    def pair_terms( self, node , data, cutoff):
+    def pair_terms(self, node, data, cutoff):
         """
         Buckingham equation in MM3 type is used!
         """
@@ -2078,7 +2080,7 @@ class FMOFCu(ForceField):
 
         data['pair_potential']=PairPotential.BuckCoulLong()
         data['pair_potential'].cutoff= cutoff
-        data['pair_potential'].eps = eps 
+        data['pair_potential'].eps = eps * self.eps_scale_factor 
         data['pair_potential'].sig = sig
 
 
@@ -2113,7 +2115,7 @@ class UFF(ForceField):
     def pair_terms(self, node, data, cutoff):
         """Add L-J term to atom"""
         data['pair_potential'] = PairPotential.LjCutCoulLong()
-        data['pair_potential'].eps = UFF_DATA[data['force_field_type']][3] 
+        data['pair_potential'].eps = UFF_DATA[data['force_field_type']][3]*self.eps_scale_factor 
         data['pair_potential'].sig = UFF_DATA[data['force_field_type']][2]*(2**(-1./6.))
         data['pair_potential'].cutoff = cutoff
 
@@ -2877,7 +2879,7 @@ class Dreiding(ForceField):
         data['potential'].omega0 = omega0
         return 1
     
-    def pair_terms(self, node, data, cutoff, nbpot='LJ', hbpot='morse'):
+    def pair_terms(self, node, data, cutoff, nbpot="LJ", hbpot='morse'):
         """ DREIDING can adopt the exponential-6 or
         Ex6 = A*exp{-C*R} - B*R^{-6}
 
@@ -2887,7 +2889,7 @@ class Dreiding(ForceField):
         This will eventually be user-defined
 
         """
-        eps = DREIDING_DATA[data['force_field_type']][3]
+        eps = DREIDING_DATA[data['force_field_type']][3] * self.eps_scale_factor
         R = DREIDING_DATA[data['force_field_type']][2]
         sig = R*(2**(-1./6.))
 
@@ -3140,7 +3142,7 @@ class UFF4MOF(ForceField):
         """Add L-J term to atom"""
         data['pair_potential'] = PairPotential.LjCutCoulLong()
         data['pair_potential'].eps = UFF4MOF_DATA[data['force_field_type']][3] 
-        data['pair_potential'].sig = UFF4MOF_DATA[data['force_field_type']][2]*(2**(-1./6.))
+        data['pair_potential'].sig = UFF4MOF_DATA[data['force_field_type']][2]*(2**(-1./6.))*self.eps_scale_factor
         data['pair_potential'].cutoff = cutoff
         return 1
 
@@ -3311,6 +3313,8 @@ class UFF4MOF(ForceField):
             return 'trigonal-bipyrimidal'
         elif coord_type == "6":
             return 'octahedral'
+        elif coord_type == "8":
+            return 'cubic-antiprism'
         else:
             print("ERROR: Cannot find coordination type for %s"%name)
             sys.exit()
@@ -3615,11 +3619,58 @@ class UFF4MOF(ForceField):
                     data['force_field_type'] = data['element']
                     if data['element'] == "F":
                         data['force_field_type'] += "_"
+                elif data['element'] in metals:
+                    if len(data['element']) == 1:
+                        fftype = data['element'] + "_"
+                    else:
+                        fftype = data['element']
+
+                    # get coordination number and angles between atoms
+                    if(self.graph.degree(node) == 2):
+                        fftype += "1f1"
+                    elif(self.graph.degree(node) == 3):
+                        fftype += "2f2"
+                    elif(self.graph.degree(node) == 4):
+                        # tetrahedral or square planar
+                        if self.graph.coplanar(node):
+                            fftype += "4f2"
+                        # Could implement a tetrahedrality index here, but that would be overkill.
+                        else:
+                            fftype += "3f2"
+                    elif(self.graph.degree(node) == 5):
+                        # assume paddlewheels........
+                        fftype += "4+2"
+
+                    elif(self.graph.degree(node) == 6):
+                        fftype += "6f3"
+                    elif(self.graph.degree(node) == 8):
+                        fftype += "8f4"
+
+                    try:
+                        UFF4MOF_DATA[fftype]
+                        data['force_field_type'] = fftype
+                    # couldn't find the force field type!
+                    except KeyError:
+                        try:
+                            fftype = fftype.replace("f", "+")
+                            UFF4MOF_DATA[fftype]
+                        except KeyError:
+                            pass
+
+                    for n in self.graph.neighbors(node):
+                        if self.graph.node[n]['element'] in metals:
+                            self.graph[node][n]['order'] = 0.25
+                        elif self.graph.node[n]['element'] == "O":
+                            self.graph[node][n]['order'] = 0.5 
+                        # else: bond order stays = 1
+
                 # WARNING, the following else statement will do unknown things to the system.
-                else:
+                if data['force_field_type'] is None:
                     ffs = list(UFF4MOF_DATA.keys())
                     for j in ffs:
                         if data['element'] == j[:2].strip("_"):
+                            print("WARNING: Could not find an appropriate UFF4MOF type for %s. Assigning %s"%(
+                                  data['element'], j))
                             data['force_field_type'] = j
             if data['force_field_type'] is None:
                 print("ERROR: could not find the proper force field type for atom %i"%(data['index'])+
@@ -3792,7 +3843,7 @@ class Dubbeldam(ForceField):
 
         """
         data['pair_potential'] = PairPotential.LjCutCoulLong()
-        data['pair_potential'].eps = Dub_atoms[data['force_field_type']][0]*kBtokcal 
+        data['pair_potential'].eps = Dub_atoms[data['force_field_type']][0]*kBtokcal*self.eps_scale_factor 
         data['pair_potential'].sig = Dub_atoms[data['force_field_type']][1]
         data['pair_potential'].cutoff = cutoff
         data['charge'] = Dub_atoms[data['force_field_type']][2]
@@ -3932,7 +3983,7 @@ class SPC_E(ForceField):
 
         """
         data['pair_potential'] = PairPotential.LjCutCoulLong()
-        data['pair_potential'].eps = SPC_E_atoms[data['force_field_type']][2]
+        data['pair_potential'].eps = SPC_E_atoms[data['force_field_type']][2] 
         data['pair_potential'].sig = SPC_E_atoms[data['force_field_type']][1]
         data['pair_potential'].cutoff = cutoff
 
@@ -4045,7 +4096,7 @@ class TIP3P(ForceField):
         
         """
         data['pair_potential'] = PairPotential.LjCutCoulLong()
-        data['pair_potential'].eps = TIP3P_atoms[data['force_field_type']][2]
+        data['pair_potential'].eps = TIP3P_atoms[data['force_field_type']][2] 
         data['pair_potential'].sig = TIP3P_atoms[data['force_field_type']][1]
         data['pair_potential'].cutoff = cutoff
 
@@ -4301,7 +4352,7 @@ class TIP5P(ForceField):
 
         """
         data['pair_potential'] = PairPotential.LjCutCoulLong()
-        data['pair_potential'].eps = TIP5P_atoms[data['force_field_type']][2]
+        data['pair_potential'].eps = TIP5P_atoms[data['force_field_type']][2] 
         data['pair_potential'].sig = TIP5P_atoms[data['force_field_type']][1]
         data['pair_potential'].cutoff = cutoff
 
@@ -4438,6 +4489,112 @@ class EPM2_CO2(ForceField):
             data['mass'] = EPM2_atoms[fftype][0] 
             data['charge'] = EPM2_atoms[fftype][3]
 
+class CO2_TraPPE(ForceField):
+
+    def __init__(self, graph=None, **kwargs):
+        self.pair_in_data = True
+        for key, value in kwargs.items():
+            setattr(self, key, value)
+        
+        if (graph is not None):
+            self.graph = graph
+            self.graph.rigid = True
+            self.detect_ff_terms()
+            self.compute_force_field_terms()
+
+    def bond_term(self, edge):
+        """Harmonic term
+        
+        E = 0.5 * K * (R - Req)^2
+        
+        just a placeholder in LAMMPS.
+        The bond is rigid 
+        therefore an unambiguous extra flag must be
+        added here to ensure the potential is not 
+        grouped with identical (however unlikely) potentials
+        which are not rigid.
+
+        """
+        n1, n2, data = edge
+
+        n1data = self.graph.node[n1]
+        n2data = self.graph.node[n2]
+        data['potential'] = BondPotential.Harmonic()
+        data['potential'].R0 = 0.5500
+        data['potential'].K = 450000.0 # strong bond potential to ensure that the structure
+                                       # will not deviate far from its intended form
+                                       # during a minimization
+        data['potential'].special_flag = "rigid"
+        return 1
+
+    def angle_term(self, angle):
+        """Harmonic angle term.
+
+        E = 0.5 * K * (theta - theta0)^2
+
+        """
+        a, b, c, data = angle
+        a_data, b_data, c_data = self.graph.node[a], self.graph.node[b], self.graph.node[c] 
+        atype = a_data['force_field_type']
+        btype = b_data['force_field_type']
+        ctype = c_data['force_field_type']
+       
+        assert (b_data['element'] == "X")
+        assert (a_data['element'] == "N")
+        assert (c_data['element'] == "N")
+        data['potential'] = AnglePotential.Harmonic()
+        data['potential'].theta0 = TraPPE_angles["_".join([atype,btype,ctype])][1]  
+        data['potential'].K = TraPPE_angles["_".join([atype,btype,ctype])][0]/2. 
+        data['potential'].special_flag = "rigid"
+        return 1
+
+    def dihedral_term(self, dihedral):
+        """
+        No dihedral potential in N2 TraPPE model.
+
+        """
+        return None
+
+    def improper_term(self, improper):
+        """
+        No improper potential in N2 TraPPE model.
+
+        """
+        return None
+    
+    def pair_terms(self, node, data, cutoff):
+        """ 
+        Lennard - Jones potential for Nx and X.
+
+        """
+        data['pair_potential'] = PairPotential.LjCutCoulLong()
+        data['pair_potential'].eps = TraPPE_atoms[data['force_field_type']][2]
+        data['pair_potential'].sig = TraPPE_atoms[data['force_field_type']][1]
+        data['pair_potential'].cutoff = cutoff
+
+    def special_commands(self):
+        st = [
+              "%-15s %s"%("pair_modify", "tail yes")
+             ] 
+        return st
+
+    def detect_ff_terms(self):
+        """ Cx and Ox
+
+        """
+        for node, data in self.graph.nodes_iter(data=True):
+            if data['element'] == "C":
+                fftype = "Cx"
+            elif data['element'] == "O":
+                fftype = "Ox"
+            else: 
+                print("ERROR: could not find the proper force field type for atom %i"%(data['index'])+
+                        " with element: '%s'"%(data['element']))
+                sys.exit()
+            data['force_field_type'] = fftype 
+            data['mass'] = TraPPE_atoms[fftype][0] 
+            data['charge'] = TraPPE_atoms[fftype][3]
+
 class N2_TraPPE(ForceField):
 
     def __init__(self, graph=None, **kwargs):
@@ -4492,8 +4649,8 @@ class N2_TraPPE(ForceField):
         assert (a_data['element'] == "N")
         assert (c_data['element'] == "N")
         data['potential'] = AnglePotential.Harmonic()
-        data['potential'].theta0 = N2_TraPPE_angles["_".join([atype,btype,ctype])][1]  
-        data['potential'].K = N2_TraPPE_angles["_".join([atype,btype,ctype])][0]/2. 
+        data['potential'].theta0 = TraPPE_angles["_".join([atype,btype,ctype])][1]  
+        data['potential'].K = TraPPE_angles["_".join([atype,btype,ctype])][0]/2. 
         data['potential'].special_flag = "rigid"
         return 1
 
@@ -4517,8 +4674,8 @@ class N2_TraPPE(ForceField):
 
         """
         data['pair_potential'] = PairPotential.LjCutCoulLong()
-        data['pair_potential'].eps = N2_TraPPE_atoms[data['force_field_type']][2]
-        data['pair_potential'].sig = N2_TraPPE_atoms[data['force_field_type']][1]
+        data['pair_potential'].eps = TraPPE_atoms[data['force_field_type']][2]
+        data['pair_potential'].sig = TraPPE_atoms[data['force_field_type']][1]
         data['pair_potential'].cutoff = cutoff
 
     def special_commands(self):
@@ -4541,5 +4698,5 @@ class N2_TraPPE(ForceField):
                         " with element: '%s'"%(data['element']))
                 sys.exit()
             data['force_field_type'] = fftype 
-            data['mass'] = N2_TraPPE_atoms[fftype][0] 
-            data['charge'] = N2_TraPPE_atoms[fftype][3]
+            data['mass'] = TraPPE_atoms[fftype][0] 
+            data['charge'] = TraPPE_atoms[fftype][3]

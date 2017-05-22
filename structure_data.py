@@ -35,30 +35,10 @@ except ImportError:
     sys.exit()
 from collections import OrderedDict
 from atomic import MASS, ATOMIC_NUMBER, COVALENT_RADII
+from atomic import organic, non_metals, noble_gases, metalloids, lanthanides, actinides, transition_metals
+from atomic import alkali, alkaline_earth, main_group, metals
 from ccdc import CCDC_BOND_ORDERS
 DEG2RAD=np.pi/180.
-# keeping track of some different groups of atoms.
-organic = set(["H", "C", "N", "O", "S"])
-non_metals = set(["H", "He", "C", "N", "O", "F", "Ne",
-                  "P", "S", "Cl", "Ar", "Se", "Br", "Kr",
-                  "I", "Xe", "Rn"])
-noble_gases = set(["He", "Ne", "Ar", "Kr", "Xe", "Rn"])
-metalloids = set(["B", "Si", "Ge", "As", "Sb", "Te", "At"])
-lanthanides = set(["La", "Ce", "Pr", "Nd", "Pm", "Sm", "Eu",
-                   "Gd", "Tb", "Dy", "Ho", "Er", "Tm", "Yb", "Lu"])
-actinides = set(["Ac", "Th", "Pa", "U", "Np", "Pu", "Am", "Cm", "Bk",
-                 "Cf", "Es", "Fm", "Md", "No", "Lr"])
-transition_metals = set(["Sc", "Ti", "V", "Cr", "Mn", "Fe", "Co", "Ni",
-                         "Cu", "Zn", "Y", "Zr", "Nb", "Mo", "Tc", "Ru",
-                         "Rh", "Pd", "Ag", "Cd", "Hf", "Ta", "W", "Re",
-                         "Os", "Ir", "Pt", "Ir", "Pt", "Au", "Hg", "Rf",
-                         "Db", "Sg", "Bh", "Hs", "Mt", "Ds", "Rg", "Cn"])
-alkali = set(["Li", "Na", "K", "Rb", "Cs", "Fr"])
-alkaline_earth = set(["Be", "Mg", "Ca", "Sr", "Ba", "Ra"])
-main_group = set(["Al", "Ga", "Ge", "In", "Sn", "Sb", "Tl", "Pb", "Bi",
-                  "Po", "At", "Cn", "Uut", "Fl", "Uup", "Lv", "Uus"])
-
-metals = main_group | alkaline_earth | alkali | transition_metals | metalloids
 
 class MolecularGraph(nx.Graph):
     """Class to contain all information relating a structure file
@@ -393,7 +373,31 @@ class MolecularGraph(nx.Graph):
 
         angle = a / DEG2RAD
         return angle
-    
+   
+    def coplanar(self, node):
+        """ Determine if this node, and it's neighbors are
+        all co-planar.
+
+        """
+        coord = self.node[node]['cartesian_coordinates']
+        vects = []
+        for j in self.neighbors(node):
+            vects.append(self.node[j]['cartesian_coordinates'] - coord)
+
+        # use the first two vectors to define a plane
+        v1 = vects[0]
+        v2 = vects[1]
+        n = np.cross(v1, v2)
+        n /= np.linalg.norm(n)
+        for v in vects[2:]:
+            v /= np.linalg.norm(v)
+            # what is a good tolerance for co-planarity in MOFs?
+            # this is used solely to determine if a 4-coordinated metal atom
+            # is square planar or tetrahedral..
+            if not np.allclose(np.dot(v,n), 0., atol=0.02):
+                return False
+        return True
+
     def compute_dihedral_between(self, a, b, c, d):
         coorda = self.node[a]['cartesian_coordinates']
         coordb = self.node[b]['cartesian_coordinates']
