@@ -3637,6 +3637,10 @@ class UFF4MOF(ForceField):
                         # Could implement a tetrahedrality index here, but that would be overkill.
                         else:
                             fftype += "3f2"
+                    elif(self.graph.degree(node) == 5):
+                        # assume paddlewheels........
+                        fftype += "4+2"
+
                     elif(self.graph.degree(node) == 6):
                         fftype += "6f3"
                     elif(self.graph.degree(node) == 8):
@@ -3647,7 +3651,12 @@ class UFF4MOF(ForceField):
                         data['force_field_type'] = fftype
                     # couldn't find the force field type!
                     except KeyError:
-                        pass
+                        try:
+                            fftype = fftype.replace("f", "+")
+                            UFF4MOF_DATA[fftype]
+                        except KeyError:
+                            pass
+
                     for n in self.graph.neighbors(node):
                         if self.graph.node[n]['element'] in metals:
                             self.graph[node][n]['order'] = 0.25
