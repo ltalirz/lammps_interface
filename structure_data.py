@@ -23,8 +23,7 @@ try:
     from writeNodesEdges import writeObjects
 
 except:
-    print("Warning! vtk for python necessary for graph debugging necessary. Code will\
-           ImportError if you try to create a slab")
+    print("Warning! vtk for python necessary for graph debugging necessary. Code will ImportError if you try to use the functionality to draw a SlabGraph to a VTK style visualization file")
 
 try:
     import networkx as nx
@@ -1481,9 +1480,10 @@ class MolecularGraph(nx.Graph):
 
 # New class to extend MolecularGraph and turn it into a slab
 class SlabGraph(MolecularGraph):
-    def __init__(self,graph):
+    def __init__(self,graph,cell):
         self.refgraph=graph.copy()
         self.slabgraph=graph
+        self.cell=cell
         #a=0,b=1,c=2
         self.vacuum_direc=2
         self.num_nodes=self.slabgraph.number_of_nodes()
@@ -1600,6 +1600,10 @@ class SlabGraph(MolecularGraph):
 
             print("WARNING! You passed in a graph with disconnected components...\
                   Assuming the largest component is the slab and continuing...")
+
+            # Important!! The reference graph must now be copied from 
+            # our new slabgraph after the disconnected components have been removed
+            self.refgraph=self.slabgraph.copy()
 
     def condense_graph(self):
         """
@@ -2242,7 +2246,6 @@ class SlabGraph(MolecularGraph):
         Takes two partitions to remove from the slab graph
         one for each surface
         """
-
         
         self.all_remove = self.remove_partition_1 | self.remove_partition_2
 
@@ -2259,31 +2262,61 @@ class SlabGraph(MolecularGraph):
         # these are all the removed oxygens 
         self.final_added_nodes = set()
         self.final_added_edges = []
+        self.final_H_edges = []
 
+        # self.removed_edges is any Si-O edge removed in intial graph condensation
         for edge in self.removed_edges:
             n1 = edge[0]
             n2 = edge[1]
        
             if n1 in self.slabgraph.nodes():
                 if(n1 not in self.final_added_nodes):
+                    # add the missing O node
                     self.slabgraph.add_node(n2, self.removed_nodes.node[n2])
+                    # add its edge to Si
                     self.slabgraph.add_edge(n1,n2)
+                    # keep track of its addition so we don't try it again
                     self.final_added_nodes.add(n2)
+     
+                    # check to see if the O we are adding is attached to a removed Si 
+                    this_intersect = set(self.refgraph.neighbors(n2)).intersection(self.all_remove)     
+                    if(len(this_intersect)==1):
+                        self.final_H_edges.append((n2, next(iter(this_intersect))))
+                        #print(self.final_H_edges)
+                    else:
+                        pass
+                        #print(this_intersect)
+                        #print("Warning! Seems as though an Oxygen was identified for capping that was not attached to Si in the original graph... Something weird is probably going to happen...")
                     #print("Added!")
                     #print(self.slabgraph.node[n2])
                     #print(self.slabgraph.node[n2]['element'])
                     #print(self.final_added_nodes)
             elif n2 in self.slabgraph.nodes():
                 if(n2 not in self.final_added_nodes):
+                    # add the missing O node
                     self.slabgraph.add_node(n1, self.removed_nodes.node[n1])
+                    # add its edge to Si
                     self.slabgraph.add_edge(n1,n2)
+                    # keep track of its addition so we don't try it again
                     self.final_added_nodes.add(n1)
+
+                    # check to see if the O we are adding is attached to a removed Si 
+                    this_intersect = set(self.refgraph.neighbors(n1)).intersection(self.all_remove)     
+                    if(len(this_intersect)==1):
+                        self.final_H_edges.append((n1, next(iter(this_intersect))))
+                        #print(self.final_H_edges)
+                    else:
+                        pass
+                        #print(this_intersect)
+                        #print("Warning! Seems as though an Oxygen was identified for capping that was not attached to Si in the original graph... Something weird is probably going to happen...")
                     #print("Added!")
                     #print(self.slabgraph.node[n1])
                     #print(self.slabgraph.node[n1]['element'])
                     #print(self.final_added_nodes)
 
         print("Final added O's:" + str(self.final_added_nodes))
+        print("O-Si bonds to convert to O-H:")
+        print(self.final_H_edges)
                 
 
         # NOTE doesn't work
@@ -2299,34 +2332,123 @@ class SlabGraph(MolecularGraph):
         #    self.slabgraph.add_node(node)
 
     def add_missing_hydrogens(self):
+        """
+        Add back in the missing Hydrogens
+        Need to be very careful because the Hydrogen to add could be attached
+        to an oxygen across a periodic boundary
+        """
         
         # check if an O was added on the surface
 
         print("\n\nAdding back in H's")
-        H_to_add=[]
 
-        for node in self.final_added_nodes:
-            neighs=self.slabgraph.neighbors(node)
-            #print(self.slabgraph.neighbors(node))
+        # for each directed edge representing a converted O->Si to O->
+        for edge in self.final_H_edges:
+            print("\n")
+            print(edge)
+            parent_node_data=self.refgraph.node[edge[0]]
+            old_child_node_data=self.refgraph.node[edge[1]]
+            new_child_node_index = edge[1]+10000
+            new_child_node_data = old_child_node_data.copy()
+            new_child_node_data['element']="H"
+   
+            # get original edge data to check for periodicity
+            old_edge_data=self.refgraph.edge[edge[0]][edge[1]]
+            symflag=old_edge_data['symflag']
 
-            # identify any 1c Oxygen, this is the one we need to cap
-            if(len(neighs)==1):
+            # New/old coordinates of child node to write in file
+            old_abc = [float(old_child_node_data['_atom_site_fract_x']),
+                       float(old_child_node_data['_atom_site_fract_y']),
+                       float(old_child_node_data['_atom_site_fract_z'])] 
 
-                print("O: %d, neigh: %d"%(node,neighs[0]))
-                # now we need to make sure that the removed actually corresponds
-                # to a Si removed in the original structure
-                if(neighs[0] in self.all_remove):
-                    ref_node=neighs[0]
-                else:
-                    print("Algorithm error! attempting to add a hydrogen when\
-                           there was no corresponding Si in the original structure!")
-                    sys.exit()
-        
-                print("Ref node: %d"%ref_node)
+            new_abc = deepcopy(old_abc)
 
+            print(symflag)
+            if(symflag != '.'):
+                # if periodic in x direction
+                if(symflag[2]=='6' or symflag[2]=='4'):
+                    if(new_child_node_data['_atom_site_fract_x'] <
+                       parent_node_data['_atom_site_fract_x']):
+                        new_abc[0]+=1.0
+                    else:
+                        new_abc[0]-=1.0
+
+                # periodic in y direction
+                elif(symflag[3]=='6' or symflag[3]=='4'):
+                    if(new_child_node_data['_atom_site_fract_y'] <
+                       parent_node_data['_atom_site_fract_y']):
+                        new_abc[1]+=1.0
+                    else:
+                        new_abc[1]-=1.0
                 
-                
+                # periodic in z direction
+                elif(symflag[4]=='6' or symflag[4]=='4'):
+                    if(new_child_node_data['_atom_site_fract_z'] <
+                       parent_node_data['_atom_site_fract_z']):
+                        new_abc[2]+=1.0
+                    else:
+                        new_abc[2]-=1.0
+
+            print("Old child abc:")
+            print(old_abc)
+            print("New child abc:")
+            print(new_abc)
+
+            new_xyz=self.to_cartesian(new_abc)
+            print("New child xyz:")
+            print(new_xyz)
+            
+            print("Parent xyz:")
+            print(parent_node_data['cartesian_coordinates'])
+
+            bond_length=np.linalg.norm(new_xyz-parent_node_data['cartesian_coordinates'])
+            print("old bond length:")
+            print(bond_length)
+            h_bond_length=0.95
+            scale_by=h_bond_length/bond_length
+            print("Scale by")
+            print(scale_by)
+
+            new_xyz=parent_node_data['cartesian_coordinates']+\
+                    (new_xyz-parent_node_data['cartesian_coordinates'])*scale_by
+            print("New xyz:")
+            print(new_xyz)
+
+            new_xyz=self.in_cell(new_xyz)
+            print("New xyz in cell:")
+            print(new_xyz)
+
+            new_abc = self.to_fractional(new_xyz)
+            print("New abc for printing:")
+            print(new_abc)
+
+            new_child_node_data['_atom_site_fract_x'] = str(new_abc[0])
+            new_child_node_data['_atom_site_fract_y'] = str(new_abc[1])
+            new_child_node_data['_atom_site_fract_z'] = str(new_abc[2])
+            new_child_node_data['cartesian_coordinates']=new_xyz
+            self.slabgraph.add_node(new_child_node_index, new_child_node_data)
+            #self.slabgraph.add_edge(edge[0],new_child_node_index)
+
+            #if(vacuum_direc==0):
+            #    if(parent_data['_atom_site_fract_x'] < 0.5)
+
+            #elif(vacuum_direc==1):
+
+            #
+            #elif(vacuum_direc==2):
+
+            #data={'element'
+            #self.slabgraph.add_node(
+             
+    def to_cartesian(self, coord):
+        """
+        return unwrapped cartesian coords from abc
+        """
+        return np.dot(self.cell.cell,coord)
                     
+    def to_fractional(self, coord):
+        f = np.dot(self.cell.inverse, coord) 
+        return f 
 
     def write_silanol_surface_density(self,cell):
 

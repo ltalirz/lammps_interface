@@ -367,8 +367,9 @@ class LammpsSimulation(object):
         self.graph = graph
 
         try:
-            if(not self.options.force_field == "UFF") and (not self.options.force_field == "Dreiding"):
-                self.graph.find_metal_sbus = True # true for UFF4MOF, BTW_FF and Dubbeldam
+            if(not self.options.force_field == "UFF") and (not self.options.force_field == "Dreiding") and \
+                    (not self.options.force_field == "UFF4MOF"):
+                self.graph.find_metal_sbus = True # true for BTW_FF and Dubbeldam
             if (self.options.force_field == "Dubbeldam"):
                 self.graph.find_organic_sbus = True
 
@@ -435,7 +436,8 @@ class LammpsSimulation(object):
     def assign_force_fields(self):
         
         attr = {'graph':self.graph, 'cutoff':self.options.cutoff, 'h_bonding':self.options.h_bonding,
-                'keep_metal_geometry':self.options.fix_metal, 'bondtype':self.options.dreid_bond_type}
+                'keep_metal_geometry':self.options.fix_metal, 'bondtype':self.options.dreid_bond_type,
+                'eps_scale_factor':self.options.eps_scale_factor}
         param = getattr(ForceFields, self.options.force_field)(**attr)
 
         self.special_commands += param.special_commands()
@@ -482,9 +484,11 @@ class LammpsSimulation(object):
                     mff = mff[:-6] # remove _Water from end of name
                 if ff[-3:] == "CO2":
                     self.add_co2_model(ngraph, ff)
+                # TODO(pboyd): should have an eps_scale_factor for molecules??
                 p = getattr(ForceFields, mff)(graph=self.subgraphs[m], 
                                          cutoff=self.options.cutoff, 
-                                         h_bonding=h_bonding)
+                                         h_bonding=h_bonding,
+                                         eps_scale_factor=1.)
                 self.special_commands += p.special_commands()
 
     def assign_molecule_ids(self, graph):
@@ -1237,7 +1241,9 @@ class LammpsSimulation(object):
         inp_str += "\n"
         inp_str += "%-15s %s\n"%("box tilt","large")
         inp_str += "%-15s %s\n"%("read_data","data.%s"%(self.name))
-    
+   
+        "compute chunk/atom molecule"
+
         if(not self.pair_in_data):
             inp_str += "#### Pair Coefficients ####\n"
             for pair,data in sorted(self.unique_pair_types.items()):
@@ -1939,73 +1945,75 @@ class LammpsSimulation(object):
                 print("something went wrong")
         return mgraph
 
-def main():
-
-    # command line parsing
-    options = Options()
-    sim = LammpsSimulation(options)
-    cell, graph = from_CIF(options.cif_file)
-    sim.set_cell(cell)
-    sim.set_graph(graph)
-    sim.split_graph()
-    sim.assign_force_fields()
-    sim.slabgraph=SlabGraph(sim.graph)
-    sim.slabgraph.check_if_zeolite()
-
-    #sim.compute_simulation_size()
-    sim.merge_graphs()
-
-    # creating slab graph
-    sim.slabgraph.remove_erroneous_disconnected_comps()
-    sim.slabgraph.condense_graph()
-    #sim.slabgraph.enumerate_all_primitive_rings()
-    sim.slabgraph.identify_undercoordinated_surface_nodes()
-
-    sim.slabgraph.write_slabgraph_cif(cell)
-    sim.slabgraph.write_slabgraph_cif(cell,bond_block=False,descriptor="debug")
-    # write output
-
-    sim.slabgraph.normalize_bulk_edge_weights()
-    sim.slabgraph.connect_super_surface_nodes()
-
-
-    sim.slabgraph.create_slab_tree()
-    #sim.slabgraph.redirect_slab_tree_by_coordinate_directionality()
-    sim.slabgraph.stoer_wagner_slab_tree_cut(weight_barrier=True)
-    sim.slabgraph.remove_surface_partitions()
-
-    # This should give us a visualization of the all si graph
-    #sim.slabgraph.draw_slabgraph()
-
-    # Add back in all missing oxygens
-    sim.slabgraph.add_all_connecting_nodes()
-
-    # add missing hydrogen caps
-    sim.slabgraph.add_missing_hydrogens()
-
-    sim.slabgraph.write_slabgraph_cif(cell,bond_block=False,descriptor="deH")
-    sim.slabgraph.write_silanol_surface_density(cell)
-
-
-    
-    # sim.write_lammps_files()
-    #if options.output_cif:
-    #    print("CIF file requested. Exiting...")
-    #    write_CIF(graph, cell)
-    #    sys.exit()
-
-
-
-
-    # Additional capability to write RASPA files if requested
-    if options.output_raspa:
-        classifier=1
-        print("Writing RASPA files to current WD")
-        write_RASPA_CIF(graph, cell, classifier)
-        write_RASPA_sim_files(sim, classifier)
-        this_config = MDMC_config(sim)
-        sim.set_MDMC_config(this_config)
-
-if __name__ == "__main__": 
-    main()
+def main():                                                                     
+                                                                                
+    # command line parsing                                                      
+    options = Options()                                                         
+    sim = LammpsSimulation(options)                                             
+    cell, graph = from_CIF(options.cif_file)                                    
+    sim.set_cell(cell)                                                          
+    sim.set_graph(graph)                                                        
+    sim.split_graph()                                                           
+    sim.assign_force_fields()                                                   
+    sim.slabgraph=SlabGraph(sim.graph,cell) 
+    sim.slabgraph.check_if_zeolite()                                            
+                                                                                
+    #sim.compute_simulation_size()                                              
+    sim.merge_graphs()                                                          
+                                                                                
+    # creating slab graph                                                       
+    sim.slabgraph.remove_erroneous_disconnected_comps()                         
+    sim.slabgraph.condense_graph()                                              
+    #sim.slabgraph.enumerate_all_primitive_rings()                              
+    sim.slabgraph.identify_undercoordinated_surface_nodes()                     
+                                                                                
+    sim.slabgraph.write_slabgraph_cif(cell)                                     
+    sim.slabgraph.write_slabgraph_cif(cell,bond_block=False,descriptor="debug") 
+    # write output                                                              
+                                                                                
+    sim.slabgraph.normalize_bulk_edge_weights()                                 
+    sim.slabgraph.connect_super_surface_nodes()                                 
+                                                                                
+                                                                                
+    sim.slabgraph.create_slab_tree()                                            
+    #sim.slabgraph.redirect_slab_tree_by_coordinate_directionality()            
+    sim.slabgraph.stoer_wagner_slab_tree_cut(weight_barrier=True)               
+    sim.slabgraph.remove_surface_partitions()                                   
+                                                                                
+    # This should give us a visualization of the all si graph                   
+    #sim.slabgraph.draw_slabgraph()                                             
+                                                                                
+    # Add back in all missing oxygens                                           
+    sim.slabgraph.add_all_connecting_nodes()                                    
+    sim.slabgraph.write_slabgraph_cif(cell,bond_block=False,descriptor="deH")   
+                                                                                
+    # add missing hydrogen caps                                                 
+    sim.slabgraph.add_missing_hydrogens()                                       
+                                                                                
+    sim.slabgraph.write_slabgraph_cif(cell,bond_block=False,descriptor="addH")   
+    sim.slabgraph.write_silanol_surface_density(cell)                           
+                                                                                
+                                                                                
+                                                                                
+    # sim.write_lammps_files()                                                  
+    #if options.output_cif:                                                     
+    #    print("CIF file requested. Exiting...")                                
+    #    write_CIF(graph, cell)                                                 
+    #    sys.exit()                                                             
+                                                                                
+                                                                                
+                                                                                
+                                                                                
+    # Additional capability to write RASPA files if requested                   
+    if options.output_raspa:                                                    
+        classifier=1                                                            
+        print("Writing RASPA files to current WD")                              
+        write_RASPA_CIF(graph, cell, classifier)                                
+        write_RASPA_sim_files(sim, classifier)                                  
+        this_config = MDMC_config(sim)                                          
+        sim.set_MDMC_config(this_config)                                        
+                                                                                
+if __name__ == "__main__":                                                      
+    main()                                                                      
+                                                                                
 
