@@ -1663,6 +1663,7 @@ class SlabGraph(MolecularGraph):
             neighbors=self.slabgraph.neighbors(node)
 
             if(len(neighbors)<4):
+                # if node is undercoordinated we identify it as a surface node
                 self.surface_nodes.append(node)
                 data['element']='X'
                 # For now rough approximation to distinguish nodes between the 2 surfaces
@@ -1683,6 +1684,7 @@ class SlabGraph(MolecularGraph):
                     else:
                         self.surface_nodes_max.append(node)
             else:
+                # any fully coordinated node is automatically a bulk node
                 self.bulk_nodes.append(node)
 
 
@@ -1771,9 +1773,10 @@ class SlabGraph(MolecularGraph):
         Turn the slabgraph into a tree
         """
         #self.slabgraphtree = nx.bfs_tree(self.slabgraph, self.super_surface_node_0)
-        self.slabgraphtree = nx.bfs_tree(self.slabgraph, self.super_surface_node_0)
-        self.iterative_BFS_tree_structure(self.super_surface_node_0)
+        #self.iterative_BFS_tree_structure(self.super_surface_node_0)
 
+        self.slabgraphtree=self.slabgraph.to_directed()
+        self.change_capacity_weight_of_super_surface_edges(super_surface_weight='max')
    
 
 
@@ -1845,22 +1848,61 @@ class SlabGraph(MolecularGraph):
             pass
         
         self.slabgraphtree=self.slabgraph.to_directed()
+        self.change_capacity_weight_of_super_surface_edges(super_surface_weight='max')
 
+
+    def change_capacity_weight_of_super_surface_edges(self,super_surface_weight='one'):
+        """
+        Depending on which min cut algo we are using, we may want to reweight
+        the value of each edge between the super surface node and each of its bulk
+        neighbors
+
+        - 'one' sets the weight of each one of these edges to one
+        - 'max' sets the weight of each one of these edges to the sum of the number
+            of neighbors of the super surface node
+        """
+
+
+        if(super_surface_weight=='one'):
+            surface_0_weight=1
+            surface_max_weight=1
+        elif(super_surface_weight=='max'):
+            surface_0_weight=float(self.super_surface_node_0_weight)
+            surface_max_weight=float(self.super_surface_node_max_weight)
+        else:
+            print("Error, weight to super surface node can only be 'one' or 'max'")
+            sys.exit()
+
+        # now reweight each edge between the supersurface node and the bulk node neighbors
         for edge in self.slabgraphtree.edges_iter():
             self.slabgraphtree.edge[edge[0]][edge[1]]['capacity']=\
+                float(self.slabgraph.edge[edge[0]][edge[1]]['weight'])
+            self.slabgraphtree.edge[edge[0]][edge[1]]['weight']=\
                 float(self.slabgraph.edge[edge[0]][edge[1]]['weight'])
 
             # However, if one node in the edge is the super surface node,
             # reset the capacity to the max weight of the supernode
             if(edge[0] == self.super_surface_node_0 or \
                edge[1] == self.super_surface_node_0):
-
                 self.slabgraphtree.edge[edge[0]][edge[1]]['capacity'] = \
-                    self.super_surface_node_0_weight
+                    surface_0_weight 
+                    #1
+                    #self.super_surface_node_0_weight
+                self.slabgraphtree.edge[edge[0]][edge[1]]['weight'] = \
+                    surface_0_weight 
+                    #1
+                    #self.super_surface_node_0_weight
+
             elif(edge[0] == self.super_surface_node_max or \
                  edge[1] == self.super_surface_node_max):
                 self.slabgraphtree.edge[edge[0]][edge[1]]['capacity'] = \
-                    self.super_surface_node_max_weight
+                    surface_max_weight
+                    #1
+                    #self.super_surface_node_max_weight
+                self.slabgraphtree.edge[edge[0]][edge[1]]['weight'] = \
+                    surface_max_weight
+                    #1
+                    #self.super_surface_node_max_weight
 
             #print(edge)
             #print(self.slabgraphtree.edge[edge[0]][edge[1]]['capacity'])
@@ -1929,9 +1971,101 @@ class SlabGraph(MolecularGraph):
             self.slabgraphtree.remove_edge(n1,n2)
             self.slabgraphtree.add_edge(n2,n1,data)
                         
+    def create_weighted_barrier_at_slab_center(self, start='weight'):
+        """
+        Here just set a high weight for any edge that is bisected by the center plane
+        of the vacuum_direc coordinate
+
+        i.e. node1 has a c-coordinate less than 0.5 and and node2 has a 
+        c-coordinate greater than 0.5
+        """
+
+        for edge in self.slabgraphtree.edges_iter():
+            n1=edge[0]
+            n2=edge[1]
+
+            if(n1 in self.bulk_nodes and n2 in self.bulk_nodes):
+                if(start=='weight'):
+                    if(self.vacuum_direc==0):
+                        if(((float(self.slabgraph.node[n1]['_atom_site_fract_x'])-0.5) < 0) !=\
+                           ((float(self.slabgraph.node[n2]['_atom_site_fract_x'])-0.5) < 0)):
+                            self.slabgraphtree.edge[n1][n2]['capacity'] = 1000000
+                            self.slabgraphtree.edge[n1][n2]['weight'] = 1000000
+                    elif(self.vacuum_direc==1):
+                        if(((float(self.slabgraph.node[n1]['_atom_site_fract_y'])-0.5) < 0) !=\
+                           ((float(self.slabgraph.node[n2]['_atom_site_fract_y'])-0.5) < 0)):
+                            self.slabgraphtree.edge[n1][n2]['capacity'] = 1000000
+                            self.slabgraphtree.edge[n1][n2]['weight'] = 1000000
+                    elif(self.vacuum_direc==2):
+                        if(((float(self.slabgraph.node[n1]['_atom_site_fract_z'])-0.5) < 0) !=\
+                           ((float(self.slabgraph.node[n2]['_atom_site_fract_z'])-0.5) < 0)):
+                            self.slabgraphtree.edge[n1][n2]['capacity'] = 1000000
+                            self.slabgraphtree.edge[n1][n2]['weight'] = 1000000
+                elif(start=='unweight'):
+                    self.slabgraphtree.edge[n1][n2]['capacity'] = 1
+                    self.slabgraphtree.edge[n1][n2]['weight'] = 1
+
             
-    def create_weighted_barrier_in_slab_center(self):
-        pass
+    def create_weighted_barrier_on_opposite_half(self, start='min'):
+        """
+        If we have a weighted barrier:
+        if start == 'min':
+             all non-super surface edges with vacuum_coord > 0.5 have weight 1,000,000
+        else if start == 'max'
+             all non-super surface edges with vacuum_coord < 0.5 have weight 1,000,000
+        else if start == 'neutral'
+             all non-super surface edges reset to weigth 1
+        """
+        for edge in self.slabgraphtree.edges_iter():
+            n1=edge[0]
+            n2=edge[1]
+
+            if(n1 in self.bulk_nodes and n2 in self.bulk_nodes):
+                # if source in the minimum (0) super surface node, make every edge with nodes
+                # greater than 0.5 vacuum coord a capacity 100000
+                if(start=='min'):
+                    if(self.vacuum_direc==0):
+                        if(float(self.slabgraph.node[n1]['_atom_site_fract_x']) < 0.5 and 
+                           float(self.slabgraph.node[n2]['_atom_site_fract_x']) < 0.5):
+                            self.slabgraphtree.edge[n1][n2]['capacity'] = 1000000
+                            self.slabgraphtree.edge[n1][n2]['weight'] = 1000000
+                    elif(self.vacuum_direc==1):
+                        if(float(self.slabgraph.node[n1]['_atom_site_fract_y']) < 0.5 and 
+                           float(self.slabgraph.node[n2]['_atom_site_fract_y']) < 0.5):
+                            self.slabgraphtree.edge[n1][n2]['capacity'] = 1000000
+                            self.slabgraphtree.edge[n1][n2]['weight'] = 1000000
+                    elif(self.vacuum_direc==2):
+                        if(float(self.slabgraph.node[n1]['_atom_site_fract_z']) < 0.5 and 
+                           float(self.slabgraph.node[n2]['_atom_site_fract_z']) < 0.5):
+                            self.slabgraphtree.edge[n1][n2]['capacity'] = 1000000
+                            self.slabgraphtree.edge[n1][n2]['weight'] = 1000000
+
+                elif(start=='max'):
+                    if(self.vacuum_direc==0):
+                        if(float(self.slabgraph.node[n1]['_atom_site_fract_x']) > 0.5 and 
+                           float(self.slabgraph.node[n2]['_atom_site_fract_x']) > 0.5):
+                            self.slabgraphtree.edge[n1][n2]['capacity'] = 1000000
+                            self.slabgraphtree.edge[n1][n2]['weight'] = 1000000
+                    elif(self.vacuum_direc==1):
+                        if(float(self.slabgraph.node[n1]['_atom_site_fract_y']) > 0.5 and 
+                           float(self.slabgraph.node[n2]['_atom_site_fract_y']) > 0.5):
+                            self.slabgraphtree.edge[n1][n2]['capacity'] = 1000000
+                            self.slabgraphtree.edge[n1][n2]['weight'] = 1000000
+                    elif(self.vacuum_direc==2):
+                        if(float(self.slabgraph.node[n1]['_atom_site_fract_z']) > 0.5 and 
+                           float(self.slabgraph.node[n2]['_atom_site_fract_z']) > 0.5):
+                            self.slabgraphtree.edge[n1][n2]['capacity'] = 1000000
+                            self.slabgraphtree.edge[n1][n2]['weight'] = 1000000
+                
+                elif(start=='neutral'):
+                    self.slabgraphtree.edge[n1][n2]['capacity'] = 1
+                    self.slabgraphtree.edge[n1][n2]['weight'] = 1
+
+                else:
+                    print("Error! only three options for weighted barrier (min, max, neutral)")
+                    sys.exit()
+                
+
 
     def add_surface_edges(self):
         """
@@ -1991,9 +2125,12 @@ class SlabGraph(MolecularGraph):
         print(str(edge_cut_set))
 
 
-    def stoer_wagner_slab_tree_cut(self):
+    def stoer_wagner_slab_tree_cut(self,weight_barrier=False):
 
         print("\n\nStoer-Wagner minimum cut on directed slab graph...")
+        # Firt create a barrier (aspect ratio of the slab is too large)
+        if(weight_barrier):
+            self.create_weighted_barrier_on_opposite_half(start='min')
         # uses stoer-wagner to do max flow (and indirectly min cut)
         # given source and target node
         self.cut_value1, self.partition1 = nx.minimum_cut(
@@ -2017,8 +2154,15 @@ class SlabGraph(MolecularGraph):
         print(self.partition1[0])
         print(self.partition1[1])
 
+        # remove the midpoint barrier
+        if(weight_barrier):
+            self.create_weighted_barrier_on_opposite_half(start='neutral')
+
         # now reverse the tree and reverse the source and target nodes
         self.slabgraphtreeREV=self.slabgraphtree.reverse(copy=True)
+        #  create a barrier (aspect ratio of the slab is too large)
+        if(weight_barrier):
+            self.create_weighted_barrier_on_opposite_half(start='max')
         self.cut_value2, self.partition2 = nx.minimum_cut(
                 self.slabgraphtreeREV,
                 self.super_surface_node_max,
@@ -2038,6 +2182,9 @@ class SlabGraph(MolecularGraph):
         print(self.partition2[0])
         print(self.partition2[1])
 
+        # remove the midpoint barrier
+        if(weight_barrier):
+            self.create_weighted_barrier_on_opposite_half(start='neutral')
 
     def remove_surface_partitions(self):
         """

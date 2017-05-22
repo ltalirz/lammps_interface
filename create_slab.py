@@ -1971,7 +1971,7 @@ def main():
 
     sim.slabgraph.create_slab_tree()
     #sim.slabgraph.redirect_slab_tree_by_coordinate_directionality()
-    sim.slabgraph.stoer_wagner_slab_tree_cut()
+    sim.slabgraph.stoer_wagner_slab_tree_cut(weight_barrier=True)
     sim.slabgraph.remove_surface_partitions()
     sim.slabgraph.add_all_connecting_nodes()
 
