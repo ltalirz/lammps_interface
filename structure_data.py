@@ -559,12 +559,12 @@ class MolecularGraph(nx.Graph):
                     self.node[label].update({'hybridization':'sp3'})
             elif element == "O":
                 if len(neighbours) >= 2:
-                    n_elems = [self.node[k]['element'] for k in neighbours]
+                    n_elems = set([self.node[k]['element'] for k in neighbours])
                     # if O is bonded to a metal, assume sp2 - like ... 
                     # there's probably many cases where this fails,
                     # but carboxylate groups, bridging hydroxy groups
                     # make this true.
-                    if (set(n_elems) & metals):
+                    if (n_elems <= metals):
                         self.node[label].update({'hybridization':'sp2'})
                     else:
                         self.node[label].update({'hybridization':'sp3'})
