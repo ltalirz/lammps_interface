@@ -483,9 +483,11 @@ class LammpsSimulation(object):
                     mff = mff[:-6] # remove _Water from end of name
                 if ff[-3:] == "CO2":
                     self.add_co2_model(ngraph, ff)
+                # TODO(pboyd): should have an eps_scale_factor for molecules??
                 p = getattr(ForceFields, mff)(graph=self.subgraphs[m], 
                                          cutoff=self.options.cutoff, 
-                                         h_bonding=h_bonding)
+                                         h_bonding=h_bonding,
+                                         eps_scale_factor=1.)
                 self.special_commands += p.special_commands()
 
     def assign_molecule_ids(self, graph):
