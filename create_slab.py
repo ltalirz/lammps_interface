@@ -1956,13 +1956,31 @@ def main():
     sim.merge_graphs()
 
     # creating slab graph
-    sim.slabgraph.enumerate_all_primitive_rings()
+    sim.slabgraph.remove_erroneous_disconnected_comps()
     sim.slabgraph.condense_graph()
-    sim.slabgraph.enumerate_all_primitive_rings()
+    #sim.slabgraph.enumerate_all_primitive_rings()
+    sim.slabgraph.identify_undercoordinated_surface_nodes()
 
-
-    # write output
     sim.slabgraph.write_slabgraph_cif(cell)
+    sim.slabgraph.write_slabgraph_cif(cell,bond_block=False,descriptor="debug")
+    # write output
+
+    sim.slabgraph.normalize_bulk_edge_weights()
+    sim.slabgraph.connect_super_surface_nodes()
+
+
+    sim.slabgraph.create_slab_tree()
+    #sim.slabgraph.redirect_slab_tree_by_coordinate_directionality()
+    sim.slabgraph.stoer_wagner_slab_tree_cut(weight_barrier=True)
+    sim.slabgraph.remove_surface_partitions()
+    sim.slabgraph.add_all_connecting_nodes()
+
+    #sim.slabgraph.draw_slabgraph()
+    sim.slabgraph.write_slabgraph_cif(cell,bond_block=False,descriptor="deH")
+    sim.slabgraph.write_silanol_surface_density(cell)
+
+
+    
     # sim.write_lammps_files()
     #if options.output_cif:
     #    print("CIF file requested. Exiting...")

@@ -1,4 +1,4 @@
-#/usr/bin/env python
+#/isr/bin/env python
 from datetime import date
 import numpy as np
 from scipy.spatial import distance
@@ -19,6 +19,8 @@ from uff import UFF_DATA
 import networkx as nx
 import operator
 
+#irom writeNodesEdges import writeObjects
+
 try:
     import networkx as nx
     from networkx.algorithms import approximation
@@ -28,30 +30,10 @@ except ImportError:
     sys.exit()
 from collections import OrderedDict
 from atomic import MASS, ATOMIC_NUMBER, COVALENT_RADII
+from atomic import organic, non_metals, noble_gases, metalloids, lanthanides, actinides, transition_metals
+from atomic import alkali, alkaline_earth, main_group, metals
 from ccdc import CCDC_BOND_ORDERS
 DEG2RAD=np.pi/180.
-# keeping track of some different groups of atoms.
-organic = set(["H", "C", "N", "O", "S"])
-non_metals = set(["H", "He", "C", "N", "O", "F", "Ne",
-                  "P", "S", "Cl", "Ar", "Se", "Br", "Kr",
-                  "I", "Xe", "Rn"])
-noble_gases = set(["He", "Ne", "Ar", "Kr", "Xe", "Rn"])
-metalloids = set(["B", "Si", "Ge", "As", "Sb", "Te", "At"])
-lanthanides = set(["La", "Ce", "Pr", "Nd", "Pm", "Sm", "Eu",
-                   "Gd", "Tb", "Dy", "Ho", "Er", "Tm", "Yb", "Lu"])
-actinides = set(["Ac", "Th", "Pa", "U", "Np", "Pu", "Am", "Cm", "Bk",
-                 "Cf", "Es", "Fm", "Md", "No", "Lr"])
-transition_metals = set(["Sc", "Ti", "V", "Cr", "Mn", "Fe", "Co", "Ni",
-                         "Cu", "Zn", "Y", "Zr", "Nb", "Mo", "Tc", "Ru",
-                         "Rh", "Pd", "Ag", "Cd", "Hf", "Ta", "W", "Re",
-                         "Os", "Ir", "Pt", "Ir", "Pt", "Au", "Hg", "Rf",
-                         "Db", "Sg", "Bh", "Hs", "Mt", "Ds", "Rg", "Cn"])
-alkali = set(["Li", "Na", "K", "Rb", "Cs", "Fr"])
-alkaline_earth = set(["Be", "Mg", "Ca", "Sr", "Ba", "Ra"])
-main_group = set(["Al", "Ga", "Ge", "In", "Sn", "Sb", "Tl", "Pb", "Bi",
-                  "Po", "At", "Cn", "Uut", "Fl", "Uup", "Lv", "Uus"])
-
-metals = main_group | alkaline_earth | alkali | transition_metals | metalloids
 
 class MolecularGraph(nx.Graph):
     """Class to contain all information relating a structure file
@@ -386,7 +368,31 @@ class MolecularGraph(nx.Graph):
 
         angle = a / DEG2RAD
         return angle
-    
+   
+    def coplanar(self, node):
+        """ Determine if this node, and it's neighbors are
+        all co-planar.
+
+        """
+        coord = self.node[node]['cartesian_coordinates']
+        vects = []
+        for j in self.neighbors(node):
+            vects.append(self.node[j]['cartesian_coordinates'] - coord)
+
+        # use the first two vectors to define a plane
+        v1 = vects[0]
+        v2 = vects[1]
+        n = np.cross(v1, v2)
+        n /= np.linalg.norm(n)
+        for v in vects[2:]:
+            v /= np.linalg.norm(v)
+            # what is a good tolerance for co-planarity in MOFs?
+            # this is used solely to determine if a 4-coordinated metal atom
+            # is square planar or tetrahedral..
+            if not np.allclose(np.dot(v,n), 0., atol=0.02):
+                return False
+        return True
+
     def compute_dihedral_between(self, a, b, c, d):
         coorda = self.node[a]['cartesian_coordinates']
         coordb = self.node[b]['cartesian_coordinates']
@@ -1472,6 +1478,9 @@ class MolecularGraph(nx.Graph):
 class SlabGraph(MolecularGraph):
     def __init__(self,graph):
         self.slabgraph=graph
+        #a=0,b=1,c=2
+        self.vacuum_direc=2
+        self.num_nodes=self.slabgraph.number_of_nodes()
     
     def __str__(self):
         pass
@@ -1483,6 +1492,68 @@ class SlabGraph(MolecularGraph):
             if(set(data['element'])>zeo_types):
                 print("Warning! Structure determined not to be zeolite! Undefined behavior...")
 
+    #def draw_slabgraph(self):
+    #    numberNodes, numberEdges = 100, 500
+    #    H = nx.gnm_random_graph(numberNodes,numberEdges)
+    #    #print 'nodes:', H.nodes()
+    #    #print 'edges:', H.edges()
+    #    # return a dictionary of positions keyed by node
+    #    pos = nx.random_layout(H,dim=3)
+    #    # convert to list of positions (each is a list)
+    #    xyz = [list(pos[i]) for i in pos]
+    #    print(xyz)
+    #    print(type(xyz))
+    #    print(type(xyz[0]))
+    #    print(type(xyz[0][0]))
+    #    degree = H.degree().values()
+    #    print(type(degree))
+    #    print(type(degree[0]))
+    #    writeObjects(xyz, edges=H.edges(), scalar=degree, name='degree', fileout='network')    
+
+    #    degree=[]
+    #    xyz=[]
+    #    for node,data in self.slabgraph.nodes_iter(data=True):
+    #        #print(data['cartesian_coordinates'])
+    #        xyz.append(list(data['cartesian_coordinates']))
+    #        if(data['element']=="Si"):
+    #            degree.append(5)
+    #        elif(data['element']=="X"):
+    #            degree.append(20)
+    #    #writeObjects(xyz, edges=self.slabgraph.edges(), scalar=degree, name='degree', fileout='network')    
+    #    print(type(xyz))
+    #    print(type(xyz[0]))
+    #    print(type(xyz[0][0]))
+    #    print(type(degree))
+    #    print(type(degree[0]))
+
+    #    f=open('test.xyz','w')
+    #    f.write("%d\n\n"%(len(xyz)))
+    #    for elem in xyz:
+    #        f.write("Si %.5f %.5f %.5f\n"%(elem[0],elem[1],elem[2]))
+    #    f.close()
+
+    def remove_erroneous_disconnected_comps(self):
+        """
+        Remove erroneous disconnected components created by ASE
+        Doesn't happy except for extremely high miller faces w/ASE but nonetheless
+        we should handle it and remove them, and alert the user
+        """
+
+        if not nx.is_connected(self.slabgraph):
+            # get a list of unconnected networks
+            sub_graphs = list(nx.connected_component_subgraphs(self.slabgraph))
+
+            main_graph = sub_graphs[0]
+
+            # find the largest network in that list
+            for sg in sub_graphs:
+                if len(sg.nodes()) > len(main_graph.nodes()):
+                    main_graph = sg
+
+            self.slabgraph = main_graph
+
+            print("WARNING! You passed in a graph with disconnected components...\
+                  Assuming the largest component is the slab and continuing...")
 
     def condense_graph(self):
         """
@@ -1490,9 +1561,9 @@ class SlabGraph(MolecularGraph):
         """
 
         # store the node indices of all removed O's
-        self.removed_nodes = set()
-        self.removed_edges = set()
-        self.added_edges = set()
+        self.removed_nodes = nx.Graph()
+        self.removed_edges = []
+        self.added_edges = []
 
         for node, data in self.slabgraph.nodes_iter(data=True):
             if(data['element']=="O"): 
@@ -1503,15 +1574,15 @@ class SlabGraph(MolecularGraph):
                 if(len(neighbors)==2):
                     # normal O coordination environment
                     # remove both edges to Si
-                    self.removed_edges.add((neighbors[0],node))
-                    self.removed_edges.add((neighbors[1],node))
+                    self.removed_edges.append((neighbors[0],node))
+                    self.removed_edges.append((neighbors[1],node))
                 
                     # create an edge between the adjacent Si
-                    self.added_edges.add((neighbors[0],neighbors[1]))
+                    self.added_edges.append((neighbors[0],neighbors[1]))
                 elif(len(neighbors)==1):
                     # the arbitrary initial slab config can have dangling O's
                     # remove both edges to Si
-                    self.removed_edges.add((neighbors[0],node))
+                    self.removed_edges.append((neighbors[0],node))
 
                     # no edge to add to the all Si graph
                 else:
@@ -1520,7 +1591,7 @@ class SlabGraph(MolecularGraph):
                     pass
                 
                 # remove the O node
-                self.removed_nodes.add(node)
+                self.removed_nodes.add_node(node,data)
 
         # remove Si-O or Al-O edges
         for edge in self.removed_edges:
@@ -1528,8 +1599,14 @@ class SlabGraph(MolecularGraph):
     
             # the sorted edge dict is used by write_CIF but IS NOT updated when modifying
             # the Nx graph data structure, hence we need to manually add here
-            del self.slabgraph.sorted_edge_dict[(edge[0],edge[1])]
-            del self.slabgraph.sorted_edge_dict[(edge[1],edge[0])]
+            try:
+                del self.slabgraph.sorted_edge_dict[(edge[0],edge[1])]
+            except:
+                pass
+            try:
+                del self.slabgraph.sorted_edge_dict[(edge[1],edge[0])]
+            except:
+                pass
             #if(edge[0]<edge[1]):
             #    del self.slabgraph.sorted_edge_dict[(edge[0],edge[1])]
             #else:
@@ -1561,12 +1638,625 @@ class SlabGraph(MolecularGraph):
         #print((80,216) in self.slabgraph.sorted_edge_dict)
         #print((216,80) in self.slabgraph.sorted_edge_dict)
         # if necessary recompute cycle properties
-        self.slabgraph.compute_init_typing()
+
+        # TODO if we want to take some cycle building based approach
+        #self.slabgraph.compute_init_typing()
       
         print(self.slabgraph.name)      
 
-    def write_slabgraph_cif(self,cell):
-        write_CIF(self.slabgraph,cell)
+    def normalize_bulk_edge_weights(self):
+        """
+        Make sure weight for all existing edges in graph is 1
+        """
+
+        for n1,n2,data in self.slabgraph.edges_iter(data=True):
+            self.slabgraph[n1][n2]['weight']=1
+
+
+    def identify_undercoordinated_surface_nodes(self):
+
+        self.surface_nodes=[]
+        self.surface_nodes_0=[]
+        self.surface_nodes_max=[]
+        self.bulk_nodes=[]
+
+        for node,data in self.slabgraph.nodes_iter(data=True):
+            if(data['element']=="O"):
+                print("Error! O's have to be removed from graph first")
+
+            neighbors=self.slabgraph.neighbors(node)
+
+            if(len(neighbors)<4):
+                # if node is undercoordinated we identify it as a surface node
+                self.surface_nodes.append(node)
+                data['element']='X'
+                # For now rough approximation to distinguish nodes between the 2 surfaces
+                # TODO better
+                if(self.vacuum_direc==0):
+                    if(float(data['_atom_site_fract_x'])<0.5):
+                        self.surface_nodes_0.append(node)
+                    else:
+                        self.surface_nodes_max.append(node)
+                elif(self.vacuum_direc==1):
+                    if(float(data['_atom_site_fract_y'])<0.5):
+                        self.surface_nodes_0.append(node)
+                    else:
+                        self.surface_nodes_max.append(node)
+                elif(self.vacuum_direc==2):
+                    if(float(data['_atom_site_fract_z'])<0.5):
+                        self.surface_nodes_0.append(node)
+                    else:
+                        self.surface_nodes_max.append(node)
+            else:
+                # any fully coordinated node is automatically a bulk node
+                self.bulk_nodes.append(node)
+
+
+
+    def connect_super_surface_nodes(self):
+        """
+        Choose the first node on surface "0"
+        Connect all other surface_0->bulk connections to this first node
+        Each added node has weight 1 
+        Remove all other surface_0 nodes
+        """
+
+        self.super_surface_node_0=self.surface_nodes_0[0]
+        print("First node listed on 0 surface = %s%d"%(
+            self.slabgraph.node[self.super_surface_node_0]['element'],
+            self.super_surface_node_0))
+        num_connected_to_0=0
+        for i in range(1,len(self.surface_nodes_0)):
+            n1=self.surface_nodes_0[i]
+            #print("Surface node: %d"%n1)
+            for n2 in self.slabgraph.neighbors(n1):
+                if(n2 in self.bulk_nodes):
+                    #print("Bulk node: %d"%n2)
+                    edge=(self.super_surface_node_0,n2)
+                    # instead of adding duplicate edges, increase edge weight
+                    if edge not in self.slabgraph.edges():
+                        self.slabgraph.add_edge(*edge,weight=1)
+                    else:
+                        self.slabgraph[edge[0]][edge[1]]['weight']+=1
+                    num_connected_to_0+=1
+    
+            self.slabgraph.remove_node(n1)
+
+        # calculate total weight along the super node
+        self.super_surface_node_0_weight=0 
+        for node in self.slabgraph.neighbors(self.super_surface_node_0):
+            self.super_surface_node_0_weight+=\
+                self.slabgraph[self.super_surface_node_0][node]['weight']
+
+        print("%d edges added to super_surface_node_0"%(num_connected_to_0))
+        print("edges to super_surface_node_max: %s"%\
+              str(self.slabgraph.edges(self.super_surface_node_0,data=True)))
+        print("%d neighbors of super_surface_node_max"%\
+              (len(self.slabgraph.neighbors(self.super_surface_node_0))))
+        print("Total weight out: %d"%self.super_surface_node_0_weight)
+
+        
+    
+        self.super_surface_node_max=self.surface_nodes_max[0]
+        print("First node listed on max surface = %s%d"%\
+              (self.slabgraph.node[self.super_surface_node_max]['element'],
+              self.super_surface_node_max))
+
+        num_connected_to_max=0
+        for i in range(1,len(self.surface_nodes_max)):
+            n1=self.surface_nodes_max[i]
+            for n2 in self.slabgraph.neighbors(n1):
+                if(n2 in self.bulk_nodes):
+                    edge=(self.super_surface_node_max,n2)
+                    # instead of adding duplicate edges, increase edge weight
+                    if edge not in self.slabgraph.edges():
+                        self.slabgraph.add_edge(*edge,weight=1)
+                    else:
+                        self.slabgraph[edge[0]][edge[1]]['weight']+=1
+                    num_connected_to_max+=1
+    
+            self.slabgraph.remove_node(n1)
+
+        # calculate total weight along the super node
+        self.super_surface_node_max_weight=0 
+        for node in self.slabgraph.neighbors(self.super_surface_node_max):
+            self.super_surface_node_max_weight+=\
+                self.slabgraph[self.super_surface_node_max][node]['weight']
+
+        print("%d edges added to super_surface_node_max"%(num_connected_to_max))
+        print("edges to super_surface_node_0: %s"%\
+              str(self.slabgraph.edges(self.super_surface_node_max)))
+        print("%d neighbors of super_surface_node_max"%\
+              (len(self.slabgraph.neighbors(self.super_surface_node_max))))
+        print("Total weight out: %d"%self.super_surface_node_max_weight)
+
+
+                    
+    def create_slab_tree(self):
+        """
+        Turn the slabgraph into a tree
+        """
+        #self.slabgraphtree = nx.bfs_tree(self.slabgraph, self.super_surface_node_0)
+        #self.iterative_BFS_tree_structure(self.super_surface_node_0)
+
+        self.slabgraphtree=self.slabgraph.to_directed()
+        self.change_capacity_weight_of_super_surface_edges(super_surface_weight='max')
+   
+
+
+    def iterative_BFS_tree_structure(self, v):                                  
+        """                                                                     
+        Construct a dict with key that indexes depth of BFS tree,               
+        and the value is a set of all nodes at that depth                       
+        """                                                  
+
+        if(nx.is_tree(self.slabgraphtree)):                   
+            print("\n\nPRINTING SLAB GRAPH AT EACH LEVEL OF TREE DEPTH")                       
+            print("--------------------------------------")                         
+                                                                                    
+                                                                                    
+            # intitialize first level                                               
+            stack = set()                                                           
+            stack.add(v)                                                            
+            curr_depth = 0                                                          
+                                                                                    
+            self.BFS_tree_dict = {                                                  
+                                    curr_depth: set(stack)                          
+                                 }                                                  
+                                                                                    
+            curr_depth += 1                                                         
+                                                                                    
+                                                                                    
+            # Move through every depth level in tree                                
+            while(len(stack) != 0):                                                 
+                                                                                    
+                # iterate over all up_nodes in stack                                
+                for up_node in stack.copy():                                        
+                                                                                    
+                    # get all down nodes from this up_node                          
+                    for down_node in self.slabgraphtree.successors_iter(up_node):            
+                        stack.add(down_node)                                        
+                                                                                    
+                    # after we've gotten all down nodes, remove this up node        
+                    stack.remove(up_node)                                           
+                                                                                    
+                # add this depth and all nodes to the graph                         
+                if(len(stack) != 0):                                                
+                    self.BFS_tree_dict[curr_depth] = set(stack)                     
+                    curr_depth += 1                                                 
+                                                                                    
+                                                                                    
+                                                                                    
+            print("Depth of BFS tree: " + str(len(self.BFS_tree_dict.keys())))      
+            for i in range(len(self.BFS_tree_dict.keys())):                         
+                print("Level " + str(i) + ": " + str(len(self.BFS_tree_dict[i])))   
+                print(self.BFS_tree_dict[i])
+
+
+            # Doesn't seem to be a way to override the 1 parent rule in any default
+            # tree generator function in networkx, therefore need to go back in manually
+            for i in range(len(self.BFS_tree_dict.keys())-1):
+                #print("LEvel %d:"%i)
+                for n1 in self.BFS_tree_dict[i]:
+                    for n2 in self.BFS_tree_dict[i+1]:
+                        directed_edge=(n1, n2)
+                        rev_directed_edge=(n2, n1)
+                        if(directed_edge not in self.slabgraphtree.edges()):
+                            if(directed_edge in self.slabgraph.edges() or
+                               rev_directed_edge in self.slabgraph.edges()):
+                                #print("Adding directed edge: %s"%str(directed_edge))
+                                self.slabgraphtree.add_edge(*directed_edge)
+
+        else:
+            # we already have made sure one child can have multiple parents
+            pass
+        
+        self.slabgraphtree=self.slabgraph.to_directed()
+        self.change_capacity_weight_of_super_surface_edges(super_surface_weight='max')
+
+
+    def change_capacity_weight_of_super_surface_edges(self,super_surface_weight='one'):
+        """
+        Depending on which min cut algo we are using, we may want to reweight
+        the value of each edge between the super surface node and each of its bulk
+        neighbors
+
+        - 'one' sets the weight of each one of these edges to one
+        - 'max' sets the weight of each one of these edges to the sum of the number
+            of neighbors of the super surface node
+        """
+
+
+        if(super_surface_weight=='one'):
+            surface_0_weight=1
+            surface_max_weight=1
+        elif(super_surface_weight=='max'):
+            surface_0_weight=float(self.super_surface_node_0_weight)
+            surface_max_weight=float(self.super_surface_node_max_weight)
+        else:
+            print("Error, weight to super surface node can only be 'one' or 'max'")
+            sys.exit()
+
+        # now reweight each edge between the supersurface node and the bulk node neighbors
+        for edge in self.slabgraphtree.edges_iter():
+            self.slabgraphtree.edge[edge[0]][edge[1]]['capacity']=\
+                float(self.slabgraph.edge[edge[0]][edge[1]]['weight'])
+            self.slabgraphtree.edge[edge[0]][edge[1]]['weight']=\
+                float(self.slabgraph.edge[edge[0]][edge[1]]['weight'])
+
+            # However, if one node in the edge is the super surface node,
+            # reset the capacity to the max weight of the supernode
+            if(edge[0] == self.super_surface_node_0 or \
+               edge[1] == self.super_surface_node_0):
+                self.slabgraphtree.edge[edge[0]][edge[1]]['capacity'] = \
+                    surface_0_weight 
+                    #1
+                    #self.super_surface_node_0_weight
+                self.slabgraphtree.edge[edge[0]][edge[1]]['weight'] = \
+                    surface_0_weight 
+                    #1
+                    #self.super_surface_node_0_weight
+
+            elif(edge[0] == self.super_surface_node_max or \
+                 edge[1] == self.super_surface_node_max):
+                self.slabgraphtree.edge[edge[0]][edge[1]]['capacity'] = \
+                    surface_max_weight
+                    #1
+                    #self.super_surface_node_max_weight
+                self.slabgraphtree.edge[edge[0]][edge[1]]['weight'] = \
+                    surface_max_weight
+                    #1
+                    #self.super_surface_node_max_weight
+
+            #print(edge)
+            #print(self.slabgraphtree.edge[edge[0]][edge[1]]['capacity'])
+
+
+    def redirect_slab_tree_by_coordinate_directionality(self,start="min"):
+        """
+        Redirect the edges in the directed version of the slab graph
+        solely based on the fractional coordinate that represents the
+        crystallographic position perpendicular to the surface (parallel to the
+        vacuum)
+
+        if start=='min', the parent node must have a vacuum_coord < child node
+        if start=='max', the parent node must have a vacuum_coord > child node
+        """
+
+        edges_to_reverse=[]
+        for edge in self.slabgraphtree.edges_iter():
+            n1=edge[0]
+            n2=edge[1]
+
+            to_reverse=False
+            
+            if(self.vacuum_direc==0):
+                if(self.slabgraph.node[n1]['_atom_site_fract_x']<
+                   self.slabgraph.node[n2]['_atom_site_fract_x']):
+                    if(start=="max"):
+                        to_reverse=True
+                else:
+                    if(start=="min"):
+                        to_reverse=True
+            elif(self.vacuum_direc==1):
+                if(self.slabgraph.node[n1]['_atom_site_fract_y']<
+                   self.slabgraph.node[n2]['_atom_site_fract_y']):
+                    if(start=="max"):
+                        to_reverse=True
+                else:
+                    if(start=="min"):
+                        to_reverse=True
+            elif(self.vacuum_direc==2):
+                if(self.slabgraph.node[n1]['_atom_site_fract_z']<
+                   self.slabgraph.node[n2]['_atom_site_fract_z']):
+                    if(start=="max"):
+                        to_reverse=True
+                else:
+                    if(start=="min"):
+                        to_reverse=True
+                        
+            # Take special care to ensure the correct directionality each edge 
+            # betweeen the super surface node and the first bulk node
+            if(start=="min"):
+                if(n2 == self.super_surface_node_0):
+                    to_reverse=True
+            elif(start=="max"):
+                if(n1 == self.super_surface_node_max):
+                    to_reverse=True
+    
+            if(to_reverse):
+                data=self.slabgraphtree[n1][n2].copy()
+                edges_to_reverse.append((n1,n2,data))
+
+
+
+        for n1,n2,data in edges_to_reverse:
+            print("Reversing! ",n1,n2, data)
+            self.slabgraphtree.remove_edge(n1,n2)
+            self.slabgraphtree.add_edge(n2,n1,data)
+                        
+    def create_weighted_barrier_at_slab_center(self, start='weight'):
+        """
+        Here just set a high weight for any edge that is bisected by the center plane
+        of the vacuum_direc coordinate
+
+        i.e. node1 has a c-coordinate less than 0.5 and and node2 has a 
+        c-coordinate greater than 0.5
+        """
+
+        for edge in self.slabgraphtree.edges_iter():
+            n1=edge[0]
+            n2=edge[1]
+
+            if(n1 in self.bulk_nodes and n2 in self.bulk_nodes):
+                if(start=='weight'):
+                    if(self.vacuum_direc==0):
+                        if(((float(self.slabgraph.node[n1]['_atom_site_fract_x'])-0.5) < 0) !=\
+                           ((float(self.slabgraph.node[n2]['_atom_site_fract_x'])-0.5) < 0)):
+                            self.slabgraphtree.edge[n1][n2]['capacity'] = 1000000
+                            self.slabgraphtree.edge[n1][n2]['weight'] = 1000000
+                    elif(self.vacuum_direc==1):
+                        if(((float(self.slabgraph.node[n1]['_atom_site_fract_y'])-0.5) < 0) !=\
+                           ((float(self.slabgraph.node[n2]['_atom_site_fract_y'])-0.5) < 0)):
+                            self.slabgraphtree.edge[n1][n2]['capacity'] = 1000000
+                            self.slabgraphtree.edge[n1][n2]['weight'] = 1000000
+                    elif(self.vacuum_direc==2):
+                        if(((float(self.slabgraph.node[n1]['_atom_site_fract_z'])-0.5) < 0) !=\
+                           ((float(self.slabgraph.node[n2]['_atom_site_fract_z'])-0.5) < 0)):
+                            self.slabgraphtree.edge[n1][n2]['capacity'] = 1000000
+                            self.slabgraphtree.edge[n1][n2]['weight'] = 1000000
+                elif(start=='unweight'):
+                    self.slabgraphtree.edge[n1][n2]['capacity'] = 1
+                    self.slabgraphtree.edge[n1][n2]['weight'] = 1
+
+            
+    def create_weighted_barrier_on_opposite_half(self, start='min'):
+        """
+        If we have a weighted barrier:
+        if start == 'min':
+             all non-super surface edges with vacuum_coord > 0.5 have weight 1,000,000
+        else if start == 'max'
+             all non-super surface edges with vacuum_coord < 0.5 have weight 1,000,000
+        else if start == 'neutral'
+             all non-super surface edges reset to weigth 1
+        """
+        for edge in self.slabgraphtree.edges_iter():
+            n1=edge[0]
+            n2=edge[1]
+
+            if(n1 in self.bulk_nodes and n2 in self.bulk_nodes):
+                # if source in the minimum (0) super surface node, make every edge with nodes
+                # greater than 0.5 vacuum coord a capacity 100000
+                if(start=='min'):
+                    if(self.vacuum_direc==0):
+                        if(float(self.slabgraph.node[n1]['_atom_site_fract_x']) < 0.5 and 
+                           float(self.slabgraph.node[n2]['_atom_site_fract_x']) < 0.5):
+                            self.slabgraphtree.edge[n1][n2]['capacity'] = 1000000
+                            self.slabgraphtree.edge[n1][n2]['weight'] = 1000000
+                    elif(self.vacuum_direc==1):
+                        if(float(self.slabgraph.node[n1]['_atom_site_fract_y']) < 0.5 and 
+                           float(self.slabgraph.node[n2]['_atom_site_fract_y']) < 0.5):
+                            self.slabgraphtree.edge[n1][n2]['capacity'] = 1000000
+                            self.slabgraphtree.edge[n1][n2]['weight'] = 1000000
+                    elif(self.vacuum_direc==2):
+                        if(float(self.slabgraph.node[n1]['_atom_site_fract_z']) < 0.5 and 
+                           float(self.slabgraph.node[n2]['_atom_site_fract_z']) < 0.5):
+                            self.slabgraphtree.edge[n1][n2]['capacity'] = 1000000
+                            self.slabgraphtree.edge[n1][n2]['weight'] = 1000000
+
+                elif(start=='max'):
+                    if(self.vacuum_direc==0):
+                        if(float(self.slabgraph.node[n1]['_atom_site_fract_x']) > 0.5 and 
+                           float(self.slabgraph.node[n2]['_atom_site_fract_x']) > 0.5):
+                            self.slabgraphtree.edge[n1][n2]['capacity'] = 1000000
+                            self.slabgraphtree.edge[n1][n2]['weight'] = 1000000
+                    elif(self.vacuum_direc==1):
+                        if(float(self.slabgraph.node[n1]['_atom_site_fract_y']) > 0.5 and 
+                           float(self.slabgraph.node[n2]['_atom_site_fract_y']) > 0.5):
+                            self.slabgraphtree.edge[n1][n2]['capacity'] = 1000000
+                            self.slabgraphtree.edge[n1][n2]['weight'] = 1000000
+                    elif(self.vacuum_direc==2):
+                        if(float(self.slabgraph.node[n1]['_atom_site_fract_z']) > 0.5 and 
+                           float(self.slabgraph.node[n2]['_atom_site_fract_z']) > 0.5):
+                            self.slabgraphtree.edge[n1][n2]['capacity'] = 1000000
+                            self.slabgraphtree.edge[n1][n2]['weight'] = 1000000
+                
+                elif(start=='neutral'):
+                    self.slabgraphtree.edge[n1][n2]['capacity'] = 1
+                    self.slabgraphtree.edge[n1][n2]['weight'] = 1
+
+                else:
+                    print("Error! only three options for weighted barrier (min, max, neutral)")
+                    sys.exit()
+                
+
+
+    def add_surface_edges(self):
+        """
+        Make sure all existing edges in graph have weight of 1
+        Add weights of infinity to all "surface edges in graph"
+        """
+
+        self.surface_edges=[]
+
+        edge_data={ 'order':1000000, 'length': 4.0, 'symflag':'--' } 
+        for i in range(1,len(self.surface_nodes)):
+            edge=(self.surface_nodes[0],self.surface_nodes[i])
+            self.surface_edges.append(edge)
+            self.slabgraph.add_edge(*edge,weight=1000000,attr_dict=edge_data)
+
+
+    def add_bulk_loop_edges(self):
+        """
+        If node is not a surface node, add a loop to itself with high weight
+        """
+        self.bulk_loop_edges=[]
+        edge_data={ 'order':1000000, 'length': 4.0, 'symflag':'--' } 
+        for i in range(0,len(self.bulk_nodes)):
+            edge=(self.bulk_nodes[i],self.surface_nodes[0])
+            self.bulk_loop_edges.append(edge)
+            self.slabgraph.add_edge(*edge,weight=1000000,attr_dict=edge_data)
+
+
+    def stoer_wagner_slab_cut(self):
+        cut_value, partition = nx.stoer_wagner(self.slabgraph)
+        print(cut_value)        
+        print(partition)
+
+
+    def kcutsets_slab_cut(self):
+        cutsets = list(nx.all_node_cuts(self.slabgraph))
+        print(len(cutsets))
+        for cutset in cutsets:
+            print(cutset)
+
+    def minimum_edge_slab_cut(self):
+
+        edge_cut_set=nx.minimum_edge_cut(self.slabgraph,
+                                         s=self.super_surface_node_0,
+                                         t=self.super_surface_node_max)
+
+        print(len(edge_cut_set))
+        print(str(edge_cut_set))
+
+    def minimum_edge_slab_tree_cut(self):
+
+        edge_cut_set=nx.minimum_edge_cut(self.slabgraphtree,
+                                         s=self.super_surface_node_0,
+                                         t=self.super_surface_node_max)
+
+        print(len(edge_cut_set))
+        print(str(edge_cut_set))
+
+
+    def stoer_wagner_slab_tree_cut(self,weight_barrier=False):
+
+        print("\n\nStoer-Wagner minimum cut on directed slab graph...")
+        # Firt create a barrier (aspect ratio of the slab is too large)
+        if(weight_barrier):
+            self.create_weighted_barrier_on_opposite_half(start='min')
+        # uses stoer-wagner to do max flow (and indirectly min cut)
+        # given source and target node
+        self.cut_value1, self.partition1 = nx.minimum_cut(
+                self.slabgraphtree,
+                self.super_surface_node_0,
+                self.super_surface_node_max)#,
+                #flow_func=nx.algorithms.flow.shortest_augmenting_path)
+
+        # wichever partition is the biggest is the one we keep
+        # for now I am hoping that the algo always finds the symmetrically unique
+        # cut CLOSEST to either the sink or source node
+        if(len(self.partition1[0])>len(self.partition1[1])):
+            self.keep_partition_1=self.partition1[0].copy()
+            self.remove_partition_1=self.partition1[1].copy()
+        else:
+            self.keep_partition_1=self.partition1[1].copy()
+            self.remove_partition_1=self.partition1[0].copy()
+
+        print("\nForward tree cut value, partiotioning")
+        print(self.cut_value1)        
+        print(self.partition1[0])
+        print(self.partition1[1])
+
+        # remove the midpoint barrier
+        if(weight_barrier):
+            self.create_weighted_barrier_on_opposite_half(start='neutral')
+
+        # now reverse the tree and reverse the source and target nodes
+        self.slabgraphtreeREV=self.slabgraphtree.reverse(copy=True)
+        #  create a barrier (aspect ratio of the slab is too large)
+        if(weight_barrier):
+            self.create_weighted_barrier_on_opposite_half(start='max')
+        self.cut_value2, self.partition2 = nx.minimum_cut(
+                self.slabgraphtreeREV,
+                self.super_surface_node_max,
+                self.super_surface_node_0)#,
+                #flow_func=nx.algorithms.flow.shortest_augmenting_path)
+
+        # determine which are the removal/keep partitions
+        if(len(self.partition2[0])>len(self.partition2[1])):
+            self.keep_partition_2=self.partition2[0].copy()
+            self.remove_partition_2=self.partition2[1].copy()
+        else:
+            self.keep_partition_2=self.partition2[1].copy()
+            self.remove_partition_2=self.partition2[0].copy()
+
+        print("\nReverse tree cut value, partiotioning")
+        print(self.cut_value2)        
+        print(self.partition2[0])
+        print(self.partition2[1])
+
+        # remove the midpoint barrier
+        if(weight_barrier):
+            self.create_weighted_barrier_on_opposite_half(start='neutral')
+
+    def remove_surface_partitions(self):
+        """
+        Takes two partitions to remove from the slab graph
+        one for each surface
+        """
+
+        
+        self.all_remove = self.remove_partition_1 | self.remove_partition_2
+
+        print("\n\nAll metal nodes to remove:")
+        print(self.all_remove)
+
+        for node in self.all_remove:
+            self.slabgraph.remove_node(node)
+
+    def add_all_connecting_nodes(self):
+       
+        print("\n\nAdd back in the missing O's")
+
+        # these are all the removed oxygens 
+        self.final_added_nodes = set()
+        self.final_added_edges = []
+
+        for edge in self.removed_edges:
+            n1 = edge[0]
+            n2 = edge[1]
+       
+            if n1 in self.slabgraph.nodes():
+                if(n1 not in self.final_added_nodes):
+                    self.slabgraph.add_node(n2, self.removed_nodes.node[n2])
+                    self.final_added_nodes.add(n2)
+                    #print("Added!")
+                    #print(self.slabgraph.node[n2])
+                    #print(self.slabgraph.node[n2]['element'])
+                    #print(self.final_added_nodes)
+            elif n2 in self.slabgraph.nodes():
+                if(n2 not in self.final_added_nodes):
+                    self.slabgraph.add_node(n1, self.removed_nodes.node[n1])
+                    self.final_added_nodes.add(n1)
+                    #print("Added!")
+                    #print(self.slabgraph.node[n1])
+                    #print(self.slabgraph.node[n1]['element'])
+                    #print(self.final_added_nodes)
+
+                
+
+        # NOTE doesn't work
+        #for node in self.removed_nodes:
+        #    # for each neighbor of node in the parent class Molecular Graph
+        #    for neigh in self.neighbors(node):
+        #        if neigh in self.slabgraph.nodes():
+        #            self.final_added_nodes.append(self.graph.get_node(neigh))
+
+
+        #for node in self.final_added_nodes:
+        #    print(node)
+        #    self.slabgraph.add_node(node)
+                    
+
+    def write_silanol_surface_density(self,cell):
+
+        print("Surface silanol density: %.5f"%(self.cut_value1/(cell.a*cell.b)))
+        print("Surface silanol density: %.5f"%(self.cut_value2/(cell.a*cell.b)))   
+
+
+    def write_slabgraph_cif(self,cell,bond_block=True,descriptor="debug"):
+        write_CIF(self.slabgraph,cell,bond_block,descriptor)
 
     def enumerate_all_primitive_rings(self):
         """
@@ -1589,6 +2279,9 @@ class SlabGraph(MolecularGraph):
         print("Min cycle length: " + str(min_cycle_length))
         print("Max cycle length: " + str(max_cycle_length))
         print("Total rings: "      + str(total_rings))
+
+
+# END SLAB GRAPH CLASS
 
 def del_parenth(string):
     return re.sub(r'\([^)]*\)', '' , string)
@@ -1640,9 +2333,9 @@ def from_CIF(cifname):
     mg.cell = cell
     return cell, mg
 
-def write_CIF(graph, cell):
+def write_CIF(graph, cell, bond_block=True,descriptor="debug"):
     """Currently used for debugging purposes"""
-    c = CIF(name="%s.debug"%graph.name)
+    c = CIF(name="%s.%s"%(graph.name,descriptor))
     # data block
     c.add_data("data", data_=graph.name)
     c.add_data("data", _audit_creation_date=
@@ -1701,25 +2394,26 @@ def write_CIF(graph, cell):
             c.add_data("atoms", _atom_type_partial_charge="0.0")
     # bond block
     # must re-sort them based on bond type (Mat Sudio)
-    tosort = [(data['order'], (n1, n2, data)) for n1, n2, data in graph.edges_iter2(data=True)]
-    for ord, (n1, n2, data) in sorted(tosort, key=lambda tup: tup[0]):
-        type = CCDC_BOND_ORDERS[data['order']]
-        dist = data['length'] 
-        sym = data['symflag']
+    if(bond_block):
+        tosort = [(data['order'], (n1, n2, data)) for n1, n2, data in graph.edges_iter2(data=True)]
+        for ord, (n1, n2, data) in sorted(tosort, key=lambda tup: tup[0]):
+            type = CCDC_BOND_ORDERS[data['order']]
+            dist = data['length'] 
+            sym = data['symflag']
 
 
-        label1 = "%s%i"%(graph.node[n1]['element'], n1)
-        label2 = "%s%i"%(graph.node[n2]['element'], n2) 
-        c.add_data("bonds", _geom_bond_atom_site_label_1=
-                                    CIF.geom_bond_atom_site_label_1(label1))
-        c.add_data("bonds", _geom_bond_atom_site_label_2=
-                                    CIF.geom_bond_atom_site_label_2(label2))
-        c.add_data("bonds", _geom_bond_distance=
-                                    CIF.geom_bond_distance(dist))
-        c.add_data("bonds", _geom_bond_site_symmetry_2=
-                                    CIF.geom_bond_site_symmetry_2(sym))
-        c.add_data("bonds", _ccdc_geom_bond_type=
-                                    CIF.ccdc_geom_bond_type(type))
+            label1 = "%s%i"%(graph.node[n1]['element'], n1)
+            label2 = "%s%i"%(graph.node[n2]['element'], n2) 
+            c.add_data("bonds", _geom_bond_atom_site_label_1=
+                                        CIF.geom_bond_atom_site_label_1(label1))
+            c.add_data("bonds", _geom_bond_atom_site_label_2=
+                                        CIF.geom_bond_atom_site_label_2(label2))
+            c.add_data("bonds", _geom_bond_distance=
+                                        CIF.geom_bond_distance(dist))
+            c.add_data("bonds", _geom_bond_site_symmetry_2=
+                                        CIF.geom_bond_site_symmetry_2(sym))
+            c.add_data("bonds", _ccdc_geom_bond_type=
+                                        CIF.ccdc_geom_bond_type(type))
     
     print('Output cif file written to %s.cif'%c.name)
     file = open("%s.cif"%c.name, "w")
