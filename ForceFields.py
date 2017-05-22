@@ -1131,11 +1131,11 @@ class BTW_FF(ForceField):
         data['potential'].aa.theta3 = Theta3
         return 1
 
-    def pair_terms( self, node , data, cutoff):
+    def pair_terms(self, node, data, cutoff):
         """
         Buckingham equation in MM3 type is used!
         """
-        eps = BTW_atoms[data['force_field_type']][4]
+        eps = BTW_atoms[data['force_field_type']][4]*self.eps_scale_factor
         sig = BTW_atoms[data['force_field_type']][3]
 
         data['pair_potential']=PairPotential.BuckCoulLong()
@@ -1591,7 +1591,7 @@ class MOF_FF(ForceField):
         
         Also, Table for short range coulombic interactions
         """
-        eps = MOFFF_atoms[data['force_field_type']][4]
+        eps = MOFFF_atoms[data['force_field_type']][4] * self.eps_scale_factor
         sig = MOFFF_atoms[data['force_field_type']][3]
 
         data['pair_potential'] = PairPotential.Buck()
@@ -2069,7 +2069,7 @@ class FMOFCu(ForceField):
         data['potential'].aa.theta3 = Theta3
         return 1
 
-    def pair_terms( self, node , data, cutoff):
+    def pair_terms(self, node, data, cutoff):
         """
         Buckingham equation in MM3 type is used!
         """
@@ -2078,7 +2078,7 @@ class FMOFCu(ForceField):
 
         data['pair_potential']=PairPotential.BuckCoulLong()
         data['pair_potential'].cutoff= cutoff
-        data['pair_potential'].eps = eps 
+        data['pair_potential'].eps = eps * self.eps_scale_factor 
         data['pair_potential'].sig = sig
 
 
@@ -2113,7 +2113,7 @@ class UFF(ForceField):
     def pair_terms(self, node, data, cutoff):
         """Add L-J term to atom"""
         data['pair_potential'] = PairPotential.LjCutCoulLong()
-        data['pair_potential'].eps = UFF_DATA[data['force_field_type']][3] 
+        data['pair_potential'].eps = UFF_DATA[data['force_field_type']][3]*self.eps_scale_factor 
         data['pair_potential'].sig = UFF_DATA[data['force_field_type']][2]*(2**(-1./6.))
         data['pair_potential'].cutoff = cutoff
 
@@ -2877,7 +2877,7 @@ class Dreiding(ForceField):
         data['potential'].omega0 = omega0
         return 1
     
-    def pair_terms(self, node, data, cutoff, nbpot='LJ', hbpot='morse'):
+    def pair_terms(self, node, data, cutoff, nbpot="LJ", hbpot='morse'):
         """ DREIDING can adopt the exponential-6 or
         Ex6 = A*exp{-C*R} - B*R^{-6}
 
@@ -2887,7 +2887,7 @@ class Dreiding(ForceField):
         This will eventually be user-defined
 
         """
-        eps = DREIDING_DATA[data['force_field_type']][3]
+        eps = DREIDING_DATA[data['force_field_type']][3] * self.eps_scale_factor
         R = DREIDING_DATA[data['force_field_type']][2]
         sig = R*(2**(-1./6.))
 
@@ -3140,7 +3140,7 @@ class UFF4MOF(ForceField):
         """Add L-J term to atom"""
         data['pair_potential'] = PairPotential.LjCutCoulLong()
         data['pair_potential'].eps = UFF4MOF_DATA[data['force_field_type']][3] 
-        data['pair_potential'].sig = UFF4MOF_DATA[data['force_field_type']][2]*(2**(-1./6.))
+        data['pair_potential'].sig = UFF4MOF_DATA[data['force_field_type']][2]*(2**(-1./6.))*self.eps_scale_factor
         data['pair_potential'].cutoff = cutoff
         return 1
 
@@ -3792,7 +3792,7 @@ class Dubbeldam(ForceField):
 
         """
         data['pair_potential'] = PairPotential.LjCutCoulLong()
-        data['pair_potential'].eps = Dub_atoms[data['force_field_type']][0]*kBtokcal 
+        data['pair_potential'].eps = Dub_atoms[data['force_field_type']][0]*kBtokcal*self.eps_scale_factor 
         data['pair_potential'].sig = Dub_atoms[data['force_field_type']][1]
         data['pair_potential'].cutoff = cutoff
         data['charge'] = Dub_atoms[data['force_field_type']][2]
@@ -3932,7 +3932,7 @@ class SPC_E(ForceField):
 
         """
         data['pair_potential'] = PairPotential.LjCutCoulLong()
-        data['pair_potential'].eps = SPC_E_atoms[data['force_field_type']][2]
+        data['pair_potential'].eps = SPC_E_atoms[data['force_field_type']][2] 
         data['pair_potential'].sig = SPC_E_atoms[data['force_field_type']][1]
         data['pair_potential'].cutoff = cutoff
 
@@ -4045,7 +4045,7 @@ class TIP3P(ForceField):
         
         """
         data['pair_potential'] = PairPotential.LjCutCoulLong()
-        data['pair_potential'].eps = TIP3P_atoms[data['force_field_type']][2]
+        data['pair_potential'].eps = TIP3P_atoms[data['force_field_type']][2] 
         data['pair_potential'].sig = TIP3P_atoms[data['force_field_type']][1]
         data['pair_potential'].cutoff = cutoff
 
@@ -4301,7 +4301,7 @@ class TIP5P(ForceField):
 
         """
         data['pair_potential'] = PairPotential.LjCutCoulLong()
-        data['pair_potential'].eps = TIP5P_atoms[data['force_field_type']][2]
+        data['pair_potential'].eps = TIP5P_atoms[data['force_field_type']][2] 
         data['pair_potential'].sig = TIP5P_atoms[data['force_field_type']][1]
         data['pair_potential'].cutoff = cutoff
 

@@ -75,9 +75,9 @@ class Options(object):
                                        dest="dreid_bond_type",
                                        type=str,
                                        default="harmonic",
-                                       help="Request the Morse bond potential "+
-                                          "for the Dreiding force field. Default" + 
-                                          " is harmonic.")
+                                       help="Request the type of bonding potential "+
+                                          "for the Dreiding force field. Options are 'morse' or "+
+                                          "'harmonic'. Default is harmonic.")
         force_field_group.add_argument("--fix-metal", action="store_true", 
                                        dest="fix_metal",
                                        default=False,
@@ -91,7 +91,14 @@ class Options(object):
                                           "Useful for structure minimizations. Currently only "+
                                           "applies to UFF and Dreiding Force Fields. Default is "+
                                           "off.")
-        
+        force_field_group.add_argument("--eps-scale", action="store", 
+                                       dest="eps_scale_factor",
+                                       type=float,
+                                       default=1.0,
+                                       help="Scale the epsilon Lennard-Jones "+
+                                          "parameters by a constant factor. This "+
+                                          "can be used to generate the FlexZIF force field, for "+
+                                          "example, by setting UFF epsilon to 0.635. Default is 1.0 (standard epsilon).") 
         simulation_group = parser.add_argument_group("Simulation options")
         simulation_group.add_argument("--minimize", action="store_true",
                                       dest="minimize",
@@ -234,7 +241,15 @@ class Options(object):
                                       help="Store last snapshot of trajectory of simulation in "+
                                            "lammps traj file format. index of last step RESTART = NEQSTP + NPRODSTP. "+
                                            "If NEQSTP and NPRODSTP are not specified, then RESTART=1")
-        
+        simulation_group.add_argument("--msd",
+                                      action="store",
+                                      default=0,
+                                      type=int,
+                                      dest="msd",
+                                      help="Request a mean squared displacement for a requested MOLECULE "+
+                                           "every MSD steps. NOTE: this requires the user to request a molecule on the command line! "+
+                                           "Default is no msd file will be written.")
+
         parameter_group = parser.add_argument_group("Parameter options")
         parameter_group.add_argument("-t", "--tolerance",
                                      action="store",
