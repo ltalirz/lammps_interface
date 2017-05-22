@@ -2344,7 +2344,7 @@ class SlabGraph(MolecularGraph):
 
         # for each directed edge representing a converted O->Si to O->
         for edge in self.final_H_edges:
-            print()
+            print("\n")
             print(edge)
             parent_node_data=self.refgraph.node[edge[0]]
             old_child_node_data=self.refgraph.node[edge[1]]
@@ -2370,18 +2370,24 @@ class SlabGraph(MolecularGraph):
                     if(new_child_node_data['_atom_site_fract_x'] <
                        parent_node_data['_atom_site_fract_x']):
                         new_abc[0]+=1.0
+                    else:
+                        new_abc[0]-=1.0
 
                 # periodic in y direction
                 elif(symflag[3]=='6' or symflag[3]=='4'):
                     if(new_child_node_data['_atom_site_fract_y'] <
                        parent_node_data['_atom_site_fract_y']):
                         new_abc[1]+=1.0
+                    else:
+                        new_abc[1]-=1.0
                 
                 # periodic in z direction
                 elif(symflag[4]=='6' or symflag[4]=='4'):
                     if(new_child_node_data['_atom_site_fract_z'] <
                        parent_node_data['_atom_site_fract_z']):
                         new_abc[2]+=1.0
+                    else:
+                        new_abc[2]-=1.0
 
             print("Old child abc:")
             print(old_abc)
