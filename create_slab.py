@@ -1955,7 +1955,7 @@ def main():
     sim.set_graph(graph)                                                        
     sim.split_graph()                                                           
     sim.assign_force_fields()                                                   
-    sim.slabgraph=SlabGraph(sim.graph)                                          
+    sim.slabgraph=SlabGraph(sim.graph,cell) 
     sim.slabgraph.check_if_zeolite()                                            
                                                                                 
     #sim.compute_simulation_size()                                              
@@ -1985,11 +1985,12 @@ def main():
                                                                                 
     # Add back in all missing oxygens                                           
     sim.slabgraph.add_all_connecting_nodes()                                    
+    sim.slabgraph.write_slabgraph_cif(cell,bond_block=False,descriptor="deH")   
                                                                                 
     # add missing hydrogen caps                                                 
     sim.slabgraph.add_missing_hydrogens()                                       
                                                                                 
-    sim.slabgraph.write_slabgraph_cif(cell,bond_block=False,descriptor="deH")   
+    sim.slabgraph.write_slabgraph_cif(cell,bond_block=False,descriptor="addH")   
     sim.slabgraph.write_silanol_surface_density(cell)                           
                                                                                 
                                                                                 
