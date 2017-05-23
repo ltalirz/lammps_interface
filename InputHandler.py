@@ -361,6 +361,12 @@ class Options(object):
                                           "Final vacuum will be larger because the min cut slab"+
                                           "will always be smaller than the initial ASE slab"+
                                           "Default is 12.5")
+        parameter_group.add_argument("--slab-verbose",
+                                     action="store",
+                                     type=bool,
+                                     default=False,
+                                     dest="slab_verbose",
+                                     help="Output intermediate and failed min cut attempts during slab generation")
 
         molecule_insertion_group = parser.add_argument_group("Molecule insertion options")
         molecule_insertion_group.add_argument("--insert-molecule",
