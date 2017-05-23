@@ -6,7 +6,7 @@ the program starts here.
 
 """
 
-import sys
+import sys,os
 import math
 import re
 import numpy as np
@@ -2066,42 +2066,36 @@ def main():
         # creating slab graph                                                       
         sim.slabgraph.remove_erroneous_disconnected_comps()                         
         sim.slabgraph.condense_graph()                                              
-        #sim.slabgraph.enumerate_all_primitive_rings()                              
         sim.slabgraph.identify_undercoordinated_surface_nodes()                     
-                                                                                    
-        sim.slabgraph.write_slabgraph_cif(cell)                                     
-        sim.slabgraph.write_slabgraph_cif(cell,bond_block=False,descriptor="debug") 
-        # write output                                                              
-                                                                                    
+        
+        # DEBUG file writing                                                                    
+        #sim.slabgraph.write_slabgraph_cif(cell)                                     
+        #sim.slabgraph.write_slabgraph_cif(cell,bond_block=False,descriptor="debug") 
+
+        # Here we need to manipulate the surface  
         sim.slabgraph.normalize_bulk_edge_weights()                                 
         sim.slabgraph.connect_super_surface_nodes()                                 
-                                                                                    
-                                                                                    
+
+        # Bad variable naming, we are just making a directed graph here
         sim.slabgraph.create_slab_tree()                                            
-        #sim.slabgraph.redirect_slab_tree_by_coordinate_directionality()            
         sim.slabgraph.stoer_wagner_slab_tree_cut(weight_barrier=True)               
         sim.slabgraph.remove_surface_partitions()                                   
                                                                                     
-        # This should give us a visualization of the all si graph                   
-        #sim.slabgraph.draw_slabgraph()                                             
-                                                                                    
         # Add back in all missing oxygens                                           
         sim.slabgraph.add_all_connecting_nodes()                                    
-        sim.slabgraph.write_slabgraph_cif(cell,bond_block=False,descriptor="deH")   
+        #sim.slabgraph.write_slabgraph_cif(cell,bond_block=False,descriptor="deH")   
                                                                                     
-        # add missing hydrogen caps                                                 
+        # add missing hydrogen caps and validate structural properties 
         sim.slabgraph.add_missing_hydrogens()                                       
-                                                                                    
-        sim.slabgraph.write_slabgraph_cif(cell,bond_block=False,descriptor="addH")   
-        sim.slabgraph.write_silanol_surface_density(cell)                           
+        approximate_thickness = sim.slabgraph.check_approximate_slab_thickness()
+        slab_is_2D_periodic   = sim.slabgraph.check_slab_is_2D_periodic()
+        
+        # For now we will only write the structure if we have succeeded 
+        #sim.slabgraph.write_slabgraph_cif(cell,bond_block=False,descriptor="addH")   
+        #sim.slabgraph.write_average_silanol_density(curr_slab_cif_name[:-4]+".addH.dat")
 
-        approximate_thickness=sim.slabgraph.check_approximate_slab_thickness()
-        slab_is_2D_periodic=sim.slabgraph.check_slab_is_2D_periodic()
-                                                                                    
-        # if we have still failed on making the slab2D periodic
-        # increase thickness and try again
 
-        # check if we need to do another iteration with a slightly bigger ASE slab
+        # check if we need to do another iteration with an L+=1 ASE slab
         if(slab_is_2D_periodic):
             print("Identified slab is periodic")
             if(sim.slab_L>0):
@@ -2120,7 +2114,7 @@ def main():
                     curr_slab_L+=1
                     print("Current slab thickness %.4f < target thickness %.4f"%
                           (approximate_thickness, sim.slab_target_thick))
-                    print("Performing ASE slab genertion with L = %d"%curr_slab_L)
+                    print("Moving on to ASE slab genertion with L = %d"%curr_slab_L)
         else:
             next_iter=True
             curr_slab_L+=1
@@ -2134,10 +2128,16 @@ def main():
 
         # if we are going to do another iteration, need to create the next iteration of ASE slab
         if(next_iter==True):
+            print("Removing ASE slab: %s"%curr_slab_cif_name)
             print("\n\n\n")
+            os.remove(curr_slab_cif_name)
             curr_slab_cif_name=create_slab_ase(options.cif_file, sim.slab_face, 
                                                             curr_slab_L,
                                                             sim.slab_vacuum)
+        else:
+            # if we have succeeded can write the final files here
+            sim.slabgraph.write_slabgraph_cif(cell,bond_block=False,descriptor="addH")   
+            sim.slabgraph.write_average_silanol_density(curr_slab_cif_name[:-4]+".addH.dat")
                                                                                 
                                                                                 
                                                                                 

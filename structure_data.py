@@ -2445,10 +2445,10 @@ class SlabGraph(MolecularGraph):
         f = np.dot(self.cell.inverse, coord) 
         return f 
 
-    def write_silanol_surface_density(self,cell):
+    def write_silanol_surface_density(self):
 
-        print("Surface silanol density: %.5f"%(self.cut_value1/(cell.a*cell.b)))
-        print("Surface silanol density: %.5f"%(self.cut_value2/(cell.a*cell.b)))   
+        print("Surface silanol density: %.5f"%(self.cut_value1/(self.cell.a*self.cell.b)))
+        print("Surface silanol density: %.5f"%(self.cut_value2/(self.cell.a*self.cell.b)))   
 
 
     def write_slabgraph_cif(self,cell,bond_block=True,descriptor="debug"):
@@ -2521,6 +2521,26 @@ class SlabGraph(MolecularGraph):
                 periodic_2D=True
 
         return periodic_2D
+
+    def write_average_silanol_density(self,ofname):
+        """
+        For now do a simple metric for the silanol density
+        """
+        unit_area=0.0
+        num_H_added = len(self.final_H_edges)
+        if(self.vacuum_direc==0):
+            unit_area=self.cell.b*self.cell.c
+        elif(self.vacuum_direc==1):
+            unit_area=self.cell.a*self.cell.c
+        elif(self.vacuum_direc==2):
+            unit_area=self.cell.a*self.cell.b
+
+        per_surface_density=(num_H_added/2)/(unit_area)
+
+        print("Average surface density: %.5f"%(per_surface_density))
+        f=open(ofname, "w")
+        f.write("%.5f"%per_surface_density)
+        
 
     def enumerate_all_primitive_rings(self):
         """
