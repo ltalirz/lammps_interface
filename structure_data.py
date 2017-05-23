@@ -1613,6 +1613,7 @@ class SlabGraph(MolecularGraph):
         # store the node indices of all removed O's
         self.removed_nodes = nx.Graph()
         self.removed_edges = []
+        self.removed_edges_data = []
         self.added_edges = []
 
         for node, data in self.slabgraph.nodes_iter(data=True):
@@ -1623,9 +1624,13 @@ class SlabGraph(MolecularGraph):
 
                 if(len(neighbors)==2):
                     # normal O coordination environment
-                    # remove both edges to Si
+
+                    # identify edges to remove AND the data associated with that node
                     self.removed_edges.append((neighbors[0],node))
+                    self.removed_edges_data.append(self.slabgraph.edge[neighbors[0]][node])
+
                     self.removed_edges.append((neighbors[1],node))
+                    self.removed_edges_data.append(self.slabgraph.edge[neighbors[1]][node])
                 
                     # create an edge between the adjacent Si
                     self.added_edges.append((neighbors[0],neighbors[1]))
@@ -1633,6 +1638,7 @@ class SlabGraph(MolecularGraph):
                     # the arbitrary initial slab config can have dangling O's
                     # remove both edges to Si
                     self.removed_edges.append((neighbors[0],node))
+                    self.removed_edges_data.append(self.slabgraph.edge[neighbors[0]][node])
 
                     # no edge to add to the all Si graph
                 else:
@@ -2265,16 +2271,16 @@ class SlabGraph(MolecularGraph):
         self.final_H_edges = []
 
         # self.removed_edges is any Si-O edge removed in intial graph condensation
-        for edge in self.removed_edges:
-            n1 = edge[0]
-            n2 = edge[1]
+        for i in range(len(self.removed_edges)):
+            n1 = self.removed_edges[i][0]
+            n2 = self.removed_edges[i][1]
        
             if n1 in self.slabgraph.nodes():
                 if(n1 not in self.final_added_nodes):
                     # add the missing O node
                     self.slabgraph.add_node(n2, self.removed_nodes.node[n2])
                     # add its edge to Si
-                    self.slabgraph.add_edge(n1,n2)
+                    self.slabgraph.add_edge(n1,n2,self.removed_edges_data[i])
                     # keep track of its addition so we don't try it again
                     self.final_added_nodes.add(n2)
      
@@ -2296,7 +2302,7 @@ class SlabGraph(MolecularGraph):
                     # add the missing O node
                     self.slabgraph.add_node(n1, self.removed_nodes.node[n1])
                     # add its edge to Si
-                    self.slabgraph.add_edge(n1,n2)
+                    self.slabgraph.add_edge(n1,n2,self.removed_edges_data[i])
                     # keep track of its addition so we don't try it again
                     self.final_added_nodes.add(n1)
 
@@ -2341,11 +2347,12 @@ class SlabGraph(MolecularGraph):
         # check if an O was added on the surface
 
         print("\n\nAdding back in H's")
+        print(self.final_H_edges)
 
         # for each directed edge representing a converted O->Si to O->
         for edge in self.final_H_edges:
-            print("\n")
-            print(edge)
+            #print("\n")
+            #print(edge)
             parent_node_data=self.refgraph.node[edge[0]]
             old_child_node_data=self.refgraph.node[edge[1]]
             new_child_node_index = edge[1]+10000
@@ -2363,7 +2370,7 @@ class SlabGraph(MolecularGraph):
 
             new_abc = deepcopy(old_abc)
 
-            print(symflag)
+            #print(symflag)
             if(symflag != '.'):
                 # if periodic in x direction
                 if(symflag[2]=='6' or symflag[2]=='4'):
@@ -2389,56 +2396,44 @@ class SlabGraph(MolecularGraph):
                     else:
                         new_abc[2]-=1.0
 
-            print("Old child abc:")
-            print(old_abc)
-            print("New child abc:")
-            print(new_abc)
+            #print("Old child abc:")
+            #print(old_abc)
+            #print("New child abc:")
+            #print(new_abc)
 
             new_xyz=self.to_cartesian(new_abc)
-            print("New child xyz:")
-            print(new_xyz)
+            #print("New child xyz:")
+            #print(new_xyz)
             
-            print("Parent xyz:")
-            print(parent_node_data['cartesian_coordinates'])
+            #print("Parent xyz:")
+            #print(parent_node_data['cartesian_coordinates'])
 
             bond_length=np.linalg.norm(new_xyz-parent_node_data['cartesian_coordinates'])
-            print("old bond length:")
-            print(bond_length)
+            #print("old bond length:")
+            #print(bond_length)
             h_bond_length=0.95
             scale_by=h_bond_length/bond_length
-            print("Scale by")
-            print(scale_by)
+            #print("Scale by")
+            #print(scale_by)
 
             new_xyz=parent_node_data['cartesian_coordinates']+\
                     (new_xyz-parent_node_data['cartesian_coordinates'])*scale_by
-            print("New xyz:")
-            print(new_xyz)
+            #print("New xyz:")
+            #print(new_xyz)
 
             new_xyz=self.in_cell(new_xyz)
-            print("New xyz in cell:")
-            print(new_xyz)
+            #print("New xyz in cell:")
+            #print(new_xyz)
 
             new_abc = self.to_fractional(new_xyz)
-            print("New abc for printing:")
-            print(new_abc)
+            #print("New abc for printing:")
+            #print(new_abc)
 
             new_child_node_data['_atom_site_fract_x'] = str(new_abc[0])
             new_child_node_data['_atom_site_fract_y'] = str(new_abc[1])
             new_child_node_data['_atom_site_fract_z'] = str(new_abc[2])
             new_child_node_data['cartesian_coordinates']=new_xyz
             self.slabgraph.add_node(new_child_node_index, new_child_node_data)
-            #self.slabgraph.add_edge(edge[0],new_child_node_index)
-
-            #if(vacuum_direc==0):
-            #    if(parent_data['_atom_site_fract_x'] < 0.5)
-
-            #elif(vacuum_direc==1):
-
-            #
-            #elif(vacuum_direc==2):
-
-            #data={'element'
-            #self.slabgraph.add_node(
              
     def to_cartesian(self, coord):
         """
@@ -2458,6 +2453,74 @@ class SlabGraph(MolecularGraph):
 
     def write_slabgraph_cif(self,cell,bond_block=True,descriptor="debug"):
         write_CIF(self.slabgraph,cell,bond_block,descriptor)
+
+    def check_approximate_slab_thickness(self):
+        """
+        return the approximate slab thickness in the vacuum direction
+        """
+        min_coord=1.0
+        max_coord=0.0
+
+        for node, data in self.slabgraph.nodes_iter(data=True):
+            if(self.vacuum_direc==0):
+                if(float(data['_atom_site_fract_x'])>max_coord):
+                    max_coord=float(data['_atom_site_fract_x'])
+                if(float(data['_atom_site_fract_x'])<min_coord):
+                    min_coord=float(data['_atom_site_fract_x'])
+            elif(self.vacuum_direc==1):
+                if(float(data['_atom_site_fract_y'])>max_coord):
+                    max_coord=float(data['_atom_site_fract_y'])
+                if(float(data['_atom_site_fract_y'])<min_coord):
+                    min_coord=float(data['_atom_site_fract_y'])
+            elif(self.vacuum_direc==2):
+                if(float(data['_atom_site_fract_z'])>max_coord):
+                    max_coord=float(data['_atom_site_fract_z'])
+                if(float(data['_atom_site_fract_z'])<min_coord):
+                    min_coord=float(data['_atom_site_fract_z'])
+
+        if(self.vacuum_direc==0):
+            approximate=(max_coord-min_coord)*self.cell.a
+        elif(self.vacuum_direc==1):
+            approximate=(max_coord-min_coord)*self.cell.b
+        elif(self.vacuum_direc==2):
+            approximate=(max_coord-min_coord)*self.cell.c
+        
+        return approximate
+
+    def check_slab_is_2D_periodic(self):
+        """
+        Check if slab is 2D periodic in the two dimensions other than the vacuum_direc
+        """
+        
+
+        periodic_a=False
+        periodic_b=False
+        periodic_c=False
+        periodic_2D=False
+
+        for n1,n2,data in self.slabgraph.edges_iter(data=True):
+            # having a O-H across a PBC doesn't count as being a periodic structure
+            if(self.slabgraph.node[n1]['element']!="H" and
+               self.slabgraph.node[n2]['element']!="H"):
+
+                if(data['symflag']=='1_455' or data['symflag']=='1_655'):
+                    periodic_a=True
+                elif(data['symflag']=='1_545' or data['symflag']=='1_565'):
+                    periodic_b=True
+                elif(data['symflag']=='1_554' or data['symflag']=='1_556'):
+                    periodic_c=True
+
+        if(self.vacuum_direc==0):
+            if(periodic_b and periodic_c):
+                periodic_2D=True
+        elif(self.vacuum_direc==1):
+            if(periodic_a and periodic_c):
+                periodic_2D=True
+        elif(self.vacuum_direc==2):
+            if(periodic_a and periodic_b):
+                periodic_2D=True
+
+        return periodic_2D
 
     def enumerate_all_primitive_rings(self):
         """

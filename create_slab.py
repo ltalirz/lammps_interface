@@ -26,6 +26,13 @@ import Molecules
 if sys.version_info < (3,0):
     input = raw_input
 
+try:
+    from ase.io import *
+    from ase.build import *
+except:
+    print("Error ASE not found! ASE import failed, cannot build initial slab guess with ASE!")
+    sys.exit()
+
 class LammpsSimulation(object):
     def __init__(self, options):
         self.name = clean(options.cif_file)
@@ -1945,61 +1952,192 @@ class LammpsSimulation(object):
                 print("something went wrong")
         return mgraph
 
+def get_initial_slab_L_ase(ifname,slab_face,slab_L,slab_vacuum):
+    cell = read(ifname)
+    slab_tmp=surface(cell,
+                     (int(slab_face[0]),int(slab_face[1]),int(slab_face[2])),
+                     1,
+                     vacuum=12.5)   
+    num_layers=int(round(30.0/(slab_tmp.get_cell_lengths_and_angles()[2]-25)))+1
+    return num_layers
+
+def create_slab_ase(ifname,slab_face,slab_L,slab_vacuum):
+    cell = read(ifname)
+    slab=surface(cell,
+                 (int(slab_face[0]),int(slab_face[1]),int(slab_face[2])),
+                 slab_L,
+                 slab_vacuum)
+    slab.center()                                                                   
+    ofname = str(ifname[:-4])+"_"+\
+             str(slab_face[0])+str(slab_face[1])+str(slab_face[2])+"_"+\
+             str(slab_L)+"_slab_ase.cif"
+
+    print("Writing slab to %s"% ofname)                                             
+    write(ofname,slab)
+    return ofname
+
+def return_current_slab_name(ifname,slab_face,slab_L,vacuum):
+    pass
+
 def main():                                                                     
                                                                                 
     # command line parsing                                                      
     options = Options()                                                         
     sim = LammpsSimulation(options)                                             
+
     cell, graph = from_CIF(options.cif_file)                                    
     sim.set_cell(cell)                                                          
     sim.set_graph(graph)                                                        
     sim.split_graph()                                                           
     sim.assign_force_fields()                                                   
-    sim.slabgraph=SlabGraph(sim.graph,cell) 
-    sim.slabgraph.check_if_zeolite()                                            
-                                                                                
-    #sim.compute_simulation_size()                                              
-    sim.merge_graphs()                                                          
-                                                                                
-    # creating slab graph                                                       
-    sim.slabgraph.remove_erroneous_disconnected_comps()                         
-    sim.slabgraph.condense_graph()                                              
-    #sim.slabgraph.enumerate_all_primitive_rings()                              
-    sim.slabgraph.identify_undercoordinated_surface_nodes()                     
-                                                                                
-    sim.slabgraph.write_slabgraph_cif(cell)                                     
-    sim.slabgraph.write_slabgraph_cif(cell,bond_block=False,descriptor="debug") 
-    # write output                                                              
-                                                                                
-    sim.slabgraph.normalize_bulk_edge_weights()                                 
-    sim.slabgraph.connect_super_surface_nodes()                                 
-                                                                                
-                                                                                
-    sim.slabgraph.create_slab_tree()                                            
-    #sim.slabgraph.redirect_slab_tree_by_coordinate_directionality()            
-    sim.slabgraph.stoer_wagner_slab_tree_cut(weight_barrier=True)               
-    sim.slabgraph.remove_surface_partitions()                                   
-                                                                                
-    # This should give us a visualization of the all si graph                   
-    #sim.slabgraph.draw_slabgraph()                                             
-                                                                                
-    # Add back in all missing oxygens                                           
-    sim.slabgraph.add_all_connecting_nodes()                                    
-    sim.slabgraph.write_slabgraph_cif(cell,bond_block=False,descriptor="deH")   
-                                                                                
-    # add missing hydrogen caps                                                 
-    sim.slabgraph.add_missing_hydrogens()                                       
-                                                                                
-    sim.slabgraph.write_slabgraph_cif(cell,bond_block=False,descriptor="addH")   
-    sim.slabgraph.write_silanol_surface_density(cell)                           
-                                                                                
-                                                                                
-                                                                                
-    # sim.write_lammps_files()                                                  
-    #if options.output_cif:                                                     
-    #    print("CIF file requested. Exiting...")                                
-    #    write_CIF(graph, cell)                                                 
-    #    sys.exit()                                                             
+
+
+    # This is IMPORTANT 
+    # If the aspect ratio of the ASE slab is too small:
+    #    -the Stoer Wagner algorithm will fail and find a min cut partition that is not 2D periodic
+    #    -it basically tunnels between the source and sink nodes because creating a slab 
+    #     would involve cutting too many bonds due to the larger surface area w.r.t the slab thickness
+    #    -it simply means we haven't built a THICK enough slab to get the correct solution
+    #    -so we retry with an initial larger slab
+
+    # get slab option
+    sim.slab_face         = options.slab_face.split('x')
+    sim.slab_L            = options.slab_L
+    sim.slab_vacuum       = options.slab_vacuum
+    sim.slab_target_thick = options.slab_target_thick
+
+    if(sim.slab_L>0 and sim.slab_target_thick > 0.001):
+        # Note that by default sim.slab_L=0 and sim.slab_target_thick = 30
+        print("Error! slab-L and target-thickness specified, but only can choose 1!)")
+        print("Specifying slab-L will create the smallest 2D periodic, min cut slab starting from an ASE slab with thickness L")
+        print("Specifying target-thickness will create the smallest 2D periodic, min cut slab with approximate thickness greater than target-thickness")
+        sys.exit()
+
+    # so that thickness of ASE initial slab can be iteratively updated
+    curr_slab_L=int(sim.slab_L)
+
+
+    # If sim.slab_L is specified, start with this thickness
+    if(sim.slab_L != 0):
+        curr_slab_cif_name = create_slab_ase(options.cif_file, sim.slab_face, 
+                                                         curr_slab_L,
+                                                         sim.slab_vacuum)
+        max_slab_L=2*curr_slab_L
+    # otherwise estimate slab_L for a given target_thick
+    else:
+        initial_slab_L=get_initial_slab_L_ase(options.cif_file,
+                                              sim.slab_face,
+                                              1,
+                                              sim.slab_vacuum)
+        curr_slab_cif_name=create_slab_ase(options.cif_file, sim.slab_face, 
+                                                        initial_slab_L,
+                                                        sim.slab_vacuum)
+        curr_slab_L = int(initial_slab_L)
+        max_slab_L  = 2*initial_slab_L
+   
+ 
+    # Booleans to determine if we are finished with this surface    
+    next_iter=True
+    slab_is_2D_periodic=False
+    slab_meets_thickness_criteria=False
+
+    # try to make surfaces until we hit stopping criteria
+    while(next_iter==True):
+        sim = LammpsSimulation(options)                                             
+        sim.slab_face         = options.slab_face.split('x')
+        sim.slab_L            = options.slab_L
+        sim.slab_vacuum       = options.slab_vacuum
+        sim.slab_target_thick = options.slab_target_thick
+        # reset the structure properties to reflect the newest ASE slab
+        cell, graph = from_CIF(curr_slab_cif_name)                                    
+        sim.set_cell(cell)                                                          
+        sim.set_graph(graph)                                                        
+        sim.split_graph()                                                           
+        sim.assign_force_fields()                                                   
+
+
+        # Beginning of routines for surface generation
+        sim.slabgraph=SlabGraph(sim.graph,cell) 
+        sim.slabgraph.check_if_zeolite()                                            
+                                                                                    
+        #sim.compute_simulation_size()                                              
+        sim.merge_graphs()                                                          
+                                                                                    
+        # creating slab graph                                                       
+        sim.slabgraph.remove_erroneous_disconnected_comps()                         
+        sim.slabgraph.condense_graph()                                              
+        #sim.slabgraph.enumerate_all_primitive_rings()                              
+        sim.slabgraph.identify_undercoordinated_surface_nodes()                     
+                                                                                    
+        sim.slabgraph.write_slabgraph_cif(cell)                                     
+        sim.slabgraph.write_slabgraph_cif(cell,bond_block=False,descriptor="debug") 
+        # write output                                                              
+                                                                                    
+        sim.slabgraph.normalize_bulk_edge_weights()                                 
+        sim.slabgraph.connect_super_surface_nodes()                                 
+                                                                                    
+                                                                                    
+        sim.slabgraph.create_slab_tree()                                            
+        #sim.slabgraph.redirect_slab_tree_by_coordinate_directionality()            
+        sim.slabgraph.stoer_wagner_slab_tree_cut(weight_barrier=True)               
+        sim.slabgraph.remove_surface_partitions()                                   
+                                                                                    
+        # This should give us a visualization of the all si graph                   
+        #sim.slabgraph.draw_slabgraph()                                             
+                                                                                    
+        # Add back in all missing oxygens                                           
+        sim.slabgraph.add_all_connecting_nodes()                                    
+        sim.slabgraph.write_slabgraph_cif(cell,bond_block=False,descriptor="deH")   
+                                                                                    
+        # add missing hydrogen caps                                                 
+        sim.slabgraph.add_missing_hydrogens()                                       
+                                                                                    
+        sim.slabgraph.write_slabgraph_cif(cell,bond_block=False,descriptor="addH")   
+        sim.slabgraph.write_silanol_surface_density(cell)                           
+
+        approximate_thickness=sim.slabgraph.check_approximate_slab_thickness()
+        slab_is_2D_periodic=sim.slabgraph.check_slab_is_2D_periodic()
+                                                                                    
+        # if we have still failed on making the slab2D periodic
+        # increase thickness and try again
+
+        # check if we need to do another iteration with a slightly bigger ASE slab
+        if(slab_is_2D_periodic):
+            print("Identified slab is periodic")
+            if(sim.slab_L>0):
+                next_iter=False
+                print("Current slab_L %d >= specified_slab_L: %d"%(curr_slab_L, sim.slab_L))
+                print("Stopping slab genertion")
+            elif(sim.slab_L==0):
+                if(approximate_thickness>sim.slab_target_thick):
+                    next_iter=False
+                    print("Current slab thickness %.4f > target thickness %.4f"%
+                          (approximate_thickness, sim.slab_target_thick))
+                    print("Stopping slab genertion")
+
+                else:
+                    next_iter=True
+                    curr_slab_L+=1
+                    print("Current slab thickness %.4f < target thickness %.4f"%
+                          (approximate_thickness, sim.slab_target_thick))
+                    print("Performing ASE slab genertion with L = %d"%curr_slab_L)
+        else:
+            next_iter=True
+            curr_slab_L+=1
+            print("Identified slab is NOT periodic")
+            print("Moving on to ASE slab genertion with L = %d"%curr_slab_L)
+        
+        # finally, we need some override stopping criteria in case something weird going on
+        if(curr_slab_L>max_slab_L):
+            print("Error! Maximum slab L exceeded without finding periodic solution")
+            next_iter=False
+
+        # if we are going to do another iteration, need to create the next iteration of ASE slab
+        if(next_iter==True):
+            print("\n\n\n")
+            curr_slab_cif_name=create_slab_ase(options.cif_file, sim.slab_face, 
+                                                            curr_slab_L,
+                                                            sim.slab_vacuum)
                                                                                 
                                                                                 
                                                                                 
