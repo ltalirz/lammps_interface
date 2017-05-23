@@ -2005,6 +2005,7 @@ def main():
     sim.slab_L            = options.slab_L
     sim.slab_vacuum       = options.slab_vacuum
     sim.slab_target_thick = options.slab_target_thick
+    sim.slab_verbose      = options.slab_verbose
 
     if(sim.slab_L>0 and sim.slab_target_thick > 0.001):
         # Note that by default sim.slab_L=0 and sim.slab_target_thick = 30
@@ -2043,11 +2044,14 @@ def main():
 
     # try to make surfaces until we hit stopping criteria
     while(next_iter==True):
+        # reset everything to beginning
         sim = LammpsSimulation(options)                                             
         sim.slab_face         = options.slab_face.split('x')
         sim.slab_L            = options.slab_L
         sim.slab_vacuum       = options.slab_vacuum
         sim.slab_target_thick = options.slab_target_thick
+        sim.slab_verbose      = options.slab_verbose
+
         # reset the structure properties to reflect the newest ASE slab
         cell, graph = from_CIF(curr_slab_cif_name)                                    
         sim.set_cell(cell)                                                          
@@ -2070,7 +2074,8 @@ def main():
         
         # DEBUG file writing                                                                    
         #sim.slabgraph.write_slabgraph_cif(cell)                                     
-        #sim.slabgraph.write_slabgraph_cif(cell,bond_block=False,descriptor="debug") 
+        if(sim.slab_verbose):
+            sim.slabgraph.write_slabgraph_cif(cell,bond_block=False,descriptor="debug") 
 
         # Here we need to manipulate the surface  
         sim.slabgraph.normalize_bulk_edge_weights()                                 
@@ -2083,7 +2088,8 @@ def main():
                                                                                     
         # Add back in all missing oxygens                                           
         sim.slabgraph.add_all_connecting_nodes()                                    
-        #sim.slabgraph.write_slabgraph_cif(cell,bond_block=False,descriptor="deH")   
+        if(sim.slab_verbose):
+            sim.slabgraph.write_slabgraph_cif(cell,bond_block=False,descriptor="deH")   
                                                                                     
         # add missing hydrogen caps and validate structural properties 
         sim.slabgraph.add_missing_hydrogens()                                       
@@ -2130,14 +2136,22 @@ def main():
         if(next_iter==True):
             print("Removing ASE slab: %s"%curr_slab_cif_name)
             print("\n\n\n")
-            os.remove(curr_slab_cif_name)
+            if(not sim.slab_verbose):
+                os.remove(curr_slab_cif_name)
             curr_slab_cif_name=create_slab_ase(options.cif_file, sim.slab_face, 
                                                             curr_slab_L,
                                                             sim.slab_vacuum)
         else:
-            # if we have succeeded can write the final files here
-            sim.slabgraph.write_slabgraph_cif(cell,bond_block=False,descriptor="addH")   
-            sim.slabgraph.write_average_silanol_density(curr_slab_cif_name[:-4]+".addH.dat")
+            # if we have succeeded can write the final files here if verbose
+            if(sim.slab_verbose):
+                sim.slabgraph.write_slabgraph_cif(cell,bond_block=False,descriptor="addH")   
+                sim.slabgraph.write_average_silanol_density(curr_slab_cif_name[:-4]+".addH.dat")
+            # and if not verbose only write if we suceeded
+            else:
+                if(slab_is_2D_periodic):
+                    sim.slabgraph.write_slabgraph_cif(cell,bond_block=False,descriptor="addH")   
+                    sim.slabgraph.write_average_silanol_density(curr_slab_cif_name[:-4]+".addH.dat")
+            pass
                                                                                 
                                                                                 
                                                                                 
