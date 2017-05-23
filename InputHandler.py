@@ -324,6 +324,44 @@ class Options(object):
                                           "Default is 200,000 steps. (corresponding to "+
                                           "200 ps if the timestep is 1 fs)")
 
+        # parameters for automated slab generation
+        parameter_group.add_argument("--slab-face",
+                                     action="store",
+                                     type=str,
+                                     default="1x0x0",
+                                     dest="slab_face",
+                                     help="The filler face of the slab you would like to generate"+
+                                          "Must have the format ixjxk (default 1x0x0)")
+        parameter_group.add_argument("--slab-target-thickness",
+                                     action="store",
+                                     type=float,
+                                     default=30.0,
+                                     dest="slab_target_thick",
+                                     help="Target thickness for slab after min cut of the initial ASE slab"+
+                                          "If 0.0, there is no attempt to have the final slab be of a certain thickness"+
+                                          "Default is 30.0 ")
+        parameter_group.add_argument("--slab-L",
+                                     action="store",
+                                     type=int,
+                                     default=0,
+                                     dest="slab_L",
+                                     help="L (thickness) pararameter for naiive slab generaation by ASE"+
+                                          "If > 0, we will use this value as the starting L for ASE"+
+                                          "Successively larger ASE slabs will be built if min cut slab is not periodic"+
+                                          "But we won't build successively larger ASE slabs based on length of the min cut slab"+  
+                                          "If = 0, we will find the L that gives us an initial ASE slab closes to slab-target-thickness"+ 
+                                          "Then we will grow the initial ASE slab until the min cut slab is periodic AND thicker than slab-target-thickness"+
+                                          "Default is 0 ")
+        parameter_group.add_argument("--slab-vacuum",
+                                     action="store",
+                                     type=float,
+                                     default=12.5,
+                                     dest="slab_vacuum",
+                                     help="Approximate vacuum on either side of the slab"+
+                                          "Final vacuum will be larger because the min cut slab"+
+                                          "will always be smaller than the initial ASE slab"+
+                                          "Default is 12.5")
+
         molecule_insertion_group = parser.add_argument_group("Molecule insertion options")
         molecule_insertion_group.add_argument("--insert-molecule",
                                               action="store",
