@@ -757,7 +757,11 @@ class BTW_FF(ForceField):
                     sys.exit()
 
 
-            if atom['force_field_type'] is None:
+            try:
+                fftype = MOFFF_atoms[chrg_flag+atom['force_field_type']]
+            except KeyError:
+                fftype = None
+            if fftype is None:
                 type_assigned = False
                 neighbours = [self.graph.node[i] for i in self.graph.neighbors(node)]
                 neighbour_elements = [a['element'] for a in neighbours]
@@ -1224,8 +1228,12 @@ class MOF_FF(ForceField):
                     print("ERROR: Zr %i is not assigned to a Zr_UiO! exiting"%(node))
                     sys.exit()
 
-
-            if atom['force_field_type'] is None:
+            # check if fftype exists:
+            try:
+                fftype = MOFFF_atoms[data['force_field_type']]
+            except KeyError:
+                fftype = None
+            if fftype is None:
                 type_assigned = False
                 neighbours = [self.graph.node[i] for i in self.graph.neighbors(node)]
                 neighbour_elements = [a['element'] for a in neighbours]
@@ -2483,7 +2491,12 @@ class UFF(ForceField):
         sqpl = ["He", "Ne", "Ar", "Ni", "Kr", "Pd", "Xe", "Pt", "Au", "Rn"]
 
         for node, data in self.graph.nodes_iter(data=True):
-            if data['force_field_type'] is None:
+            # check if fftype exists:
+            try:
+                fftype = UFF_DATA[data['force_field_type']]
+            except KeyError:
+                fftype = None
+            if fftype is None:
                 if data['element'] in organics:
                     if data['hybridization'] == "sp3":
                         data['force_field_type'] = "%s_3"%data['element']
@@ -3089,7 +3102,12 @@ class Dreiding(ForceField):
         halides = ["F", "Cl", "Br", "I"]
         electro_neg_atoms = ["N", "O", "F"]
         for node, data in self.graph.nodes_iter(data=True):
-            if data['force_field_type'] is None or self.h_bonding:
+            # check if fftype exists:
+            try:
+                fftype = DREIDING_DATA[data['force_field_type']]
+            except KeyError:
+                fftype = None
+            if fftype is None or self.h_bonding:
                 if data['element'] in organics:
                     if data['hybridization'] == "sp3":
                         data['force_field_type'] = "%s_3"%data['element']
@@ -3511,7 +3529,12 @@ class UFF4MOF(ForceField):
         halides = ["F", "Cl", "Br", "I"]
         for node, data in self.graph.nodes_iter(data=True):
             special = 'special_flag' in data
-            if data['force_field_type'] is None:
+            # check if fftype exists:
+            try:
+                fftype = UFF4MOF_DATA[data['force_field_type']]
+            except KeyError:
+                fftype = None
+            if fftype is None:
                 if special:
                     # Zn4O case TODO(pboyd): generalize these cases...
                     if data['special_flag'] == "O_z_Zn4O":
