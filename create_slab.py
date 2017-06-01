@@ -2009,10 +2009,10 @@ def main():
 
     if(sim.slab_L>0 and sim.slab_target_thick > 0.001):
         # Note that by default sim.slab_L=0 and sim.slab_target_thick = 30
-        print("Error! slab-L and target-thickness specified, but only can choose 1!)")
+        print("Notice! slab-L was specified!)")
         print("Specifying slab-L will create the smallest 2D periodic, min cut slab starting from an ASE slab with thickness L")
-        print("Specifying target-thickness will create the smallest 2D periodic, min cut slab with approximate thickness greater than target-thickness")
-        sys.exit()
+        print("Not pecifying slab-L will create the smallest 2D periodic, min cut slab with approximate thickness greater than target-thickness (for which 30 Angstrom is the default)")
+        #sys.exit()
 
     # so that thickness of ASE initial slab can be iteratively updated
     curr_slab_L=int(sim.slab_L)
