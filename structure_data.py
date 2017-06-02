@@ -2687,11 +2687,7 @@ def from_CIF(cifname):
 
 def write_CIF(graph, cell, bond_block=True,descriptor="debug"):
     """Currently used for debugging purposes"""
-    # If desciptor is None, will overwrite the old cif
-    if(descriptor=None):
-        c = CIF(name="%s"%(graph.name))
-    else:
-        c = CIF(name="%s.%s"%(graph.name,descriptor))
+    c = CIF(name="%s.%s"%(graph.name,descriptor))
     # data block
     c.add_data("data", data_=graph.name)
     c.add_data("data", _audit_creation_date=
