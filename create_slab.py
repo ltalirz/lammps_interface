@@ -2121,7 +2121,7 @@ def main():
         
         # DEBUG file writing                                                                    
         if(sim.slab_verbose):
-            sim.slabgraph.write_slabgraph_cif(cell,bond_block=False,descriptor="debug") 
+            sim.slabgraph.write_slabgraph_cif(cell,bond_block=False,descriptor="debug",relabel=False) 
 
         # Here we need to manipulate the surface  
         sim.slabgraph.normalize_bulk_edge_weights()                                 
@@ -2137,7 +2137,7 @@ def main():
 
         # DEBUG file writing
         if(sim.slab_verbose):
-            sim.slabgraph.write_slabgraph_cif(cell,bond_block=False,descriptor="deH")   
+            sim.slabgraph.write_slabgraph_cif(cell,bond_block=False,descriptor="deH",relabel=False)   
                                                                                     
         # add missing hydrogen caps and validate structural properties 
         sim.slabgraph.add_missing_hydrogens()                                       
@@ -2192,12 +2192,12 @@ def main():
         else:
             # if we have succeeded can write the final files here if verbose
             if(sim.slab_verbose):
-                sim.slabgraph.write_slabgraph_cif(cell,bond_block=False,descriptor="addH")   
+                sim.slabgraph.write_slabgraph_cif(cell,bond_block=False,descriptor="addH",relabel=False)   
                 sim.slabgraph.write_average_silanol_density(curr_slab_cif_name[:-4]+".addH.dat")
             # and if not verbose only write if we suceeded
             else:
                 if(slab_is_2D_periodic):
-                    sim.slabgraph.write_slabgraph_cif(cell,bond_block=False,descriptor="addH")   
+                    sim.slabgraph.write_slabgraph_cif(cell,bond_block=False,descriptor="addH",relabel=False)   
                     sim.slabgraph.write_average_silanol_density(curr_slab_cif_name[:-4]+".addH.dat")
             pass
     ############################
