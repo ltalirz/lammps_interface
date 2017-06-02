@@ -2418,14 +2418,21 @@ class SlabGraph(MolecularGraph):
 
         print("\n\nAdding back in H's")
         print(self.final_H_edges)
+        print(self.cell.a)
+        print(self.cell.b)
+        print(self.cell.c)
+        print(self.cell.alpha)
+        print(self.cell.beta)
+        print(self.cell.gamma)
 
         # for each directed edge representing a converted O->Si to O->
         for edge in self.final_H_edges:
-            #print("\n")
-            #print(edge)
-            # O data
+            print("\n")
+            print(edge)
+            print((self.refgraph.node[edge[0]]['ciflabel'],self.refgraph.node[edge[1]]['ciflabel']))
+            # data of parent node (the surface O atom)
             parent_node_data=self.refgraph.node[edge[0]]
-            # Si data to be turned into H data
+            # data of child node (the Si atom to be turned into H)
             old_child_node_data=self.refgraph.node[edge[1]]
             new_child_node_index = edge[1]+10000
             new_child_node_data = old_child_node_data.copy()
@@ -2437,82 +2444,95 @@ class SlabGraph(MolecularGraph):
             symflag=old_edge_data['symflag']
 
             # New/old coordinates of child node to write in file
-            old_abc = [float(old_child_node_data['_atom_site_fract_x']),
+            old_child_abc = [float(old_child_node_data['_atom_site_fract_x']),
                        float(old_child_node_data['_atom_site_fract_y']),
                        float(old_child_node_data['_atom_site_fract_z'])] 
 
-            new_abc = deepcopy(old_abc)
+            new_child_abc = deepcopy(old_child_abc)
 
-            #print(symflag)
+            print(symflag)
             if(symflag != '.'):
                 # if periodic in x direction
                 if(symflag[2]=='6' or symflag[2]=='4'):
                     if(new_child_node_data['_atom_site_fract_x'] <
                        parent_node_data['_atom_site_fract_x']):
-                        new_abc[0]+=1.0
+                        new_child_abc[0]+=1.0
                     else:
-                        new_abc[0]-=1.0
+                        new_child_abc[0]-=1.0
 
                 # periodic in y direction
                 elif(symflag[3]=='6' or symflag[3]=='4'):
                     if(new_child_node_data['_atom_site_fract_y'] <
                        parent_node_data['_atom_site_fract_y']):
-                        new_abc[1]+=1.0
+                        new_child_abc[1]+=1.0
                     else:
-                        new_abc[1]-=1.0
+                        new_child_abc[1]-=1.0
                 
                 # periodic in z direction
                 elif(symflag[4]=='6' or symflag[4]=='4'):
                     if(new_child_node_data['_atom_site_fract_z'] <
                        parent_node_data['_atom_site_fract_z']):
-                        new_abc[2]+=1.0
+                        new_child_abc[2]+=1.0
                     else:
-                        new_abc[2]-=1.0
+                        new_child_abc[2]-=1.0
 
-            #print("Old child abc:")
-            #print(old_abc)
-            #print("New child abc:")
-            #print(new_abc)
+            print("Old child abc:")
+            print(old_child_abc)
+            print("New child abc:")
+            print(new_child_abc)
 
-            new_xyz=self.to_cartesian(new_abc)
-            #print("New child xyz:")
-            #print(new_xyz)
-            
-            #print("Parent xyz:")
-            #print(parent_node_data['cartesian_coordinates'])
+            new_child_xyz=self.to_cartesian(new_child_abc)
+            print("New child xyz:")
+            print(new_child_xyz)
+           
+            print("Parent abc:")
+            parent_abc=np.array([float(parent_node_data['_atom_site_fract_x']),
+                                 float(parent_node_data['_atom_site_fract_y']),
+                                 float(parent_node_data['_atom_site_fract_z'])])
+            print(parent_abc)
+            print("Stored parent xyz:")
+            print(parent_node_data['cartesian_coordinates'])
+            print("Stored parent abc:")
+            print(self.to_fractional(parent_node_data['cartesian_coordinates']))
+            print("Calculated parent xyz:")
+            updated_parent_xyz=self.to_cartesian(parent_abc)
+            print(updated_parent_xyz)
+            print("Calculated parent abc:")
+            print(self.to_fractional(updated_parent_xyz))
+            #parent_node_data['cartesian_coordinates']=updated_parent_xyz.copy()
 
-            bond_length=np.linalg.norm(new_xyz-parent_node_data['cartesian_coordinates'])
-            #print("old bond length:")
-            #print(bond_length)
+            bond_length=np.linalg.norm(new_child_xyz-parent_node_data['cartesian_coordinates'])
+            print("old bond length:")
+            print(bond_length)
             h_bond_length=0.95
             scale_by=h_bond_length/bond_length
-            #print("Scale by")
-            #print(scale_by)
+            print("Scale by")
+            print(scale_by)
 
-            new_xyz=parent_node_data['cartesian_coordinates']+\
-                    (new_xyz-parent_node_data['cartesian_coordinates'])*scale_by
-            #print("New xyz:")
-            #print(new_xyz)
+            new_child_xyz=parent_node_data['cartesian_coordinates']+\
+                    (new_child_xyz-parent_node_data['cartesian_coordinates'])*scale_by
+            print("New child xyz:")
+            print(new_child_xyz)
 
-            new_xyz=self.in_cell(new_xyz)
-            #print("New xyz in cell:")
-            #print(new_xyz)
+            new_child_xyz=self.in_cell(new_child_xyz)
+            print("New child xyz in cell:")
+            print(new_child_xyz)
 
-            new_abc = self.to_fractional(new_xyz)
-            #print("New abc for printing:")
-            #print(new_abc)
+            new_child_abc = self.to_fractional(new_child_xyz)
+            print("New child abc for printing:")
+            print(new_child_abc)
 
-            new_child_node_data['_atom_site_fract_x'] = str(new_abc[0])
-            new_child_node_data['_atom_site_fract_y'] = str(new_abc[1])
-            new_child_node_data['_atom_site_fract_z'] = str(new_abc[2])
-            new_child_node_data['cartesian_coordinates']=new_xyz
+            new_child_node_data['_atom_site_fract_x'] = str(new_child_abc[0])
+            new_child_node_data['_atom_site_fract_y'] = str(new_child_abc[1])
+            new_child_node_data['_atom_site_fract_z'] = str(new_child_abc[2])
+            new_child_node_data['cartesian_coordinates']=new_child_xyz
             self.slabgraph.add_node(new_child_node_index, new_child_node_data)
              
     def to_cartesian(self, coord):
         """
         return unwrapped cartesian coords from abc
         """
-        return np.dot(self.cell.cell,coord)
+        return np.dot(coord,self.cell.cell)
                     
     def to_fractional(self, coord):
         f = np.dot(self.cell.inverse, coord) 
