@@ -1610,6 +1610,7 @@ class SlabGraph(MolecularGraph):
         If we have a zeolite graph, condense it to a Si only graph
         """
 
+        print("\n\n Consolidating Si-O graph to Si only graph\n")
         # store the node indices of all removed O's
         self.removed_nodes = nx.Graph()
         self.removed_edges = []
@@ -1624,6 +1625,7 @@ class SlabGraph(MolecularGraph):
 
                 if(len(neighbors)==2):
                     # normal O coordination environment
+                    #print("Node %d is a bulk O node"%node)
 
                     # identify edges to remove AND the data associated with that node
                     self.removed_edges.append((neighbors[0],node))
@@ -1635,6 +1637,7 @@ class SlabGraph(MolecularGraph):
                     # create an edge between the adjacent Si
                     self.added_edges.append((neighbors[0],neighbors[1]))
                 elif(len(neighbors)==1):
+                    #print("Node %d is a surface O node"%node)
                     # the arbitrary initial slab config can have dangling O's
                     # remove both edges to Si
                     self.removed_edges.append((neighbors[0],node))
@@ -1643,11 +1646,22 @@ class SlabGraph(MolecularGraph):
                     # no edge to add to the all Si graph
                 else:
                     # a disconnected O existed in the intial ase truncation
-                    # do nothing but remove the node
+                    # do nothing since we have already removed disconnected
+                    # componenets in remove_erroneous_disconnected_comps
                     pass
                 
                 # remove the O node
                 self.removed_nodes.add_node(node,data)
+        #    elif(data['element']=='Si'):
+        #        print("Si has %d neighbors"%len(self.slabgraph.neighbors(node)))
+
+        print("All nodes to remove:")
+        print(self.removed_nodes)
+        print("All edges to remove:")
+        print(self.removed_edges)
+        print("All edges to add:")
+        print(self.added_edges)
+
 
         # remove Si-O or Al-O edges
         for edge in self.removed_edges:
@@ -1680,7 +1694,7 @@ class SlabGraph(MolecularGraph):
             else:
                 self.slabgraph.sorted_edge_dict[(edge[1],edge[0])] = edge
 
-        # Remove Si nodes
+        # Remove O nodes
         for node in self.removed_nodes:
             self.slabgraph.remove_node(node)
 
@@ -1716,13 +1730,40 @@ class SlabGraph(MolecularGraph):
         self.surface_nodes_max=[]
         self.bulk_nodes=[]
 
+        # temporary number of edges look up
+        # this is necessary because a fully coordinated Si can still have
+        # only 3 neighors if it connects another Si by a both bulk edge AND a 
+        # periodic edge 
+        temp_neigh_list = {}
+        for edge in self.added_edges:
+            if(edge[0] not in temp_neigh_list.keys()):
+                temp_neigh_list[edge[0]]=1
+            else:
+                temp_neigh_list[edge[0]]+=1
+                
+            if(edge[1] not in temp_neigh_list.keys()):
+                temp_neigh_list[edge[1]]=1
+            else:
+                temp_neigh_list[edge[1]]+=1
+
+
+        print("\n\nIdentifying surface/bulk nodes\n")
         for node,data in self.slabgraph.nodes_iter(data=True):
             if(data['element']=="O"):
                 print("Error! O's have to be removed from graph first")
+                sys.exit()
 
+            # Here need to be very careful
+            # For small unit cells, one Si can be fully coordinated w/o having
+            # 4 neighbors as it can be connected to a different Si AND the
+            # periodic image  
             neighbors=self.slabgraph.neighbors(node)
+            
+            #print("Si has %d neighbors"%len(self.slabgraph.neighbors(node)))
+            #print("Si has %d edges"%temp_neigh_list[node])
 
-            if(len(neighbors)<4):
+            #if(len(neighbors)<4):
+            if(temp_neigh_list[node]<4):
                 # if node is undercoordinated we identify it as a surface node
                 self.surface_nodes.append(node)
                 data['element']='X'
@@ -1746,6 +1787,13 @@ class SlabGraph(MolecularGraph):
             else:
                 # any fully coordinated node is automatically a bulk node
                 self.bulk_nodes.append(node)
+
+        print("Bulk nodes:")
+        print(self.bulk_nodes)
+        print("Surface 0 nodes:")
+        print(self.surface_nodes_0)
+        print("Surface max nodes:")
+        print(self.surface_nodes_max)
 
 
 
@@ -2288,7 +2336,8 @@ class SlabGraph(MolecularGraph):
                     this_intersect = set(self.refgraph.neighbors(n2)).intersection(self.all_remove)     
                     if(len(this_intersect)==1):
                         self.final_H_edges.append((n2, next(iter(this_intersect))))
-                        #print(self.final_H_edges)
+                        print("Adding a forward edge for new O-H edge")
+                        print(self.final_H_edges)
                     else:
                         pass
                         #print(this_intersect)
@@ -2310,7 +2359,8 @@ class SlabGraph(MolecularGraph):
                     this_intersect = set(self.refgraph.neighbors(n1)).intersection(self.all_remove)     
                     if(len(this_intersect)==1):
                         self.final_H_edges.append((n1, next(iter(this_intersect))))
-                        #print(self.final_H_edges)
+                        print("Adding a reverse edge for new O-H edge")
+                        print(self.final_H_edges)
                     else:
                         pass
                         #print(this_intersect)
