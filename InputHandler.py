@@ -197,7 +197,7 @@ class Options(object):
                                       "where you know that structural collapse will result in " +
                                       "the box decreasing past 2*rcut")
         simulation_group.add_argument("--auto-mol-replication", action="store",
-                                      type=bool, dest="replication",
+                                      type=bool, dest="auto_mol_rep",
                                       default=None,
                                       help="If None: user will be prompted to replicate identified molecules in the supercell"+
                                       "If True: automatic replication of identified molecules in the supercell"+
