@@ -2333,13 +2333,12 @@ class SlabGraph(MolecularGraph):
             n2 = self.removed_edges[i][1]
 
     
-            # Again we have the problem that one Si can represent two H's if one
-            # edge to it is a bulk edge while the other edge to it is a periodic edge
-       
             if n1 in self.slabgraph.nodes():
                 if(n1 not in self.final_added_nodes):
                     # add the missing O node
-                    self.slabgraph.add_node(n2, self.removed_nodes.node[n2])
+                    print("Adding an O (node %d, ciflabel %s)"%(n2,self.refgraph.node[n2]['ciflabel']))
+                    #self.slabgraph.add_node(n2, self.removed_nodes.node[n2])
+                    self.slabgraph.add_node(n2, self.refgraph.node[n2])
                     # add its edge to Si
                     self.slabgraph.add_edge(n1,n2,self.removed_edges_data[i])
                     # keep track of its addition so we don't try it again
@@ -2347,6 +2346,7 @@ class SlabGraph(MolecularGraph):
      
                     # check to see if the O we are adding is attached to a removed Si 
                     this_intersect = set(self.refgraph.neighbors(n2)).intersection(self.all_removed_metal)     
+                    print(this_intersect)
                     if(len(this_intersect)==1):
                         self.final_H_edges.append((n2, next(iter(this_intersect))))
                         print("Adding a forward edge for new O-H edge")
@@ -2362,7 +2362,9 @@ class SlabGraph(MolecularGraph):
             elif n2 in self.slabgraph.nodes():
                 if(n2 not in self.final_added_nodes):
                     # add the missing O node
-                    self.slabgraph.add_node(n1, self.removed_nodes.node[n1])
+                    print("Adding an O (node %d, ciflabel %s)"%(n1, self.refgraph.node[n1]['ciflabel']))
+                    #self.slabgraph.add_node(n1, self.removed_nodes.node[n1])
+                    self.slabgraph.add_node(n1, self.refgraph.node[n1])
                     # add its edge to Si
                     self.slabgraph.add_edge(n1,n2,self.removed_edges_data[i])
                     # keep track of its addition so we don't try it again
@@ -2384,7 +2386,7 @@ class SlabGraph(MolecularGraph):
                     #print(self.final_added_nodes)
 
         print("Final added O's:" + str(self.final_added_nodes))
-        print("O-Si bonds to convert to O-H:")
+        print("%d O-Si bonds to convert to O-H:"%len(self.final_H_edges))
         print(self.final_H_edges)
         self.final_H_edges_ciflabel=[]
         for edge in self.final_H_edges:
@@ -2421,11 +2423,14 @@ class SlabGraph(MolecularGraph):
         for edge in self.final_H_edges:
             #print("\n")
             #print(edge)
+            # O data
             parent_node_data=self.refgraph.node[edge[0]]
+            # Si data to be turned into H data
             old_child_node_data=self.refgraph.node[edge[1]]
             new_child_node_index = edge[1]+10000
             new_child_node_data = old_child_node_data.copy()
             new_child_node_data['element']="H"
+            new_child_node_data['ciflabel']="H"+str(new_child_node_index)
    
             # get original edge data to check for periodicity
             old_edge_data=self.refgraph.edge[edge[0]][edge[1]]
@@ -2519,8 +2524,8 @@ class SlabGraph(MolecularGraph):
         print("Surface silanol density: %.5f"%(self.cut_value2/(self.cell.a*self.cell.b)))   
 
 
-    def write_slabgraph_cif(self,cell,bond_block=True,descriptor="debug"):
-        write_CIF(self.slabgraph,cell,bond_block,descriptor)
+    def write_slabgraph_cif(self,cell,bond_block=True,descriptor="debug",relabel=False):
+        write_CIF(self.slabgraph,cell,bond_block,descriptor,relabel)
 
     def check_approximate_slab_thickness(self):
         """
@@ -2685,9 +2690,12 @@ def from_CIF(cifname):
     mg.cell = cell
     return cell, mg
 
-def write_CIF(graph, cell, bond_block=True,descriptor="debug"):
+def write_CIF(graph, cell, bond_block=True,descriptor="debug",relabel=True):
     """Currently used for debugging purposes"""
-    c = CIF(name="%s.%s"%(graph.name,descriptor))
+    if(descriptor==None):
+        c = CIF(name="%s"%(graph.name))
+    else:
+        c = CIF(name="%s.%s"%(graph.name,descriptor))
     # data block
     c.add_data("data", data_=graph.name)
     c.add_data("data", _audit_creation_date=
@@ -2718,7 +2726,16 @@ def write_CIF(graph, cell, bond_block=True,descriptor="debug"):
     element_counter = {}
     carts = []
     for node, data in graph.nodes_iter(data=True):
-        label = "%s%i"%(data['element'], node)
+        # can override write to try to preserve the already assigned ciflabel
+        if(relabel==True):
+            label = "%s%i"%(data['ciflabel'], node)
+        else:
+            try:
+                label = "%s"%(data['ciflabel'])
+            except:
+                label = "%s%i"%(data['ciflabel'], node)
+
+
         c.add_data("atoms", _atom_site_label=
                                 CIF.atom_site_label(label))
         c.add_data("atoms", _atom_site_type_symbol=
