@@ -724,8 +724,14 @@ class LammpsSimulation(object):
             for mtype in list(self.molecule_types.keys()):
                 # prompt for replication of this molecule in the supercell.
                 rep = self.subgraphs[self.molecule_types[mtype][0]]
-                response = input("Would you like to replicate molceule %i with atoms (%s) in the supercell? [y/n]: "%
-                        (mtype, ", ".join([rep.node[j]['element'] for j in rep.nodes()])))
+                if(self.options.auto_mol_rep is None):
+                    response = input("Would you like to replicate molceule %i with atoms (%s) in the supercell? [y/n]: "%
+                            (mtype, ", ".join([rep.node[j]['element'] for j in rep.nodes()])))
+                elif(self.options.auto_mol_rep is True):
+                    response = 'y'
+                else:
+                    repsonse = 'n'
+                    
                 if response in ['y', 'Y', 'yes']:
                     for m in self.molecule_types[mtype]:
                         self.subgraphs[m].build_supercell(supercell, self.cell, track_molecule=True, molecule_len=molcount)
@@ -1979,6 +1985,7 @@ def create_slab_ase(ifname,slab_face,slab_L,slab_vacuum):
 def return_current_slab_name(ifname,slab_face,slab_L,vacuum):
     pass
 
+
 def main():                                                                     
                                                                                 
     # command line parsing                                                      
@@ -1990,8 +1997,40 @@ def main():
     sim.set_graph(graph)                                                        
     sim.split_graph()                                                           
     sim.assign_force_fields()                                                   
+    write_CIF(graph,cell,bond_block=False,descriptor="original")
 
+    # TODO May need a big preparation step here that each Si is more than 2 eges away
+    # from its periodic image
+    # For now, naiive way is to say that if a lattice dimension is < ~6 Angstrom, we need to duplicate once in that direction
+    ############################
+    # START MINIMUM SUPERCELL GENERATION
+    ############################
+    # minimum supercell has to be 6 A in each orthogonal direction
+    # corresponding to 3 A cutoff
+    sim.options.cutoff=3.5
+    sim.compute_simulation_size() 
+    sim.merge_graphs()
 
+    # Overwrite old cif with new minimum supercell
+    write_CIF(graph,cell,bond_block=False,descriptor=None)
+
+    # Reload the new CIF
+    options = Options()                                                         
+    sim = LammpsSimulation(options)                                             
+
+    cell, graph = from_CIF(options.cif_file)                                    
+    sim.set_cell(cell)                                                          
+    sim.set_graph(graph)                                                        
+    sim.split_graph()                                                           
+    sim.assign_force_fields()                                                   
+    ############################
+    # FINISHED MINIMUM SUPERCELL GENERATION
+    ############################
+    
+
+    ############################
+    # START AUTOMATED SLAB GENERATION CRITERIA 
+    ############################
     # This is IMPORTANT 
     # If the aspect ratio of the ASE slab is too small:
     #    -the Stoer Wagner algorithm will fail and find a min cut partition that is not 2D periodic
@@ -2041,7 +2080,15 @@ def main():
     next_iter=True
     slab_is_2D_periodic=False
     slab_meets_thickness_criteria=False
+    ############################
+    # END AUTOMATED SLAB GENERATION CRITERIA 
+    ############################
 
+
+
+    ############################
+    # START AUTOMATED SLAB GENERATION
+    ############################
     # try to make surfaces until we hit stopping criteria
     while(next_iter==True):
         # reset everything to beginning
@@ -2073,7 +2120,6 @@ def main():
         sim.slabgraph.identify_undercoordinated_surface_nodes()                     
         
         # DEBUG file writing                                                                    
-        #sim.slabgraph.write_slabgraph_cif(cell)                                     
         if(sim.slab_verbose):
             sim.slabgraph.write_slabgraph_cif(cell,bond_block=False,descriptor="debug") 
 
@@ -2088,6 +2134,8 @@ def main():
                                                                                     
         # Add back in all missing oxygens                                           
         sim.slabgraph.add_all_connecting_nodes()                                    
+
+        # DEBUG file writing
         if(sim.slab_verbose):
             sim.slabgraph.write_slabgraph_cif(cell,bond_block=False,descriptor="deH")   
                                                                                     
@@ -2152,6 +2200,9 @@ def main():
                     sim.slabgraph.write_slabgraph_cif(cell,bond_block=False,descriptor="addH")   
                     sim.slabgraph.write_average_silanol_density(curr_slab_cif_name[:-4]+".addH.dat")
             pass
+    ############################
+    # END AUTOMATED SLAB GENERATION
+    ############################
                                                                                 
                                                                                 
                                                                                 
