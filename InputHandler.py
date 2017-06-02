@@ -196,6 +196,12 @@ class Options(object):
                                       " This is useful when dealing with flexible materials " +
                                       "where you know that structural collapse will result in " +
                                       "the box decreasing past 2*rcut")
+        simulation_group.add_argument("--auto-mol-replication", action="store",
+                                      type=bool, dest="replication",
+                                      default=None,
+                                      help="If None: user will be prompted to replicate identified molecules in the supercell"+
+                                      "If True: automatic replication of identified molecules in the supercell"+
+                                      "If False: automatic non-replication of identified molecules in the supercell") 
         simulation_group.add_argument("-O","--orthogonalize", action="store_true",
                                       default=False,
                                       dest="orthogonalize",
