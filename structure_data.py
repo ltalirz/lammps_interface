@@ -1578,6 +1578,8 @@ class SlabGraph(MolecularGraph):
             f.write("Si %.5f %.5f %.5f\n"%(elem[0],elem[1],elem[2]))
         f.close()
 
+
+
     def remove_erroneous_disconnected_comps(self):
         """
         Remove erroneous disconnected components created by ASE
@@ -1604,6 +1606,10 @@ class SlabGraph(MolecularGraph):
             # Important!! The reference graph must now be copied from 
             # our new slabgraph after the disconnected components have been removed
             self.refgraph=self.slabgraph.copy()
+
+        print("Reference graph:")
+        for node, data in self.refgraph.nodes_iter(data=True):
+            print(node, data['ciflabel'],data['element'])
 
     def condense_graph(self):
         """
@@ -2300,28 +2306,35 @@ class SlabGraph(MolecularGraph):
         Takes two partitions to remove from the slab graph
         one for each surface
         """
-        
-        self.all_remove = self.remove_partition_1 | self.remove_partition_2
+       
+        # Note this will include the super surface nodes in the cut partition 
+        self.all_removed_metal = self.remove_partition_1 | self.remove_partition_2
 
-        print("\n\nAll metal nodes to remove:")
-        print(self.all_remove)
+        print("\n\nAll Si/metal nodes to remove:")
+        print(self.all_removed_metal)
 
-        for node in self.all_remove:
+        for node in self.all_removed_metal:
             self.slabgraph.remove_node(node)
 
     def add_all_connecting_nodes(self):
        
         print("\n\nAdd back in the missing O's")
 
-        # these are all the removed oxygens 
+        # these are all the previously removed oxygens that need to be readded
         self.final_added_nodes = set()
+        # these are all the edges that contained a removed oxygen that needs to be readded
         self.final_added_edges = []
+        # these are all the edges that contained a removed oxygen that needs to be readded AND a reomoved Si 
         self.final_H_edges = []
 
         # self.removed_edges is any Si-O edge removed in intial graph condensation
         for i in range(len(self.removed_edges)):
             n1 = self.removed_edges[i][0]
             n2 = self.removed_edges[i][1]
+
+    
+            # Again we have the problem that one Si can represent two H's if one
+            # edge to it is a bulk edge while the other edge to it is a periodic edge
        
             if n1 in self.slabgraph.nodes():
                 if(n1 not in self.final_added_nodes):
@@ -2333,7 +2346,7 @@ class SlabGraph(MolecularGraph):
                     self.final_added_nodes.add(n2)
      
                     # check to see if the O we are adding is attached to a removed Si 
-                    this_intersect = set(self.refgraph.neighbors(n2)).intersection(self.all_remove)     
+                    this_intersect = set(self.refgraph.neighbors(n2)).intersection(self.all_removed_metal)     
                     if(len(this_intersect)==1):
                         self.final_H_edges.append((n2, next(iter(this_intersect))))
                         print("Adding a forward edge for new O-H edge")
@@ -2356,7 +2369,7 @@ class SlabGraph(MolecularGraph):
                     self.final_added_nodes.add(n1)
 
                     # check to see if the O we are adding is attached to a removed Si 
-                    this_intersect = set(self.refgraph.neighbors(n1)).intersection(self.all_remove)     
+                    this_intersect = set(self.refgraph.neighbors(n1)).intersection(self.all_removed_metal)     
                     if(len(this_intersect)==1):
                         self.final_H_edges.append((n1, next(iter(this_intersect))))
                         print("Adding a reverse edge for new O-H edge")
@@ -2373,6 +2386,11 @@ class SlabGraph(MolecularGraph):
         print("Final added O's:" + str(self.final_added_nodes))
         print("O-Si bonds to convert to O-H:")
         print(self.final_H_edges)
+        self.final_H_edges_ciflabel=[]
+        for edge in self.final_H_edges:
+            self.final_H_edges_ciflabel.append((self.refgraph.node[edge[0]]['ciflabel'],
+                                                self.refgraph.node[edge[1]]['ciflabel']))
+        print(self.final_H_edges_ciflabel)
                 
 
         # NOTE doesn't work
@@ -2669,7 +2687,11 @@ def from_CIF(cifname):
 
 def write_CIF(graph, cell, bond_block=True,descriptor="debug"):
     """Currently used for debugging purposes"""
-    c = CIF(name="%s.%s"%(graph.name,descriptor))
+    # If desciptor is None, will overwrite the old cif
+    if(descriptor=None):
+        c = CIF(name="%s"%(graph.name))
+    else:
+        c = CIF(name="%s.%s"%(graph.name,descriptor))
     # data block
     c.add_data("data", data_=graph.name)
     c.add_data("data", _audit_creation_date=
