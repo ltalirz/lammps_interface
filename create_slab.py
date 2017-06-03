@@ -2131,7 +2131,7 @@ def main():
         sim.slabgraph.connect_super_surface_nodes()                                 
 
         # Bad variable naming, we are just making a directed graph here
-        sim.slabgraph.create_slab_tree()                                            
+        sim.slabgraph.convert_to_digraph()                                            
         sim.slabgraph.nx_min_cut_digraph(weight_barrier=True)               
         sim.slabgraph.remove_surface_partitions()                                   
                                                                                     
@@ -2144,14 +2144,14 @@ def main():
                                                                                     
         # add missing hydrogen caps and validate structural properties 
         sim.slabgraph.add_missing_hydrogens()                                       
-        approximate_thickness = sim.slabgraph.check_approximate_slab_thickness()
+        # check approximate slab thickness
+        min_thickness = sim.slabgraph.check_approximate_slab_thickness()
+        max_thickness = sim.slabgraph.check_approximate_slab_thickness_v2()
+        approximate_thickness = (max_thickness+min_thickness)/2
+        # check if generated slab is 2D periodic
         slab_is_2D_periodic   = sim.slabgraph.check_slab_is_2D_periodic()
-        
-        # For now we will only write the structure if we have succeeded 
-        #sim.slabgraph.write_slabgraph_cif(cell,bond_block=False,descriptor="addH")   
-        #sim.slabgraph.write_average_silanol_density(curr_slab_cif_name[:-4]+".addH.dat")
-
-
+       
+ 
         # check if we need to do another iteration with an L+=1 ASE slab
         if(slab_is_2D_periodic):
             print("Identified slab is periodic")
@@ -2197,7 +2197,7 @@ def main():
             if(sim.slab_verbose):
                 sim.slabgraph.write_slabgraph_cif(cell,bond_block=False,descriptor="addH",relabel=False)   
                 sim.slabgraph.write_average_silanol_density(curr_slab_cif_name[:-4]+".addH.dat")
-            # and if not verbose only write if we suceeded
+            # and if not verbose only write if we suceeded to minimize # of files written
             else:
                 if(slab_is_2D_periodic):
                     sim.slabgraph.write_slabgraph_cif(cell,bond_block=False,descriptor="addH",relabel=False)   

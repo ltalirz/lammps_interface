@@ -1883,7 +1883,7 @@ class SlabGraph(MolecularGraph):
 
 
                     
-    def create_slab_tree(self):
+    def convert_to_digraph(self):
         """
         Turn the slabgraph into a tree
         """
@@ -2615,8 +2615,30 @@ class SlabGraph(MolecularGraph):
             approximate=(max_coord-min_coord)*self.cell.b
         elif(self.vacuum_direc==2):
             approximate=(max_coord-min_coord)*self.cell.c
-        
+       
+        print("Maximal slab distance ~ %.3f"%approximate) 
         return approximate
+
+    def check_approximate_slab_thickness_v2(self):
+        """
+        return the approximate MINIMUM slab distance in the vacuum direction
+        
+        iterate over all set(surface_0_nodes) and set(surface_max_nodes) combinations
+        and find the minimum euclidian distance
+        """
+
+        approx_min_dist = 10000.0
+        for n1 in self.remove_partition_1:
+            for n2 in self.remove_partition_2:
+                #print(self.refgraph.node[n1]['cartesian_coordinates'])
+                eucl_dist = np.linalg.norm(self.refgraph.node[n1]['cartesian_coordinates']-
+                                           self.refgraph.node[n2]['cartesian_coordinates'])
+                if(eucl_dist < approx_min_dist):
+                    approx_min_dist = float(eucl_dist)
+
+        print("Minimal slab distance ~ %.3f"%approx_min_dist)
+        return approx_min_dist
+
 
     def check_slab_is_2D_periodic(self):
         """
