@@ -1486,6 +1486,7 @@ class SlabGraph(MolecularGraph):
         self.cell=cell
         #a=0,b=1,c=2
         self.vacuum_direc=2
+        # store original number of nodes so we know what index to use when we start adding H's
         self.num_nodes=self.slabgraph.number_of_nodes()
     
     def __str__(self):
@@ -2240,9 +2241,21 @@ class SlabGraph(MolecularGraph):
         print(str(edge_cut_set))
 
 
-    def stoer_wagner_slab_tree_cut(self,weight_barrier=False):
+    def nx_min_cut_digraph(self,weight_barrier=False):
+        """
+        Use the Nx minimum cut of a directed graph (forward and reverse) edges
+        both exist with same weight, could equivalently be expressed as 
+        an undirected graph and the stoer-wagner algorithm be used
 
-        print("\n\nStoer-Wagner minimum cut on directed slab graph...")
+        weight_barrier sets up a weight of inifinity for all edges whose nodes'
+        vacuum coordinates are both < 0.5 to constrain the solution to one half 
+        of the slab
+
+        then the weight barrier reverses (coordiantes > 0.5) to find the solution
+        on the other half of the slab
+        """
+
+        print("\n\nNx minimum_cut function on directed slab graph...")
         # Firt create a barrier (aspect ratio of the slab is too large)
         if(weight_barrier):
             self.create_weighted_barrier_on_opposite_half(start='min')
@@ -2264,10 +2277,24 @@ class SlabGraph(MolecularGraph):
             self.keep_partition_1=self.partition1[1].copy()
             self.remove_partition_1=self.partition1[0].copy()
 
-        print("\nForward tree cut value, partiotioning")
+        # useful to also have a copy of the  partition sets with ciflabels
+        self.partition1_labeled=[[],[]]
+        for node in self.partition1[0]:
+            self.partition1_labeled[0].append((node,self.refgraph.node[node]['ciflabel']))
+        for node in self.partition1[1]:
+            self.partition1_labeled[1].append((node,self.refgraph.node[node]['ciflabel']))
+
+
+        print("\nForward s-t cut value:")
         print(self.cut_value1)        
-        print(self.partition1[0])
-        print(self.partition1[1])
+        #print("Partition 1, set 0:")
+        #print(self.partition1[0])
+        #print("Partition 1, set 1:")
+        #print(self.partition1[1])
+        print("Forward cut (node, ciflabel) partition1:")
+        print(self.partition1_labeled[0])
+        print("Forward cut (node, ciflabel) partition2:")
+        print(self.partition1_labeled[1])
 
         # remove the midpoint barrier
         if(weight_barrier):
@@ -2292,10 +2319,24 @@ class SlabGraph(MolecularGraph):
             self.keep_partition_2=self.partition2[1].copy()
             self.remove_partition_2=self.partition2[0].copy()
 
-        print("\nReverse tree cut value, partiotioning")
+        # useful to also have a copy of the  partition sets with ciflabels
+        self.partition2_labeled=[[],[]]
+        for node in self.partition2[0]:
+            self.partition2_labeled[0].append((node,self.refgraph.node[node]['ciflabel']))
+        for node in self.partition2[1]:
+            self.partition2_labeled[1].append((node,self.refgraph.node[node]['ciflabel']))
+
+
+        print("\nReverse s-t cut value:")
         print(self.cut_value2)        
-        print(self.partition2[0])
-        print(self.partition2[1])
+        #print("Partition 2, set 0:")
+        #print(self.partition2[0])
+        #print("Partition 2, set 1:")
+        #print(self.partition2[1])
+        print("Reverse cut (node, ciflabel) partition1:")
+        print(self.partition2_labeled[0])
+        print("Reverse cut (node, ciflabel) partition2:")
+        print(self.partition2_labeled[1])
 
         # remove the midpoint barrier
         if(weight_barrier):
@@ -2311,7 +2352,8 @@ class SlabGraph(MolecularGraph):
         self.all_removed_metal = self.remove_partition_1 | self.remove_partition_2
 
         print("\n\nAll Si/metal nodes to remove:")
-        print(self.all_removed_metal)
+        for node in self.all_removed_metal:
+            print((node, self.refgraph.node[node]['ciflabel']))
 
         for node in self.all_removed_metal:
             self.slabgraph.remove_node(node)
@@ -2336,8 +2378,7 @@ class SlabGraph(MolecularGraph):
             if n1 in self.slabgraph.nodes():
                 if(n1 not in self.final_added_nodes):
                     # add the missing O node
-                    print("Adding an O (node %d, ciflabel %s)"%(n2,self.refgraph.node[n2]['ciflabel']))
-                    #self.slabgraph.add_node(n2, self.removed_nodes.node[n2])
+                    #print("Adding an O (node %d, ciflabel %s)"%(n2,self.refgraph.node[n2]['ciflabel']))
                     self.slabgraph.add_node(n2, self.refgraph.node[n2])
                     # add its edge to Si
                     self.slabgraph.add_edge(n1,n2,self.removed_edges_data[i])
@@ -2346,11 +2387,11 @@ class SlabGraph(MolecularGraph):
      
                     # check to see if the O we are adding is attached to a removed Si 
                     this_intersect = set(self.refgraph.neighbors(n2)).intersection(self.all_removed_metal)     
-                    print(this_intersect)
                     if(len(this_intersect)==1):
-                        self.final_H_edges.append((n2, next(iter(this_intersect))))
+                        this_edge=(n2, next(iter(this_intersect)))
+                        self.final_H_edges.append(this_edge)
                         print("Adding a forward edge for new O-H edge")
-                        print(self.final_H_edges)
+                        print(this_edge)
                     else:
                         pass
                         #print(this_intersect)
@@ -2362,8 +2403,7 @@ class SlabGraph(MolecularGraph):
             elif n2 in self.slabgraph.nodes():
                 if(n2 not in self.final_added_nodes):
                     # add the missing O node
-                    print("Adding an O (node %d, ciflabel %s)"%(n1, self.refgraph.node[n1]['ciflabel']))
-                    #self.slabgraph.add_node(n1, self.removed_nodes.node[n1])
+                    #print("Adding an O (node %d, ciflabel %s)"%(n1, self.refgraph.node[n1]['ciflabel']))
                     self.slabgraph.add_node(n1, self.refgraph.node[n1])
                     # add its edge to Si
                     self.slabgraph.add_edge(n1,n2,self.removed_edges_data[i])
@@ -2371,11 +2411,11 @@ class SlabGraph(MolecularGraph):
                     self.final_added_nodes.add(n1)
 
                     # check to see if the O we are adding is attached to a removed Si 
-                    this_intersect = set(self.refgraph.neighbors(n1)).intersection(self.all_removed_metal)     
                     if(len(this_intersect)==1):
-                        self.final_H_edges.append((n1, next(iter(this_intersect))))
+                        this_edge=((n1, next(iter(this_intersect))))
+                        self.final_H_edges.append(this_edge)
                         print("Adding a reverse edge for new O-H edge")
-                        print(self.final_H_edges)
+                        print(this_edge)
                     else:
                         pass
                         #print(this_intersect)
@@ -2418,13 +2458,8 @@ class SlabGraph(MolecularGraph):
 
         print("\n\nAdding back in H's")
         print(self.final_H_edges)
-        print(self.cell.a)
-        print(self.cell.b)
-        print(self.cell.c)
-        print(self.cell.alpha)
-        print(self.cell.beta)
-        print(self.cell.gamma)
 
+        this_index = self.num_nodes+1
         # for each directed edge representing a converted O->Si to O->
         for edge in self.final_H_edges:
             print("\n")
@@ -2434,7 +2469,7 @@ class SlabGraph(MolecularGraph):
             parent_node_data=self.refgraph.node[edge[0]]
             # data of child node (the Si atom to be turned into H)
             old_child_node_data=self.refgraph.node[edge[1]]
-            new_child_node_index = edge[1]+10000
+            new_child_node_index = int(this_index)
             new_child_node_data = old_child_node_data.copy()
             new_child_node_data['element']="H"
             new_child_node_data['ciflabel']="H"+str(new_child_node_index)
@@ -2527,6 +2562,9 @@ class SlabGraph(MolecularGraph):
             new_child_node_data['_atom_site_fract_z'] = str(new_child_abc[2])
             new_child_node_data['cartesian_coordinates']=new_child_xyz
             self.slabgraph.add_node(new_child_node_index, new_child_node_data)
+            print("Adding child H node w/index %d"%new_child_node_index)
+
+            this_index+=1
              
     def to_cartesian(self, coord):
         """

@@ -1997,6 +1997,7 @@ def main():
     sim.set_graph(graph)                                                        
     sim.split_graph()                                                           
     sim.assign_force_fields()                                                   
+    sim.merge_graphs()
     write_CIF(graph,cell,bond_block=False,descriptor="original")
 
     # TODO May need a big preparation step here that each Si is more than 2 eges away
@@ -2111,8 +2112,10 @@ def main():
         sim.slabgraph=SlabGraph(sim.graph,cell) 
         sim.slabgraph.check_if_zeolite()                                            
                                                                                     
-        #sim.compute_simulation_size()                                              
         sim.merge_graphs()                                                          
+
+        # DEBUG file writing: reprint the slab graph since ASE cif can't be read by mercury
+        sim.slabgraph.write_slabgraph_cif(cell,bond_block=False,descriptor=None,relabel=False) 
                                                                                     
         # creating slab graph                                                       
         sim.slabgraph.remove_erroneous_disconnected_comps()                         
@@ -2129,7 +2132,7 @@ def main():
 
         # Bad variable naming, we are just making a directed graph here
         sim.slabgraph.create_slab_tree()                                            
-        sim.slabgraph.stoer_wagner_slab_tree_cut(weight_barrier=True)               
+        sim.slabgraph.nx_min_cut_digraph(weight_barrier=True)               
         sim.slabgraph.remove_surface_partitions()                                   
                                                                                     
         # Add back in all missing oxygens                                           
