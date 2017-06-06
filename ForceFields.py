@@ -21,8 +21,8 @@ import re
 import sys
 from Molecules import *
 DEG2RAD = math.pi/180.
-kBtokcal = 0.00198588 
-
+KBTOKCAL = 0.00198588 
+EVTOKCAL = 23.0609
 class ForceField(object):
 
     __metaclass__ = abc.ABCMeta
@@ -3761,7 +3761,7 @@ class Dubbeldam(ForceField):
             sys.exit()
 
         data['potential'] = BondPotential.Harmonic()
-        data['potential'].K = Dub_bonds[string][0]*kBtokcal/2.
+        data['potential'].K = Dub_bonds[string][0]*KBTOKCAL/2.
         data['potential'].R0 = Dub_bonds[string][1]
         return 1
 
@@ -3789,7 +3789,7 @@ class Dubbeldam(ForceField):
 
         data['potential'] = AnglePotential.Harmonic()
         # check to make sure to divide by DEG2RAD**2
-        data['potential'].K = Dub_angles[string][0]*kBtokcal/2. / DEG2RAD**2
+        data['potential'].K = Dub_angles[string][0]*KBTOKCAL/2. / DEG2RAD**2
         data['potential'].theta0 = Dub_angles[string][1]
         return 1
 
@@ -3825,7 +3825,7 @@ class Dubbeldam(ForceField):
             sys.exit()
         w = 0.0
         data['potential'] = DihedralPotential.Charmm()
-        data['potential'].K = Dub_dihedrals[string][0]*kBtokcal 
+        data['potential'].K = Dub_dihedrals[string][0]*KBTOKCAL 
         data['potential'].n = Dub_dihedrals[string][2] 
         data['potential'].d = Dub_dihedrals[string][1]
         data['potential'].w = w
@@ -3879,7 +3879,7 @@ class Dubbeldam(ForceField):
         data['potential'] = ImproperPotential.Cvff()
         
         # I have 3 impropers, he only has 1. Divide by 3 to get average?
-        data['potential'].K = Dub_impropers[string][0]*kBtokcal / len(self.graph.neighbors(b)) 
+        data['potential'].K = Dub_impropers[string][0]*KBTOKCAL / len(self.graph.neighbors(b)) 
         data['potential'].d = -1 
         data['potential'].n = Dub_impropers[string][2]
         return 1
@@ -3889,7 +3889,7 @@ class Dubbeldam(ForceField):
 
         """
         data['pair_potential'] = PairPotential.LjCutCoulLong()
-        data['pair_potential'].eps = Dub_atoms[data['force_field_type']][0]*kBtokcal*self.eps_scale_factor 
+        data['pair_potential'].eps = Dub_atoms[data['force_field_type']][0]*KBTOKCAL*self.eps_scale_factor 
         data['pair_potential'].sig = Dub_atoms[data['force_field_type']][1]
         data['pair_potential'].cutoff = cutoff
         data['charge'] = Dub_atoms[data['force_field_type']][2]
@@ -3939,6 +3939,172 @@ class Dubbeldam(ForceField):
                         " with element: '%s'"%(data['element']))
                 sys.exit()
 
+class BKS_SPC_SIOH(ForceField):
+
+    """A force field based on the BKS and SPC models for silica and water.
+    Applies only to Silica-based systems.
+
+    The article can be found here:
+    Smirnov K., "A molecular dynamics study of the interaction of water with the external surface of silicalite-1"
+           Phys. Chem. Chem. Phys. 2017, 19, 2950.
+
+    http://pubs.rsc.org/en/content/articlepdf/2011/cp/c6cp06770k
+    """
+
+
+    def __init__(self, graph=None, **kwargs):
+        self.pair_in_data = False
+        # override existing arguments with kwargs
+        for key, value in kwargs.items():
+            setattr(self, key, value)
+
+        if (graph is not None):
+            self.graph = graph
+            self.detect_ff_terms() 
+            self.compute_force_field_terms()
+
+    def bond_term(self, edge):
+        """
+        A Morse potential is used ONLY between Silanol O-H!
+        Everything else is governed by 2-body interactions.
+       
+        E_OH = D0(exp(-2*gamma*(r - R0)) - 2*exp(gamma*(r - R0)))
+
+        In LAMMPS:
+        E = D*[1 - exp(-alpha*(r - R0))]**2
+
+        The lammps potential is effectively the same, just shifted 
+        such that the minimum of the function is at 0 instead of the 
+        bond dissociation energy.
+        
+        """
+        n1, n2, data = edge
+        type1 = self.graph.node[n1]['force_field_type'] 
+        type2 = self.graph.node[n2]['force_field_type']
+        string = "_".join([type1, type2])
+        valid_bond_type = set(["Oh", "Hh"])
+        if set([type1, type2]) != valid_bond_type:
+            return None 
+
+        data['potential'] = BondPotential.Morse()
+        data['potential'].D = 5.102 * EVTOKCAL 
+        data['potential'].alpha = 2.149 
+        data['potential'].R0 = 0.980
+        return 1
+
+    def angle_term(self, angle):
+        """
+        Only applicable to the Si-Oh-Hh angle. 
+        All other angles are controlled by pairwise interactions.
+
+        A harmonic angle potential is used.
+
+        E = 0.5*K*(theta - theta0)**2
+
+
+        """
+        a, b, c, data = angle
+        K = 100.0
+        a_data, b_data, c_data = self.graph.node[a], self.graph.node[b], self.graph.node[c] 
+        atype = a_data['force_field_type']
+        btype = b_data['force_field_type']
+        ctype = c_data['force_field_type']
+       
+        valid_angle_type = set(["Si", "Oh", "Hh"])
+
+        if (set([atype, btype, ctype]) != valid_angle_type):
+            return None
+
+        data['potential'] = AnglePotential.Harmonic()
+        # this is in kcal/rad^2 
+        data['potential'].K = 2.667*EVTOKCAL/2. 
+        data['potential'].theta0 = 130.0 
+        return 1
+
+    def dihedral_term(self, dihedral):
+        """
+        No dihedral terms in this force field.
+
+        """
+        return None
+
+    def improper_term(self, improper):
+        """
+        No improper terms in this force field.
+
+        """
+        return None
+    
+    def pair_terms(self, node, data, cutoff):
+        """ 
+        This is tricky because the inter-silanol bonding is a buckingham
+        potential, but the oxygen of the Si-O and oxygen of water have a
+        LJ potential (from SPC)
+
+        """
+        pot = PairPotential.BuckCoulLong()
+
+        pot.A = 0. 
+        pot.rho = 0.
+        pot.C = 0.
+        pot.cutoff = cutoff
+        data['pair_potential'] = pot 
+
+    def special_commands(self):
+        """ Note: the non-bonded forces are computed with a buckingham potential
+
+        lj implies Lennard-Jones, but from what I've read it applies to any
+        non-bonded (and non-coulombic) interaction.
+
+        http://lammps.sandia.gov/doc/special_bonds.html
+
+        """
+        st = ["%-15s %s"%("pair_modify", "shifted yes"),
+              "%-15s %s"%("special_bonds", "lj/coul 0.0 0.0 0.25"), 
+              "%-15s %.1f"%('dielectric', 1.0)] 
+        return st
+
+    def detect_ff_terms(self):
+        """ 
+        There are several parameters here, Oh, Os, Ow, Hw, Hh, Si
+
+        SPC water is Ow and Hw
+
+        Silanol Oh and Hh
+
+        Silica Os and Si
+
+        """
+        for node, data in self.graph.nodes_iter(data=True):
+            elem = data['element']
+            neighbours = [self.graph.node[j] for j in self.graph.neighbors(node)]
+            neigh_elem = [i['element'] for i in neighbours]
+            if elem == "O":
+                if set(neigh_elem) == set(["Si"]):
+                    data['force_field_type'] = "Os"
+                elif set(neigh_elem) == set(["Si", "H"]):
+                    data['force_field_type'] = "Oh"
+                elif set(neigh_elem) == set(["H"]):
+                    data['force_field_type'] = "Ow"
+
+            elif elem == "H":
+                if len(neighbours) == 1 and neigh_elem[0] == "O":
+                    # get the neighbours of the H atoms neighbour (oxygen)
+                    o_neigh = [self.graph.node[j] for j in 
+                               self.graph.neighbors(self.graph.neighbors(node)[0])]
+                    o_neigh_elem = [i['element'] for i in o_neigh]
+                    if set(o_neigh_elem) == set(["H"]):
+                        data['force_field_type'] = "Hw"
+                    elif set(o_neigh_elem) == set(["H", "Si"]):
+                        data['force_field_type'] = "Hh"
+
+            elif elem == "Si":
+                data['force_field_type'] = "Si"
+
+            if data['force_field_type'] is None:
+                print("ERROR: could not find the proper force field type for atom %i"%(data['index'])+
+                        " with element: '%s'"%(data['element']))
+                sys.exit()
 
 class SPC_E(ForceField):
     def __init__(self, graph=None, **kwargs):

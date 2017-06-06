@@ -237,6 +237,9 @@ class LammpsSimulation(object):
         # mix yourself
 
         table_str = ""
+        # TODO(pboyd): make it easier to have specific mixing parameters
+        # i.e. different atom types can have a different force constant, or
+        # even potential!
         if len(list(set(pot_names))) > 1 or (any(['buck' in i for i in list(set(pot_names))])):
             self.pair_in_data = False
             for (i, j) in itertools.combinations_with_replacement(nodes_list, 2):
@@ -1234,13 +1237,23 @@ class LammpsSimulation(object):
         if(self.kspace_style): 
             inp_str += "%-15s %s\n"%("kspace_style", self.kspace_style) 
         inp_str += "\n"
-    
+   
+        # modify long-range treatments if molecules fluctuate.
+        if self.options.gcmc or self.options.deposit:
+            for ix, comm in enumerate(self.special_commands):
+                if "tail yes" in comm:
+                    print("WARNING: the force field defaults to a tail correction, but "+
+                            "this is not properly treated with fluctuating molecule counts in LAMMPS "+
+                            "so this is automatically changed to 'shifted yes' for your convenience!")
+                    self.special_commands[ix] = string.replace(comm, "tail yes", "shifted yes")
+
         # general catch-all for extra force field commands needed.
         inp_str += "\n".join(list(set(self.special_commands)))
         inp_str += "\n"
         inp_str += "%-15s %s\n"%("box tilt","large")
         inp_str += "%-15s %s\n"%("read_data","data.%s"%(self.name))
-   
+  
+        # VACF? or RMS?
         "compute chunk/atom molecule"
 
         if(not self.pair_in_data):
@@ -1529,6 +1542,8 @@ class LammpsSimulation(object):
 
             gcmc_str = ""
             if (self.options.gcmc):
+                # WARN about special commands - tail corrections are not updated with the number of particles
+                # so switch to shifted yes
                 gcmc_fix = self.fixcount()
                 molecule_fixes.append(gcmc_fix)
                 # chem. pot. is ignored when the 'pressure' keyword is set. We will default to this.
