@@ -2578,6 +2578,7 @@ class SlabGraph(MolecularGraph):
 
     def write_silanol_surface_density(self):
 
+
         print("Surface silanol density: %.5f"%(self.cut_value1/(self.cell.a*self.cell.b)))
         print("Surface silanol density: %.5f"%(self.cut_value2/(self.cell.a*self.cell.b)))   
 
@@ -2679,6 +2680,7 @@ class SlabGraph(MolecularGraph):
         """
         For now do a simple metric for the silanol density
         """
+        print(self.cell.gamma)
         unit_area=0.0
         num_H_added = len(self.final_H_edges)
         if(self.vacuum_direc==0):
@@ -2688,11 +2690,13 @@ class SlabGraph(MolecularGraph):
         elif(self.vacuum_direc==2):
             unit_area=self.cell.a*self.cell.b
 
+        # correct if this face is not orthogonal
+        unit_area*=np.sin(np.deg2rad(self.cell.gamma))
         per_surface_density=(num_H_added/2)/(unit_area)
 
-        print("Average surface density: %.5f"%(per_surface_density))
+        print("Average surface density: %.7f"%(per_surface_density))
         f=open(ofname, "w")
-        f.write("%.5f"%per_surface_density)
+        f.write("%.7f"%per_surface_density)
         
 
     def enumerate_all_primitive_rings(self):
