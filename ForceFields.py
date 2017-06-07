@@ -3982,14 +3982,21 @@ class BKS_SPC_SIOH(ForceField):
         type1 = self.graph.node[n1]['force_field_type'] 
         type2 = self.graph.node[n2]['force_field_type']
         string = "_".join([type1, type2])
+        typeset = set([type1, type2])
         valid_bond_type = set(["Oh", "Hh"])
-        if set([type1, type2]) != valid_bond_type:
+        valid_bond_type2 = set(["Ow", "Hw"])
+        if ((typeset != valid_bond_type) and
+                (typeset != valid_bond_type2)):
             return None 
-
         data['potential'] = BondPotential.Morse()
-        data['potential'].D = 5.102 * EVTOKCAL 
-        data['potential'].alpha = 2.149 
-        data['potential'].R0 = 0.980
+        if typeset == valid_bond_type:
+            data['potential'].D = 5.102 * EVTOKCAL 
+            data['potential'].alpha = 2.149 
+            data['potential'].R0 = 0.980
+        elif typeset == valid_bond_type2:
+            data['potential'].D = 5.102 * EVTOKCAL 
+            data['potential'].alpha = 2.1578
+            data['potential'].R0 = 1.012
         return 1
 
     def angle_term(self, angle):
@@ -4009,16 +4016,23 @@ class BKS_SPC_SIOH(ForceField):
         atype = a_data['force_field_type']
         btype = b_data['force_field_type']
         ctype = c_data['force_field_type']
-       
+        
+        typeset = set([atype, btype, ctype])
         valid_angle_type = set(["Si", "Oh", "Hh"])
+        valid_angle_type2 = set(["Ow", "Hw"])
 
-        if (set([atype, btype, ctype]) != valid_angle_type):
+        if ((typeset != valid_angle_type) and 
+                (typeset != valid_angle_type2)):
             return None
-
         data['potential'] = AnglePotential.Harmonic()
-        # this is in kcal/rad^2 
-        data['potential'].K = 2.667*EVTOKCAL/2. 
-        data['potential'].theta0 = 130.0 
+        # this is in kcal/rad^2
+        if typeset == valid_angle_type:
+            data['potential'].K = 2.667*EVTOKCAL/2. 
+            data['potential'].theta0 = 130.0
+        elif typeset == valid_angle_type2:
+            data['potential'].K = 4.396*EVTOKCAL/2. 
+            data['potential'].theta0 = 113.24
+
         return 1
 
     def dihedral_term(self, dihedral):
@@ -4082,10 +4096,13 @@ class BKS_SPC_SIOH(ForceField):
             if elem == "O":
                 if set(neigh_elem) == set(["Si"]):
                     data['force_field_type'] = "Os"
+                    data['charge'] = -1.2
                 elif set(neigh_elem) == set(["Si", "H"]):
                     data['force_field_type'] = "Oh"
+                    data['charge'] = -1.01
                 elif set(neigh_elem) == set(["H"]):
                     data['force_field_type'] = "Ow"
+                    data['charge'] = -0.82
 
             elif elem == "H":
                 if len(neighbours) == 1 and neigh_elem[0] == "O":
@@ -4095,11 +4112,14 @@ class BKS_SPC_SIOH(ForceField):
                     o_neigh_elem = [i['element'] for i in o_neigh]
                     if set(o_neigh_elem) == set(["H"]):
                         data['force_field_type'] = "Hw"
+                        data['charge'] = +0.41
                     elif set(o_neigh_elem) == set(["H", "Si"]):
                         data['force_field_type'] = "Hh"
+                        data['charge'] = +0.41
 
             elif elem == "Si":
                 data['force_field_type'] = "Si"
+                data['charge'] = +2.4 
 
             if data['force_field_type'] is None:
                 print("ERROR: could not find the proper force field type for atom %i"%(data['index'])+
@@ -4211,9 +4231,9 @@ class SPC_E(ForceField):
         """
         for node, data in self.graph.nodes_iter(data=True):
             if data['element'] == "O":
-                fftype = "OW"
+                fftype = "Ow"
             elif data['element'] == "H":
-                fftype = "HW"
+                fftype = "Hw"
             else:
                 print("ERROR: could not find the proper force field type for atom %i"%(data['index'])+
                         " with element: '%s'"%(data['element']))

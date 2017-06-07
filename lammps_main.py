@@ -16,11 +16,13 @@ import itertools
 import operator
 from structure_data import from_CIF, write_CIF, clean
 from structure_data import write_RASPA_CIF, write_RASPA_sim_files, MDMC_config
+from lammps_potentials import PairPotential
 from CIFIO import CIF
 from ccdc import CCDC_BOND_ORDERS
 from datetime import datetime
 from InputHandler import Options
 from copy import deepcopy
+from ForceFields import EVTOKCAL
 import Molecules
 if sys.version_info < (3,0):
     input = raw_input
@@ -240,12 +242,22 @@ class LammpsSimulation(object):
         # TODO(pboyd): make it easier to have specific mixing parameters
         # i.e. different atom types can have a different force constant, or
         # even potential!
+        # how to mix two different potential parameters?? This will have to be
+        # case-by-case.
         if len(list(set(pot_names))) > 1 or (any(['buck' in i for i in list(set(pot_names))])):
             self.pair_in_data = False
+        if not self.pair_in_data:
             for (i, j) in itertools.combinations_with_replacement(nodes_list, 2):
                 (n1, i_data), (n2, j_data) = self.unique_atom_types[i], self.unique_atom_types[j]
-                mol1 = self.type_molecules[i]
-                mol2 = self.type_molecules[j]
+                # type_molecules only stores existing molecules in the system, not ones that will be deposited
+                # so this exits with a keyerror exception. Not sure if I should type molecules that will be 
+                # deposited. For some reason I made a point not to type these, so I will leave this for now.
+                try:
+                    mol1 = self.type_molecules[i]
+                    mol2 = self.type_molecules[j]
+                except KeyError:
+                    mol1 = 0
+                    mol2 = 0
                 # test to see if h-bonding to occur between molecules
                 pairwise_test = ((mol1 != mol2 and self.no_molecule_pair) or (not self.no_molecule_pair))
                 if i_data['tabulated_potential'] and j_data['tabulated_potential']:
@@ -264,9 +276,53 @@ class LammpsSimulation(object):
                     hdata['tabulated_potential'] = False
                     hdata['h_bond_potential'] = hdata['h_bond_function'](n1, self.graph, flipped=True)
                     self.unique_pair_types[(i,j,'hb')] = hdata 
-                # mix Lorentz-Berthelot rules
                 pair_data = deepcopy(i_data)
-                if 'buck' in i_data['pair_potential'].name and 'buck' in j_data['pair_potential'].name:
+                # specific mixing rules for the BKS modified force field for silanols.
+                if self.options.force_field == "BKS_SPC_SIOH":
+                    fftypei = i_data['force_field_type']
+                    fftypej = j_data['force_field_type']
+                    pairpot = deepcopy(i_data)
+                    fftypeset = set([fftypei, fftypej])
+                    # LJ potential - values taken directly from paper and converted to appropriate units
+                    if ((fftypeset == set(["Ow","Oh"])) or
+                        (fftypeset == set(["Ow", "Os"])) or
+                        (fftypeset == set(["Oh", "Os"])) or
+                            (fftypeset == set(["Ow"])) or 
+                            (fftypeset == set(["Oh"]))):
+                        pairpot['pair_potential'] = PairPotential.LjCutCoulLong()
+                        pairpot['pair_potential'].eps = 6.734e-3 * EVTOKCAL 
+                        pairpot['pair_potential'].sig = 3.554 * (2**(-1./6.))
+                        pairpot['pair_potential'].cutoff = self.options.cutoff
+                        self.unique_pair_types[(i,j, pairpot['pair_potential'].name)] = pairpot
+
+                    # Buck potential - some redundancy here because these parameters
+                    # are assigned to each atom type.
+                    elif fftypeset == set(["Si","Os"]):
+                        pairpot['pair_potential'] = PairPotential.BuckCoulLong()
+                        pairpot['pair_potential'].A = 18003.7572 * EVTOKCAL 
+                        pairpot['pair_potential'].rho = 1./4.87318 # LAMMPS uses the inverse coefficient
+                        pairpot['pair_potential'].C = 133.5381 * EVTOKCAL
+                        pairpot['pair_potential'].cutoff = self.options.cutoff
+                        self.unique_pair_types[(i,j, pairpot['pair_potential'].name)] = pairpot
+
+                    elif set([fftypei, fftypej]) == set(["Os"]):
+                        pairpot['pair_potential'] = PairPotential.BuckCoulLong()
+                        pairpot['pair_potential'].A = 1388.773 * EVTOKCAL 
+                        pairpot['pair_potential'].rho = 1./2.76
+                        pairpot['pair_potential'].C = 175.0 * EVTOKCAL
+                        pairpot['pair_potential'].cutoff = self.options.cutoff
+                        self.unique_pair_types[(i,j, pairpot['pair_potential'].name)] = pairpot
+
+                    elif set([fftypei, fftypej]) == set(["Si","Oh"]):
+                        pairpot['pair_potential'] = PairPotential.BuckCoulLong()
+                        pairpot['pair_potential'].A = 230112.514 * EVTOKCAL 
+                        pairpot['pair_potential'].rho = 1./6.864
+                        pairpot['pair_potential'].C = 138.834 * EVTOKCAL
+                        pairpot['pair_potential'].cutoff = self.options.cutoff
+                        self.unique_pair_types[(i,j, pairpot['pair_potential'].name)] = pairpot
+
+                # specific to BTW I think..
+                if 'buck' in i_data['pair_potential'].name and self.options.force_field == "BTW_FF": 
                     eps1 = i_data['pair_potential'].eps 
                     eps2 = j_data['pair_potential'].eps 
                     sig1 = i_data['pair_potential'].sig 
@@ -283,6 +339,7 @@ class LammpsSimulation(object):
                     pair_data['tabulated_potential'] = False
                     # assuming i_data has the same pair_potential name as j_data
                     self.unique_pair_types[(i,j, i_data['pair_potential'].name)] = pair_data
+                # mix Lorentz-Berthelot rules
                 elif 'lj' in i_data['pair_potential'].name and 'lj' in j_data['pair_potential'].name:
 
                     pair_data['pair_potential'].eps = np.sqrt(i_data['pair_potential'].eps*j_data['pair_potential'].eps)
@@ -528,10 +585,15 @@ class LammpsSimulation(object):
             # just take the general force field used on the
             # framework
             mol_ff = self.options.mol_ff
+
         #TODO(pboyd): Check how h-bonding is handeled at this level
         ff = getattr(ForceFields, mol_ff)(graph=molecule,
                                      cutoff=self.options.cutoff)
         
+        # compute bonding of molecule??
+        # TODO(pboyd): Compute bonding for a molecule (all routines are geared towards 
+        # image calculations)
+
         # add the unique potentials to the unique_dictionaries.
         self.unique_atoms(molecule)
         self.unique_bonds(molecule)

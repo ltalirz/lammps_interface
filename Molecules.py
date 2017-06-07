@@ -344,20 +344,21 @@ class SPC_E_Water(Water):
     HOH = 109.47
     
     def __init__(self, **kwargs):
-        """ Class that provides a template molecule for TIP3P Water.
+        """ Class that provides a template molecule for SPC Water.
 
         Geometric features are evaluated to ensure the proper
-        configuration to support TIP3P 
+        configuration to support SPC
 
-        Initially set up a default TIP3P water configuration,
-        then update if needed if superposing a TIP3P particle
+        Initially set up a default SPC water configuration,
+        then update if needed if superposing a SPC particle
         on an existing water.
 
         """
         nx.Graph.__init__(self, **kwargs)
+        MolecularGraph.__init__(self)
         self.O_coord = np.array([0., 0., 0.])
         self.rigid = True
-        for idx, ff_type in enumerate(["OW", "HW", "HW"]):
+        for idx, ff_type in enumerate(["Ow", "Hw", "Hw"]):
 
             element = ff_type[0]
             if idx == 0:
@@ -378,6 +379,20 @@ class SPC_E_Water(Water):
                      "cartesian_coordinates":coord
                      })
             self.add_node(idx+1, **data)
+        # add some bonding in case the potential calls for bonding and
+        # angle terms
+        kw = {}
+        kw.update({'length':self.ROH})
+        kw.update({'weight': 1})
+        kw.update({'order': 1})
+        kw.update({'symflag': "1_555"})
+        kw.update({'potential': None})
+
+        self.sorted_edge_dict.update({(1,2): (1, 2), (2, 1):(1, 2)})
+        self.sorted_edge_dict.update({(1,3): (1, 3), (3, 1):(1, 3)})
+        self.add_edge(1, 2, key=self.number_of_edges()+1, **kw) 
+        self.add_edge(1, 3, key=self.number_of_edges()+1, **kw)
+        self.compute_all_angles()
     # no dummies in SPC_E, but this needs to be here to make the water
     # template work.
     @property
@@ -400,6 +415,7 @@ class TIP3P_Water(Water):
 
         """
         nx.Graph.__init__(self, **kwargs)
+        MolecularGraph.__init__(self)
         self.O_coord = np.array([0., 0., 0.])
         self.rigid = True
         for idx, ff_type in enumerate(["OW", "HW", "HW"]):
@@ -445,6 +461,7 @@ class TIP4P_Water(Water):
 
         """
         nx.Graph.__init__(self, **kwargs)
+        MolecularGraph.__init__(self)
         self.rigid = True
         self.O_coord = np.array([0., 0., 0.])
         for idx, ff_type in enumerate(["OW", "HW", "HW", "X"]):
@@ -504,6 +521,7 @@ class TIP5P_Water(Water):
 
         """
         nx.Graph.__init__(self, **kwargs)
+        MolecularGraph.__init__(self)
         self.O_coord = np.array([0., 0., 0.])
         self.rigid = True
         for idx, ff_type in enumerate(["OW", "HW", "HW", "X", "X"]):
