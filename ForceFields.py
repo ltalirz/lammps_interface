@@ -4073,7 +4073,7 @@ class BKS_SPC_SIOH(ForceField):
         http://lammps.sandia.gov/doc/special_bonds.html
 
         """
-        st = ["%-15s %s"%("pair_modify", "shifted yes"),
+        st = ["%-15s %s"%("pair_modify", "shift yes"),
               "%-15s %s"%("special_bonds", "lj/coul 0.0 0.0 0.25"), 
               "%-15s %.1f"%('dielectric', 1.0)] 
         return st

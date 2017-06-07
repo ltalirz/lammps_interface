@@ -586,6 +586,9 @@ class LammpsSimulation(object):
             # framework
             mol_ff = self.options.mol_ff
 
+        # BKS Force field uses a non-rigid SPC Water
+        if mol_ff == "BKS_SPC_SIOH":
+            molecule.rigid = False
         #TODO(pboyd): Check how h-bonding is handeled at this level
         ff = getattr(ForceFields, mol_ff)(graph=molecule,
                                      cutoff=self.options.cutoff)
@@ -1306,8 +1309,8 @@ class LammpsSimulation(object):
                 if "tail yes" in comm:
                     print("WARNING: the force field defaults to a tail correction, but "+
                             "this is not properly treated with fluctuating molecule counts in LAMMPS "+
-                            "so this is automatically changed to 'shifted yes' for your convenience!")
-                    self.special_commands[ix] = string.replace(comm, "tail yes", "shifted yes")
+                            "so this is automatically changed to 'shift yes' for your convenience!")
+                    self.special_commands[ix] = string.replace(comm, "tail yes", "shift yes")
 
         # general catch-all for extra force field commands needed.
         inp_str += "\n".join(list(set(self.special_commands)))
@@ -1553,12 +1556,10 @@ class LammpsSimulation(object):
                 inp_str += "%-15s %-10s %s\n"%("variable", "pdamp", "equal 1000*${dt}")
             # always start with nvt langevin
             if self.options.insert_molecule:
-                id = self.fixcount()
+                id=self.fixcount()
                 molecule_fixes.append(id)
                 if(self.template_molecule.rigid):
                     if self.template_molecule.rigid_fix < 0:
-                        id=self.fixcount()
-                        molecule_fixes.append(id)
                         self.template_molecule.rigid_fix = id
                     inp_str += "%-15s %s\n"%("fix", "%i %s rigid/small molecule langevin %.2f %.2f ${tdamp} %i mol %s"%(id, 
                                                                                             self.options.insert_molecule,
@@ -1577,7 +1578,7 @@ class LammpsSimulation(object):
                                                                                         ))
                     id = self.fixcount()
                     molecule_fixes.append(id)
-                    inp_str += "%-15s %s\n"%("fix", "%i %i nve"%(id,molid))
+                    inp_str += "%-15s %s\n"%("fix", "%i %s nve"%(id, self.options.insert_molecule))
 
 
             for molid in mollist: 
