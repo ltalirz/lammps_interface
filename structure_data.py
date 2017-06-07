@@ -22,6 +22,7 @@ import operator
 try:
     from writeNodesEdges import writeObjects
 
+
 except:
     print("Warning! vtk for python necessary for graph debugging necessary. Code will ImportError if you try to use the functionality to draw a SlabGraph to a VTK style visualization file")
 
@@ -29,9 +30,16 @@ try:
     import networkx as nx
     from networkx.algorithms import approximation
 
+
 except ImportError:
     print("Warning: could not load networkx module, this is needed to produce the lammps data file.")
     sys.exit()
+
+try:
+    import nxmaxflowcustom as nxmfc
+except:
+    print("Not loading local nxmfc")
+
 from collections import OrderedDict
 from atomic import MASS, ATOMIC_NUMBER, COVALENT_RADII
 from atomic import organic, non_metals, noble_gases, metalloids, lanthanides, actinides, transition_metals
@@ -1985,6 +1993,9 @@ class SlabGraph(MolecularGraph):
         elif(super_surface_weight=='max'):
             surface_0_weight=float(self.super_surface_node_0_weight)
             surface_max_weight=float(self.super_surface_node_max_weight)
+        elif(super_surface_weight=='inf'):
+            surface_0_weight=100000
+            surface_max_weight=100000
         else:
             print("Error, weight to super surface node can only be 'one' or 'max'")
             sys.exit()
@@ -2239,6 +2250,96 @@ class SlabGraph(MolecularGraph):
 
         print(len(edge_cut_set))
         print(str(edge_cut_set))
+
+    def nx_min_cut_digraph_custom(self,weight_barrier=False):
+
+        print("\n\nNx minimum_cut function on directed slab graph...")
+        # Firt create a barrier (aspect ratio of the slab is too large)
+        if(weight_barrier):
+            self.create_weighted_barrier_on_opposite_half(start='min')
+        # uses stoer-wagner to do max flow (and indirectly min cut)
+        # given source and target node
+        self.cut_value1, self.partition1 = nxmfc.minimum_cut(
+                self.slabgraphtree,
+                self.super_surface_node_0,
+                self.super_surface_node_max,
+                flow_func=nx.algorithms.flow.shortest_augmenting_path)
+
+        # wichever partition is the biggest is the one we keep
+        # for now I am hoping that the algo always finds the symmetrically unique
+        # cut CLOSEST to either the sink or source node
+        if(len(self.partition1[0])>len(self.partition1[1])):
+            self.keep_partition_1=self.partition1[0].copy()
+            self.remove_partition_1=self.partition1[1].copy()
+        else:
+            self.keep_partition_1=self.partition1[1].copy()
+            self.remove_partition_1=self.partition1[0].copy()
+
+        # useful to also have a copy of the  partition sets with ciflabels
+        self.partition1_labeled=[[],[]]
+        for node in self.partition1[0]:
+            self.partition1_labeled[0].append((node,self.refgraph.node[node]['ciflabel']))
+        for node in self.partition1[1]:
+            self.partition1_labeled[1].append((node,self.refgraph.node[node]['ciflabel']))
+
+
+        print("\nForward s-t cut value:")
+        print(self.cut_value1)        
+        #print("Partition 1, set 0:")
+        #print(self.partition1[0])
+        #print("Partition 1, set 1:")
+        #print(self.partition1[1])
+        print("Forward cut (node, ciflabel) partition1:")
+        print(self.partition1_labeled[0])
+        print("Forward cut (node, ciflabel) partition2:")
+        print(self.partition1_labeled[1])
+
+        # remove the midpoint barrier
+        if(weight_barrier):
+            self.create_weighted_barrier_on_opposite_half(start='neutral')
+
+        # now reverse the tree and reverse the source and target nodes
+        # NOTE obsolete now that we have a directed graph and not a tree
+        self.slabgraphtreeREV=self.slabgraphtree.reverse(copy=True)
+        #  create a barrier (aspect ratio of the slab is too large)
+        if(weight_barrier):
+            self.create_weighted_barrier_on_opposite_half(start='max')
+        self.cut_value2, self.partition2 = nxmfc.minimum_cut(
+                self.slabgraphtreeREV,
+                self.super_surface_node_max,
+                self.super_surface_node_0,
+                flow_func=nx.algorithms.flow.shortest_augmenting_path)
+
+        # determine which are the removal/keep partitions
+        if(len(self.partition2[0])>len(self.partition2[1])):
+            self.keep_partition_2=self.partition2[0].copy()
+            self.remove_partition_2=self.partition2[1].copy()
+        else:
+            self.keep_partition_2=self.partition2[1].copy()
+            self.remove_partition_2=self.partition2[0].copy()
+
+        # useful to also have a copy of the  partition sets with ciflabels
+        self.partition2_labeled=[[],[]]
+        for node in self.partition2[0]:
+            self.partition2_labeled[0].append((node,self.refgraph.node[node]['ciflabel']))
+        for node in self.partition2[1]:
+            self.partition2_labeled[1].append((node,self.refgraph.node[node]['ciflabel']))
+
+
+        print("\nReverse s-t cut value:")
+        print(self.cut_value2)        
+        #print("Partition 2, set 0:")
+        #print(self.partition2[0])
+        #print("Partition 2, set 1:")
+        #print(self.partition2[1])
+        print("Reverse cut (node, ciflabel) partition1:")
+        print(self.partition2_labeled[0])
+        print("Reverse cut (node, ciflabel) partition2:")
+        print(self.partition2_labeled[1])
+
+        # remove the midpoint barrier
+        if(weight_barrier):
+            self.create_weighted_barrier_on_opposite_half(start='neutral')
 
 
     def nx_min_cut_digraph(self,weight_barrier=False):
