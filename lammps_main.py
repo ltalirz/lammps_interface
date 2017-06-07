@@ -320,6 +320,13 @@ class LammpsSimulation(object):
                         pairpot['pair_potential'].C = 138.834 * EVTOKCAL
                         pairpot['pair_potential'].cutoff = self.options.cutoff
                         self.unique_pair_types[(i,j, pairpot['pair_potential'].name)] = pairpot
+                    else:
+                        pairpot['pair_potential'] = PairPotential.LjCutCoulLong()
+                        pairpot['pair_potential'].eps = 0.0 
+                        pairpot['pair_potential'].sig = 0.0 
+                        pairpot['pair_potential'].cutoff = self.options.cutoff
+                        self.unique_pair_types[(i,j, pairpot['pair_potential'].name)] = pairpot
+
 
                 # specific to BTW I think..
                 if 'buck' in i_data['pair_potential'].name and self.options.force_field == "BTW_FF": 

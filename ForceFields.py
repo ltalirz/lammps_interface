@@ -4074,7 +4074,7 @@ class BKS_SPC_SIOH(ForceField):
 
         """
         st = ["%-15s %s"%("pair_modify", "shift yes"),
-              "%-15s %s"%("special_bonds", "lj/coul 0.0 0.0 0.25"), 
+              "%-15s %s"%("special_bonds", "lj/coul 0.0 0.25 0.0"), 
               "%-15s %.1f"%('dielectric', 1.0)] 
         return st
 
