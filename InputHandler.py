@@ -331,6 +331,15 @@ class Options(object):
                                           "200 ps if the timestep is 1 fs)")
 
         # parameters for automated slab generation
+        parameter_group.add_argument("--slab-specified",
+                                     action="store",
+                                     type=bool,
+                                     default=False,
+                                     dest="slab_specified",
+                                     help="An easy over ride CL option that means the program" +
+                                          "assumes you have already passed in a cif file corresponding to a slab" +
+                                          "Nothing will be done to massage the structures and the min cut will" +
+                                          "be found directly from the input structure")
         parameter_group.add_argument("--slab-face",
                                      action="store",
                                      type=str,
