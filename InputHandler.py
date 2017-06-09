@@ -51,7 +51,7 @@ class Options(object):
                                        help="Enter the requested force "+
                                           "field to describe the system. Current "+
                                           "options are 'BTW_FF', 'Dreiding', 'UFF', "+
-                                          "'UFF4MOF', and 'Dubbeldam'."+
+                                          "'UFF4MOF', 'Dubbeldam', and 'BKS_SPC_SIOH'."+
                                           " The default is set to the Universal "+
                                           "Force Field [UFF].")
         force_field_group.add_argument("--molecule-ff", action="store", 
