@@ -1899,8 +1899,8 @@ class SlabGraph(MolecularGraph):
         #self.iterative_BFS_tree_structure(self.super_surface_node_0)
 
         self.slabgraphtree=self.slabgraph.to_directed()
-        #self.change_capacity_weight_of_super_surface_edges(super_surface_weight='max')
-        self.change_capacity_weight_of_super_surface_edges(super_surface_weight='max')
+        #self.create_weighted_barrier_on_super_surface_edges(super_surface_weight='max')
+        self.create_weighted_barrier_on_super_surface_edges(super_surface_weight='max')
    
 
 
@@ -1972,10 +1972,10 @@ class SlabGraph(MolecularGraph):
             pass
         
         self.slabgraphtree=self.slabgraph.to_directed()
-        self.change_capacity_weight_of_super_surface_edges(super_surface_weight='max')
+        self.create_weighted_barrier_on_super_surface_edges(super_surface_weight='max')
 
 
-    def change_capacity_weight_of_super_surface_edges(self,super_surface_weight='one'):
+    def create_weighted_barrier_on_super_surface_edges(self,super_surface_weight='one'):
         """
         Depending on which min cut algo we are using, we may want to reweight
         the value of each edge between the super surface node and each of its bulk
@@ -2250,20 +2250,112 @@ class SlabGraph(MolecularGraph):
 
         print(len(edge_cut_set))
         print(str(edge_cut_set))
+    
+
+    def get_edges_between_partitions(self,partition):
+
+        edges_that_were_cut=[]
+        for s in partition[0]:
+            for t in partition[1]:
+                if((s,t) in self.slabgraphtree.edges()):
+                    edges_that_were_cut.append((s,t))
+
+        return edges_that_were_cut
 
     def nx_min_cut_digraph_custom(self,weight_barrier=False):
 
         print("\n\nNx minimum_cut function on directed slab graph...")
+        all_min_cutsets=[]
+        curr_min_cutsets=[]
+
         # Firt create a barrier (aspect ratio of the slab is too large)
         if(weight_barrier):
-            self.create_weighted_barrier_on_opposite_half(start='min')
+            #self.create_weighted_barrier_on_opposite_half(start='min')
+            self.create_weighted_barrier_on_super_surface_edges(super_surface_weight='inf')
         # uses stoer-wagner to do max flow (and indirectly min cut)
         # given source and target node
-        self.cut_value1, self.partition1 = nxmfc.minimum_cut(
+        self.cut_value1, self.partition1, self.sat_edges= nxmfc.minimum_cut(
                 self.slabgraphtree,
                 self.super_surface_node_0,
                 self.super_surface_node_max,
                 flow_func=nx.algorithms.flow.shortest_augmenting_path)
+
+        this_cutset=self.get_edges_between_partitions(self.partition1)
+        all_min_cutsets.append(this_cutset.copy())
+        curr_min_cutsets.append(this_cutset.copy())
+
+        #print(curr_min_cutsets)
+        while(len(curr_min_cutsets)!=0):
+            print("Iterating cutset:" + str(curr_min_cutsets[0]))
+
+            for edge in curr_min_cutsets[0]:
+                print("Augmenting edge:"+str(edge))
+
+                # augment capacity of one edge for the current cutset
+                # this will destroy this cutset as the minimum cut, so we will
+                # find another minimum cut with equal max flow if it exists
+                self.slabgraphtree.edge[edge[0]][edge[1]]['capacity']+=1
+                self.slabgraphtree.edge[edge[1]][edge[0]]['capacity']+=1
+
+                this_cut_value1, this_partition1, this_sat_edges= nxmfc.minimum_cut(
+                        self.slabgraphtree,
+                        self.super_surface_node_0,
+                        self.super_surface_node_max,
+                        flow_func=nx.algorithms.flow.preflow_push)
+
+                this_cutset1=self.get_edges_between_partitions(this_partition1)
+                # reset the capacity back to the normal graph
+                #self.slabgraphtree.edge[edge[0]][edge[1]]['capacity']-=1
+                #self.slabgraphtree.edge[edge[1]][edge[0]]['capacity']-=1
+
+                # if this new cut has same minimum value AND
+                # is unique to all previously identified minimum cutsets
+                # keep it
+                if(this_cut_value1 == self.cut_value1 and this_cutset1 not in all_min_cutsets):
+                    print("Found new cutset!:")
+                    print(str(this_cutset1))
+                    print(
+                          [(self.slabgraph.node[n1]['ciflabel'],
+                            self.slabgraph.node[n2]['ciflabel']) 
+                           for (n1, n2) in this_cutset1] 
+                         )
+                    # keep a copy of this new min cutset
+                    all_min_cutsets.append(this_cutset1)
+                    # add this new min cutset to the stack of cuts that need to be
+                    # augmented to find a new one
+                    curr_min_cutsets.append(this_cutset1)
+
+                    # reset the capacity back to the normal graph
+                    #self.slabgraphtree.edge[edge[0]][edge[1]]['capacity']-=1
+                    #self.slabgraphtree.edge[edge[1]][edge[0]]['capacity']-=1
+
+                    # move on to newest identified min cut
+                    break
+
+
+            curr_min_cutsets.pop(0)
+
+        print("Multiple min cutsets identified (%d):"%len(all_min_cutsets))
+        print(all_min_cutsets)
+        print([
+                [(self.slabgraph.node[n1]['ciflabel'],
+                  self.slabgraph.node[n2]['ciflabel']) 
+                for (n1, n2) in all_min_cutsets[i]] 
+                for i in range(len(all_min_cutsets))
+              ])
+        print("Debugging structures to cif:")
+        for i in range(len(all_min_cutsets)):
+            # change element so we can vis it
+            for (u,v) in all_min_cutsets[i]:
+                self.slabgraph.node[u]['element']='Ge'
+                self.slabgraph.node[v]['element']='Ge'
+            self.write_slabgraph_cif(self.cell,bond_block=False,descriptor="cutset%d"%i,relabel=False)
+            # reset
+            for (u,v) in all_min_cutsets[i]:
+                self.slabgraph.node[u]['element']='Si'
+                self.slabgraph.node[v]['element']='Si'
+
+            
 
         # wichever partition is the biggest is the one we keep
         # for now I am hoping that the algo always finds the symmetrically unique
@@ -2285,6 +2377,13 @@ class SlabGraph(MolecularGraph):
 
         print("\nForward s-t cut value:")
         print(self.cut_value1)        
+        print("\nForward s-t cut edges:")
+        self.forward_edges=self.get_edges_between_partitions(self.partition1)
+        print(self.forward_edges)
+        print("\nForward s-t cut labeled:")
+        print([(self.slabgraph.node[n1]['ciflabel'],self.slabgraph.node[n2]['ciflabel']) for (n1, n2) in self.forward_edges])
+
+        
         #print("Partition 1, set 0:")
         #print(self.partition1[0])
         #print("Partition 1, set 1:")
@@ -2304,7 +2403,7 @@ class SlabGraph(MolecularGraph):
         #  create a barrier (aspect ratio of the slab is too large)
         if(weight_barrier):
             self.create_weighted_barrier_on_opposite_half(start='max')
-        self.cut_value2, self.partition2 = nxmfc.minimum_cut(
+        self.cut_value2, self.partition2, self.cutset2 = nxmfc.minimum_cut(
                 self.slabgraphtreeREV,
                 self.super_surface_node_max,
                 self.super_surface_node_0,
@@ -2328,6 +2427,8 @@ class SlabGraph(MolecularGraph):
 
         print("\nReverse s-t cut value:")
         print(self.cut_value2)        
+        print("\nReverse s-t cut edges:")
+        print(self.get_edges_between_partitions(self.partition2))
         #print("Partition 2, set 0:")
         #print(self.partition2[0])
         #print("Partition 2, set 1:")
