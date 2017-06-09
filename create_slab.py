@@ -2132,7 +2132,7 @@ def main():
 
         # Bad variable naming, we are just making a directed graph here
         sim.slabgraph.convert_to_digraph()                                            
-        sim.slabgraph.nx_min_cut_digraph(weight_barrier=True)               
+        sim.slabgraph.nx_min_cut_digraph_custom(weight_barrier=True)               
         sim.slabgraph.remove_surface_partitions()                                   
                                                                                     
         # Add back in all missing oxygens                                           

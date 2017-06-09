@@ -446,15 +446,14 @@ def minimum_cut(G, s, t, capacity='capacity', flow_func=None, **kwargs):
         raise nx.NetworkXError("cutoff should not be specified.")
 
     R = flow_func(G, s, t, capacity=capacity, value_only=True, **kwargs)
-    print("Max flow is: %d"%R.graph['flow_value'])
     # Remove saturated edges from the residual network 
     cutset = [(u, v, d) for u, v, d in R.edges(data=True)
               if d['flow'] == d['capacity']]
-    print("Num edges in original graph: %d"%G.number_of_edges())
-    print("Preliminary cut set (cardinality %d):"%len(cutset))
-    print(cutset)
+    #print("Num edges in original graph: %d"%G.number_of_edges())
+    #print("Preliminary cut set (cardinality %d):"%len(cutset))
+    #print(cutset)
     R.remove_edges_from(cutset)
-    print([(u,v,d) for u,v,d in R.edges(data=True)])
+    #print([(u,v,d) for u,v,d in R.edges(data=True)])
 
     #cutset0flow = [(u, v, d) for u, v, d in R.edges(data=True)
     #               if d['flow'] == 0]
@@ -468,12 +467,12 @@ def minimum_cut(G, s, t, capacity='capacity', flow_func=None, **kwargs):
     # Then, reachable and non reachable nodes from source in the
     # residual network form the node partition that defines
     # the minimum cut.
-    print(type(nx.shortest_path_length(R, target=t)))
-    print(nx.shortest_path_length(R, target=t))
+    #print(type(nx.shortest_path_length(R, target=t)))
+    #print(nx.shortest_path_length(R, target=t))
     
-    for node in R.nodes():
-        this_tree=nx.bfs_tree(G,node)
-        print(len(this_tree.nodes()))
+    #for node in R.nodes():
+    #    this_tree=nx.bfs_tree(G,node)
+    #    print(len(this_tree.nodes()))
 
     # I think here we need to find ANY shortest path length = min length
     non_reachable = set(nx.shortest_path_length(R, target=t))
@@ -482,7 +481,9 @@ def minimum_cut(G, s, t, capacity='capacity', flow_func=None, **kwargs):
     # sure that it is reusable.
     if cutset is not None:
         R.add_edges_from(cutset)
-    return (R.graph['flow_value'], partition)
+
+    # return max flow/min cut, the partitions, and the edge list of the cutset
+    return (R.graph['flow_value'], partition, [(u,v) for u, v, d in R.edges(data=True) if d['flow'] == d['capacity']])
 
 
 def minimum_cut_value(G, s, t, capacity='capacity', flow_func=None, **kwargs):
