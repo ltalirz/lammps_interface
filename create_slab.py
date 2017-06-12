@@ -2126,13 +2126,20 @@ def main():
         if(sim.slab_verbose):
             sim.slabgraph.write_slabgraph_cif(cell,bond_block=False,descriptor="debug",relabel=False) 
 
-        # Here we need to manipulate the surface  
+        # Here we need to manipulate the edge properties of the graph
         sim.slabgraph.normalize_bulk_edge_weights()                                 
         sim.slabgraph.connect_super_surface_nodes()                                 
 
-        # Bad variable naming, we are just making a directed graph here
+        # Create a directed copy for max-flow/min-cut st problem
         sim.slabgraph.convert_to_digraph()                                            
+
+        # As a test run the stoer wagner algorithm on the undirected copy of the graph
+        #sim.slabgraph.nx_stoer_wagner_cut_custom(weight_barrier=False)
+
+        # Execute max-flow/min-cut calculation
         sim.slabgraph.nx_min_cut_digraph_custom(weight_barrier=True)               
+
+        # exclude graph partitions on the "outside" of the min cut
         sim.slabgraph.remove_surface_partitions()                                   
                                                                                     
         # Add back in all missing oxygens                                           

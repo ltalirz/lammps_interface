@@ -35,10 +35,11 @@ except ImportError:
     print("Warning: could not load networkx module, this is needed to produce the lammps data file.")
     sys.exit()
 
+import nxstoerwagnercustom as nxswc
 try:
     import nxmaxflowcustom as nxmfc
 except:
-    print("Not loading local nxmfc")
+    print("Not able to load custom nx algorithms (make sure at most recent git commit")
 
 from collections import OrderedDict
 from atomic import MASS, ATOMIC_NUMBER, COVALENT_RADII
@@ -1898,9 +1899,15 @@ class SlabGraph(MolecularGraph):
         #self.slabgraphtree = nx.bfs_tree(self.slabgraph, self.super_surface_node_0)
         #self.iterative_BFS_tree_structure(self.super_surface_node_0)
 
+        # keep copy of the old undirected graph
+        self.slabgraphundirected=self.slabgraph.copy()
+
+        # create directed copy of the slabgraph
         self.slabgraphtree=self.slabgraph.to_directed()
-        #self.create_weighted_barrier_on_super_surface_edges(super_surface_weight='max')
-        self.create_weighted_barrier_on_super_surface_edges(super_surface_weight='max')
+
+        # add large weight to all edges from the super surface node to the first layer
+        # of bulk nodes
+        self.create_weighted_barrier_on_super_surface_edges(super_surface_weight='inf')
    
 
 
@@ -1997,7 +2004,7 @@ class SlabGraph(MolecularGraph):
             surface_0_weight=100000
             surface_max_weight=100000
         else:
-            print("Error, weight to super surface node can only be 'one' or 'max'")
+            print("Error, weight to super surface node can only be 'one','max', or 'inf'")
             sys.exit()
 
         # now reweight each edge between the supersurface node and the bulk node neighbors
@@ -2011,25 +2018,32 @@ class SlabGraph(MolecularGraph):
             # reset the capacity to the max weight of the supernode
             if(edge[0] == self.super_surface_node_0 or \
                edge[1] == self.super_surface_node_0):
+                # adjust directed graph edge properties
                 self.slabgraphtree.edge[edge[0]][edge[1]]['capacity'] = \
                     surface_0_weight 
-                    #1
-                    #self.super_surface_node_0_weight
                 self.slabgraphtree.edge[edge[0]][edge[1]]['weight'] = \
                     surface_0_weight 
-                    #1
-                    #self.super_surface_node_0_weight
+
+                # adjust undirected graph edge properties
+                self.slabgraphundirected.edge[edge[0]][edge[1]]['capacity'] = \
+                    surface_0_weight 
+                self.slabgraphundirected.edge[edge[0]][edge[1]]['weight'] = \
+                    surface_0_weight 
 
             elif(edge[0] == self.super_surface_node_max or \
                  edge[1] == self.super_surface_node_max):
+                # adjust directed graph edge properties
                 self.slabgraphtree.edge[edge[0]][edge[1]]['capacity'] = \
                     surface_max_weight
-                    #1
-                    #self.super_surface_node_max_weight
                 self.slabgraphtree.edge[edge[0]][edge[1]]['weight'] = \
                     surface_max_weight
-                    #1
-                    #self.super_surface_node_max_weight
+
+                # adjust undirected graph edge properties
+                self.slabgraphundirected.edge[edge[0]][edge[1]]['capacity'] = \
+                    surface_max_weight
+                self.slabgraphundirected.edge[edge[0]][edge[1]]['weight'] = \
+                    surface_max_weight
+
 
             #print(edge)
             #print(self.slabgraphtree.edge[edge[0]][edge[1]]['capacity'])
@@ -2226,6 +2240,15 @@ class SlabGraph(MolecularGraph):
         print(cut_value)        
         print(partition)
 
+    def nx_stoer_wagner_cut_custom(self, weight_barrier=False):
+        print("\n\nNx stoer_wagner function on undirected slab graph...")
+        cut_value, partition = nxswc.stoer_wagner_custom(self.slabgraphundirected,
+                                                         s=self.super_surface_node_0,
+                                                         t=self.super_surface_node_max)
+        print(cut_value)        
+        print(partition)
+
+        sys.exit()
 
     def kcutsets_slab_cut(self):
         cutsets = list(nx.all_node_cuts(self.slabgraph))
