@@ -2273,7 +2273,22 @@ class SlabGraph(MolecularGraph):
 
         print(len(edge_cut_set))
         print(str(edge_cut_set))
-    
+   
+    def union_2_tuple(self, set1, set2):
+        
+        new_set = deepcopy(set1)
+        for elem in set2:
+            new_set.add(elem)
+
+        return new_set
+
+    def relative_complement_2_tuple(self,set1, set2):
+        new_set=set()
+        for elem in set1:
+            if(elem not in set2):
+                new_set.add(elem)
+
+        return new_set
 
     def get_edges_between_partitions(self,partition):
 
@@ -2284,6 +2299,149 @@ class SlabGraph(MolecularGraph):
                     edges_that_were_cut.append((s,t))
 
         return edges_that_were_cut
+
+    def enumerate_cuts(self, G, s, t, e_incl, e_excl, max_weight, all_min_cuts):
+        """
+        Recursive algorithm to enumerate cuts constrained to contain various
+        edges and exclude others
+
+        The inclusion/exclusion depends on the stage of the recursion tree
+        """
+        Gp=deepcopy(G)
+
+        # weight exclusion edges
+        for edge in e_excl:
+            #print(edge)
+            Gp.edge[edge[0]][edge[1]]['capacity']=100000
+            Gp.edge[edge[1]][edge[0]]['capacity']=100000
+        # add artificial edges to insure inclusion of the inclusion edges
+        for (u,v) in e_incl:
+            # add artificial edge from s to u
+            Gp.add_edge(s, u)
+            Gp.add_edge(u, s)
+            Gp.edge[s][u]['capacity']=100000
+            Gp.edge[u][s]['capacity']=100000
+
+            # add artificial edge from v to t
+            Gp.add_edge(v, t)
+            Gp.add_edge(t, v)
+            Gp.edge[v][t]['capacity']=100000
+            Gp.edge[t][v]['capacity']=100000
+
+        # compute new max-flow/min-cut (bc we need to ensure we have actually
+        # generated a new min cut after forcing edge inclusion/exclusion
+        cut_value, partition, sat_edges = nxmfc.minimum_cut(
+            Gp, s, t, flow_func=nx.algorithms.flow.shortest_augmenting_path)
+        # get the cutset
+        Cp = set(self.get_edges_between_partitions(partition))
+
+        # stopping criteria
+        # return if non near minimal cut
+        if(cut_value > max_weight):
+            return
+        # TODO return if symmetric version of previously identified cut
+
+        # ensure that despite the adding of the artificial edges, the proposed cut
+        # is indeed still minimal in the original graph
+        tmp_weight=sum([self.slabgraphtree.edge[edge[0]][edge[1]]['capacity'] for edge in Cp])
+        if(tmp_weight<=(max_weight*1.000001)):
+            print(tmp_weight, Cp)
+            all_min_cuts.append(Cp)
+            self.debug_min_cuts(Cp,len(all_min_cuts))
+       
+        #print("Cp") 
+        #print(Cp)
+        #print("Cp-e_incl") 
+        #print(Cp-e_incl)
+        for edge in Cp - e_incl:
+            edge=set([(edge[0],edge[1])])
+
+            e_excl = e_excl.union(edge)
+            #e_excl = e_excl + edge
+            #e_excl = self.union_2_tuple(e_excl, edge)
+
+            self.enumerate_cuts(G, s, t, e_incl, e_excl, max_weight, all_min_cuts)
+
+            #print("e_excl")
+            #print(e_excl)
+            #print("edge")
+            #print(edge)
+            e_excl = e_excl - edge
+            #e_excl = self.relative_complement_2_tuple(e_excl, edge)
+            #print("relative complement")
+            #print(e_excl)
+
+            e_incl = e_incl.union(edge)
+            #e_incl = e_incl + edge
+            #e_incl = self.union_2_tuple(e_incl, edge)
+        
+        return
+        
+
+    def nx_near_min_cut_digraph_custom(self,weight_barrier=False):
+
+        print("\n\nNx near minimum cut function on directed slab graph...")
+        # Firt create a barrier on all super surface edges
+        # handles when aspect ratio of the slab is too large and the solution is a tunnel from s to t
+        if(weight_barrier):
+            self.create_weighted_barrier_on_super_surface_edges(super_surface_weight='inf')
+
+        self.cut_value1, self.partition1, self.sat_edges1= nxmfc.minimum_cut(
+                self.slabgraphtree,
+                self.super_surface_node_0,
+                self.super_surface_node_max,
+                flow_func=nx.algorithms.flow.shortest_augmenting_path)
+
+        C = set(self.get_edges_between_partitions(self.partition1))
+
+        print("Initial solution:")
+        print(self.cut_value1, C)
+
+        # the edge inclusion and exclusion sets
+        e_incl = set()
+        e_excl = set()
+
+        # For now not interested in finding near minimal, only minimal
+        fract_tol=0.0
+        int_tol=1
+        max_weight=(self.cut_value1+int_tol)*(1+fract_tol)
+
+        # to track all min cuts
+        all_min_cuts=[]
+
+        # run
+        self.enumerate_cuts(self.slabgraphtree,
+                       self.super_surface_node_0, 
+                       self.super_surface_node_max,
+                       e_incl,
+                       e_excl,
+                       max_weight,
+                       all_min_cuts)
+        
+    def debug_min_cuts(self,cutset,step):
+
+        tmp_nodes=[]
+        for (u,v) in cutset:                                    
+            # color nodes                                                   
+            self.slabgraph.node[u]['element']='Ge'                          
+            self.slabgraph.node[v]['element']='Ge'                          
+                                                                            
+            # color edges                                                   
+            this_intersect = set(self.refgraph.neighbors(u)).intersection(self.refgraph.neighbors(v))
+            if(len(this_intersect) == 1):                                   
+                n_to_add=next(iter(this_intersect))                         
+                this_data = self.refgraph.node[n_to_add]                    
+                self.slabgraph.add_node(n_to_add, this_data)                
+                tmp_nodes.append(n_to_add)                                  
+                                                                            
+        self.write_slabgraph_cif(self.cell,bond_block=False,descriptor="cutset%04d"%step,relabel=False)
+        # reset nodes                                                       
+        for (u,v) in cutset:                                    
+            self.slabgraph.node[u]['element']='Si'                          
+            self.slabgraph.node[v]['element']='Si'                          
+        # reset edges                                                       
+        for node in tmp_nodes:                                              
+            self.slabgraph.remove_node(node)
 
     def nx_min_cut_digraph_custom(self,weight_barrier=False):
 
@@ -2297,11 +2455,14 @@ class SlabGraph(MolecularGraph):
             self.create_weighted_barrier_on_super_surface_edges(super_surface_weight='inf')
         # uses stoer-wagner to do max flow (and indirectly min cut)
         # given source and target node
-        self.cut_value1, self.partition1, self.sat_edges= nxmfc.minimum_cut(
+        self.cut_value1, self.partition1, self.sat_edges1= nxmfc.minimum_cut(
                 self.slabgraphtree,
                 self.super_surface_node_0,
                 self.super_surface_node_max,
                 flow_func=nx.algorithms.flow.shortest_augmenting_path)
+
+        print("Num saturated edges: %d (%d total edges)"%(len(self.sat_edges1),self.slabgraph.number_of_edges()))
+        print("Actual min cut value: %d"%int(self.cut_value1))
 
         this_cutset=self.get_edges_between_partitions(self.partition1)
         all_min_cutsets.append(this_cutset.copy())
@@ -2369,15 +2530,42 @@ class SlabGraph(MolecularGraph):
         print("Debugging structures to cif:")
         for i in range(len(all_min_cutsets)):
             # change element so we can vis it
+            tmp_nodes=[]
             for (u,v) in all_min_cutsets[i]:
+                # color nodes
                 self.slabgraph.node[u]['element']='Ge'
                 self.slabgraph.node[v]['element']='Ge'
+                
+                # color edges
+                this_intersect = set(self.refgraph.neighbors(u)).intersection(self.refgraph.neighbors(v))     
+                if(len(this_intersect) == 1):
+                    n_to_add=next(iter(this_intersect))
+                    this_data = self.refgraph.node[n_to_add]
+                    self.slabgraph.add_node(n_to_add, this_data)
+                    tmp_nodes.append(n_to_add)
+
             self.write_slabgraph_cif(self.cell,bond_block=False,descriptor="cutset%d"%i,relabel=False)
-            # reset
+            # reset nodes
             for (u,v) in all_min_cutsets[i]:
                 self.slabgraph.node[u]['element']='Si'
                 self.slabgraph.node[v]['element']='Si'
-
+            # reset edges
+            for node in tmp_nodes:
+                self.slabgraph.remove_node(node)
+        
+        # Debug vis all saturated edges' nodes
+        tmp_nodes=[]
+        for (u,v) in self.sat_edges1:
+            # find common neighbor between u and v
+            this_intersect = set(self.refgraph.neighbors(u)).intersection(self.refgraph.neighbors(v))     
+            if(len(this_intersect) == 1):
+                n_to_add=next(iter(this_intersect))
+                this_data = self.refgraph.node[n_to_add]
+                self.slabgraph.add_node(n_to_add, this_data)
+                tmp_nodes.append(n_to_add)
+        self.write_slabgraph_cif(self.cell,bond_block=False,descriptor="satedges",relabel=False)
+        for node in tmp_nodes:
+            self.slabgraph.remove_node(node)
             
 
         # wichever partition is the biggest is the one we keep
@@ -2672,7 +2860,7 @@ class SlabGraph(MolecularGraph):
         #    print(node)
         #    self.slabgraph.add_node(node)
 
-    def add_missing_hydrogens(self):
+    def add_missing_hydrogens(self,debug=False):
         """
         Add back in the missing Hydrogens
         Need to be very careful because the Hydrogen to add could be attached
@@ -2687,9 +2875,10 @@ class SlabGraph(MolecularGraph):
         this_index = self.num_nodes+1
         # for each directed edge representing a converted O->Si to O->
         for edge in self.final_H_edges:
-            print("\n")
-            print(edge)
-            print((self.refgraph.node[edge[0]]['ciflabel'],self.refgraph.node[edge[1]]['ciflabel']))
+            if(debug):
+                print("\n")
+                print(edge)
+                print((self.refgraph.node[edge[0]]['ciflabel'],self.refgraph.node[edge[1]]['ciflabel']))
             # data of parent node (the surface O atom)
             parent_node_data=self.refgraph.node[edge[0]]
             # data of child node (the Si atom to be turned into H)
@@ -2710,7 +2899,8 @@ class SlabGraph(MolecularGraph):
 
             new_child_abc = deepcopy(old_child_abc)
 
-            print(symflag)
+            if(debug):
+                print(symflag)
             if(symflag != '.'):
                 # if periodic in x direction
                 if(symflag[2]=='6' or symflag[2]=='4'):
@@ -2736,51 +2926,60 @@ class SlabGraph(MolecularGraph):
                     else:
                         new_child_abc[2]-=1.0
 
-            print("Old child abc:")
-            print(old_child_abc)
-            print("New child abc:")
-            print(new_child_abc)
+            if(debug):
+                print("Old child abc:")
+                print(old_child_abc)
+                print("New child abc:")
+                print(new_child_abc)
 
             new_child_xyz=self.to_cartesian(new_child_abc)
-            print("New child xyz:")
-            print(new_child_xyz)
-           
-            print("Parent abc:")
+            if(debug):
+                print("New child xyz:")
+                print(new_child_xyz)
+               
+                print("Parent abc:")
             parent_abc=np.array([float(parent_node_data['_atom_site_fract_x']),
                                  float(parent_node_data['_atom_site_fract_y']),
                                  float(parent_node_data['_atom_site_fract_z'])])
-            print(parent_abc)
-            print("Stored parent xyz:")
-            print(parent_node_data['cartesian_coordinates'])
-            print("Stored parent abc:")
-            print(self.to_fractional(parent_node_data['cartesian_coordinates']))
-            print("Calculated parent xyz:")
+            if(debug):
+                print(parent_abc)
+                print("Stored parent xyz:")
+                print(parent_node_data['cartesian_coordinates'])
+                print("Stored parent abc:")
+                print(self.to_fractional(parent_node_data['cartesian_coordinates']))
+                print("Calculated parent xyz:")
             updated_parent_xyz=self.to_cartesian(parent_abc)
-            print(updated_parent_xyz)
-            print("Calculated parent abc:")
-            print(self.to_fractional(updated_parent_xyz))
+            if(debug):
+                print(updated_parent_xyz)
+                print("Calculated parent abc:")
+                print(self.to_fractional(updated_parent_xyz))
             #parent_node_data['cartesian_coordinates']=updated_parent_xyz.copy()
 
             bond_length=np.linalg.norm(new_child_xyz-parent_node_data['cartesian_coordinates'])
-            print("old bond length:")
-            print(bond_length)
+            if(debug):
+                print("old bond length:")
+                print(bond_length)
             h_bond_length=0.95
             scale_by=h_bond_length/bond_length
-            print("Scale by")
-            print(scale_by)
+            if(debug):
+                print("Scale by")
+                print(scale_by)
 
             new_child_xyz=parent_node_data['cartesian_coordinates']+\
                     (new_child_xyz-parent_node_data['cartesian_coordinates'])*scale_by
-            print("New child xyz:")
-            print(new_child_xyz)
+            if(debug):
+                print("New child xyz:")
+                print(new_child_xyz)
 
             new_child_xyz=self.in_cell(new_child_xyz)
-            print("New child xyz in cell:")
-            print(new_child_xyz)
+            if(debug):
+                print("New child xyz in cell:")
+                print(new_child_xyz)
 
             new_child_abc = self.to_fractional(new_child_xyz)
-            print("New child abc for printing:")
-            print(new_child_abc)
+            if(debug):
+                print("New child abc for printing:")
+                print(new_child_abc)
 
             new_child_node_data['_atom_site_fract_x'] = str(new_child_abc[0])
             new_child_node_data['_atom_site_fract_y'] = str(new_child_abc[1])
