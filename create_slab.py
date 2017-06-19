@@ -33,6 +33,14 @@ except:
     print("Error ASE not found! ASE import failed, cannot build initial slab guess with ASE!")
     sys.exit()
 
+try:
+    import pymatgen
+    import pymatgen.io.cif as pic                                                   
+    from pymatgen.core.surface import Slab, SlabGenerator,generate_all_slabs 
+except:
+    print("Error Pymatgen not found! Pymatgen import failed, cannot build initial slab guess with Pymatgen!")
+    sys.exit()
+
 class LammpsSimulation(object):
     def __init__(self, options):
         self.name = clean(options.cif_file)
@@ -1958,7 +1966,182 @@ class LammpsSimulation(object):
                 print("something went wrong")
         return mgraph
 
+
+def get_nlayers(this_slabgen):
+    """
+    Helper function for pymatgen slab generation
+
+    this_slabgen: SlabGenerator object
+    """
+
+    h=this_slabgen._proj_height                                               
+    nlayers_slab = int(math.ceil(this_slabgen.min_slab_size / h))               
+    nlayers_vac  = int(math.ceil(this_slabgen.min_vac_size / h))                
+    nlayers = nlayers_slab + nlayers_vac                                        
+                                                                                
+    return [nlayers_slab, nlayers_vac, nlayers] 
+
+def num2alpha(n):                                                               
+    """
+    Helper function for pymatgen slab generation
+
+    turns integer into excel column
+    """
+                                                                                
+    div=n                                                                       
+    string=""                                                                   
+    temp=0                                                                      
+    while div>0:                                                                
+        module=(div-1)%26                                                       
+        string=chr(97+module)+string                                            
+        div=int((div-module)/26)                                                
+                                                                                
+    return string 
+
+def unique_typing(structure,dataset,debug=False):                               
+    """
+    Helper function for pymatgen slab generation
+
+    structure: any pymatgen Structure or subclass
+    """
+                                                                                
+    print(dataset.keys())                                                       
+    print(structure.sites[0].species_string)                                    
+                                                                                
+                                                                                
+    # map from unique type to the int in dataset['equivalent_atoms']            
+    unique_descr_to_int = {}                                                    
+                                                                                
+    # all site numbers for a given unique descr                                 
+    unique_descr_to_sites={}                                                    
+                                                                                
+    # how many sites exist of the unique type in key                            
+    unique_descr_count = {}                                                     
+                                                                                
+    # how many uniques have been discovered per element, { Si: 2, O: 1, Al: 1}  
+    unique_element_counter={}                                                   
+                                                                                
+    descr=[]                                                                    
+                                                                                
+    for i in range(len(dataset['equivalent_atoms'])):                           
+        # already discovered                                                    
+        if dataset['equivalent_atoms'][i] in unique_descr_to_int.keys():        
+            descr.append(unique_descr_to_int[dataset['equivalent_atoms'][i]])   
+            unique_descr_count[unique_descr_to_int[dataset['equivalent_atoms'][i]]] += 1
+            unique_descr_to_sites[unique_descr_to_int[dataset['equivalent_atoms'][i]]].append(i+1)
+        # not discovered                                                        
+        else:                                                                   
+            element=structure.sites[i].species_string                           
+                                                                                
+            if(element in unique_element_counter.keys()):                       
+                                                                                
+                # we now have yet another unique type for this element          
+                unique_element_counter[element] += 1                            
+                alpha_str=num2alpha(unique_element_counter[element])            
+                this_descr=element+'_'+alpha_str                                
+                                                                                
+                                                                                
+            else:                                                               
+                # first unique atom type for this element                       
+                unique_element_counter[element] = 1                             
+                alpha_str=num2alpha(unique_element_counter[element])            
+                this_descr=element+'_'+alpha_str                                
+                                                                                
+                                                                                
+            unique_descr_to_int[dataset['equivalent_atoms'][i]]=this_descr      
+            unique_descr_count[unique_descr_to_int[dataset['equivalent_atoms'][i]]] = 1
+            descr.append(unique_descr_to_int[dataset['equivalent_atoms'][i]])   
+            unique_descr_to_sites[unique_descr_to_int[dataset['equivalent_atoms'][i]]]=[i+1]
+                                                                                
+    #print("All descriptions:")                                                 
+    #print(descr)                                                               
+    debug_key=descr[0]                                                          
+    print("Sample unique type key")                                             
+    print(debug_key)                                                            
+    print("All sites for this key")                                             
+    print(unique_descr_to_sites[debug_key])                   
+
+
+def create_slab_pym(ifname,slab_face,slab_thickness,slab_vacuum):
+   
+    # initial pymatgen structure object 
+    parser=pic.CifParser(ifname)
+    structure=parser.get_structures()[0]                      
+
+    # initial slabgen object
+    slabgen=SlabGenerator(structure, 
+                 (int(slab_face[0]),int(slab_face[1]),int(slab_face[2])),
+                 min_slab_size=slab_thickness, 
+                 min_vacuum_size=slab_vacuum,
+                 lll_reduce=True, center_slab=True
+                         )
+    print("Projection height of slab for this face: %.3f"%(slabgen._proj_height))
+
+    # recalculate the new min slab thickness to have two additional layers
+    layers_list=get_nlayers(slabgen)
+    new_min_slab_size=(layers_list[0]+4)*slabgen._proj_height-0.1
+    print("%d slab layers for thickness of %.1f"%(layers_list[0],slab_thickness))
+
+    # create modified slabgen object
+    slabgen=SlabGenerator(structure, 
+                 (int(slab_face[0]),int(slab_face[1]),int(slab_face[2])),
+                 min_slab_size=new_min_slab_size, 
+                 min_vacuum_size=slab_vacuum,
+                 lll_reduce=True, center_slab=True
+                         )
+    layers_list=get_nlayers(slabgen)
+    print("%d slab layers for thickness of %.1f"%(layers_list[0],new_min_slab_size))
+
+    # create slab
+    slab = slabgen.get_slab()
+
+    # compute # of atoms per slab layer
+    slab_L=layers_list[0]
+    a_per_l = int(len(slab.sites)/slab_L)
+
+
+    # make sure has inversion symmetry, otherwise for now error
+    # when we find a min cut, we know that the other is just the -1 symm group
+    laue = ["-1", "2/m", "mmm", "4/m", "4/mmm",                                 
+            "-3", "-3m", "6/m", "6/mmm", "m-3", "m-3m"] 
+    tol=0.3
+    sg = pymatgen.symmetry.analyzer.SpacegroupAnalyzer(slab, symprec=tol)       
+    pg = sg.get_point_group_symbol()                                            
+    print(pg)                                                                   
+    if str(pg) in laue:                                                         
+        #return slab                                                            
+        print("Laue symmetry found!: " + pg)                                    
+    else:                                                                       
+        print("No Laue symmetry found...")   
+        print("For now not working with non-symmetric slabs") 
+        print("Exit code: NoSymmetry")
+        sys.exit()
+   
+    # get equivalent atom types by symmetry:
+    symm_struct=sg.get_symmetrized_structure()
+    symm_dataset=sg.get_symmetry_dataset()
+    unique_typing(symm_struct,symm_dataset) 
+    
+    
+    # re-write new slab to CIF so LAMMPS interface can find minimum truncation surface
+    ofname = str(ifname[:-4])+"_"+\
+             str(slab_face[0])+str(slab_face[1])+str(slab_face[2])+"_"+\
+             str(slab_L)+"_slab_pym"
+    outputter = pic.CifWriter(slab)
+    outputter.write_file(ofname+".cif")
+    
+
+    # return (# of slab layers, atoms per layer, ofname)
+    print("Layer properties: %s"%str((slab_L, a_per_l, ofname)))
+    return slab_L, a_per_l, ofname
+
+
 def get_initial_slab_L_ase(ifname,slab_face,slab_L,slab_vacuum):
+    """
+    Helper function for ASE slab generation
+
+    Estimate the # of layers needed to make a slab of a specified thickness
+    """
     cell = read(ifname)
     slab_tmp=surface(cell,
                      (int(slab_face[0]),int(slab_face[1]),int(slab_face[2])),
@@ -1968,6 +2151,11 @@ def get_initial_slab_L_ase(ifname,slab_face,slab_L,slab_vacuum):
     return num_layers
 
 def create_slab_ase(ifname,slab_face,slab_L,slab_vacuum):
+    """
+    Helper function for ASE slab generation
+
+    Write the ASE slab 
+    """
     cell = read(ifname)
     slab=surface(cell,
                  (int(slab_face[0]),int(slab_face[1]),int(slab_face[2])),
@@ -2027,99 +2215,244 @@ def main():
     ############################
     # FINISHED MINIMUM SUPERCELL GENERATION
     ############################
-    
-
-    ############################
-    # START AUTOMATED SLAB GENERATION CRITERIA 
-    ############################
-    # This is IMPORTANT 
-    # If the aspect ratio of the ASE slab is too small:
-    #    -the Stoer Wagner algorithm will fail and find a min cut partition that is not 2D periodic
-    #    -it basically tunnels between the source and sink nodes because creating a slab 
-    #     would involve cutting too many bonds due to the larger surface area w.r.t the slab thickness
-    #    -it simply means we haven't built a THICK enough slab to get the correct solution
-    #    -so we retry with an initial larger slab
-
-    # get slab option
-    sim.slab_face         = options.slab_face.split('x')
-    sim.slab_L            = options.slab_L
-    sim.slab_vacuum       = options.slab_vacuum
-    sim.slab_target_thick = options.slab_target_thick
-    sim.slab_verbose      = options.slab_verbose
-
-    if(sim.slab_L>0 and sim.slab_target_thick > 0.001):
-        # Note that by default sim.slab_L=0 and sim.slab_target_thick = 30
-        print("Notice! slab-L was specified!)")
-        print("Specifying slab-L will create the smallest 2D periodic, min cut slab starting from an ASE slab with thickness L")
-        print("Not pecifying slab-L will create the smallest 2D periodic, min cut slab with approximate thickness greater than target-thickness (for which 30 Angstrom is the default)")
-        #sys.exit()
-
-    # so that thickness of ASE initial slab can be iteratively updated
-    curr_slab_L=int(sim.slab_L)
-
-
-    # If sim.slab_L is specified, start with this thickness
-    if(sim.slab_L != 0):
-        curr_slab_cif_name = create_slab_ase(options.cif_file, sim.slab_face, 
-                                                         curr_slab_L,
-                                                         sim.slab_vacuum)
-        max_slab_L=2*curr_slab_L
-    # otherwise estimate slab_L for a given target_thick
-    else:
-        initial_slab_L=get_initial_slab_L_ase(options.cif_file,
-                                              sim.slab_face,
-                                              1,
-                                              sim.slab_vacuum)
-        curr_slab_cif_name=create_slab_ase(options.cif_file, sim.slab_face, 
-                                                        initial_slab_L,
-                                                        sim.slab_vacuum)
-        curr_slab_L = int(initial_slab_L)
-        max_slab_L  = 2*initial_slab_L
    
- 
-    # Booleans to determine if we are finished with this surface    
-    next_iter=True
-    slab_is_2D_periodic=False
-    slab_meets_thickness_criteria=False
-    ############################
-    # END AUTOMATED SLAB GENERATION CRITERIA 
-    ############################
+    sim.slab_pym=options.slab_pym 
+    if(not sim.slab_pym):
+        ############################
+        # START AUTOMATED ASE SLAB GENERATION CRITERIA 
+        ############################
+        # This is IMPORTANT 
+        # If the aspect ratio of the ASE slab is too small:
+        #    -the Stoer Wagner algorithm will fail and find a min cut partition that is not 2D periodic
+        #    -it basically tunnels between the source and sink nodes because creating a slab 
+        #     would involve cutting too many bonds due to the larger surface area w.r.t the slab thickness
+        #    -it simply means we haven't built a THICK enough slab to get the correct solution
+        #    -so we retry with an initial larger slab
 
-
-
-    ############################
-    # START AUTOMATED SLAB GENERATION
-    ############################
-    # try to make surfaces until we hit stopping criteria
-    while(next_iter==True):
-        # reset everything to beginning
-        sim = LammpsSimulation(options)                                             
+        # get slab option
         sim.slab_face         = options.slab_face.split('x')
         sim.slab_L            = options.slab_L
         sim.slab_vacuum       = options.slab_vacuum
         sim.slab_target_thick = options.slab_target_thick
         sim.slab_verbose      = options.slab_verbose
 
-        # reset the structure properties to reflect the newest ASE slab
+        if(sim.slab_L>0 and sim.slab_target_thick > 0.001):
+            # Note that by default sim.slab_L=0 and sim.slab_target_thick = 30
+            print("Notice! slab-L was specified!)")
+            print("Specifying slab-L will create the smallest 2D periodic, min cut slab starting from an ASE slab with thickness L")
+            print("Not pecifying slab-L will create the smallest 2D periodic, min cut slab with approximate thickness greater than target-thickness (for which 30 Angstrom is the default)")
+            #sys.exit()
+
+        # so that thickness of ASE initial slab can be iteratively updated
+        curr_slab_L=int(sim.slab_L)
+
+
+        # If sim.slab_L is specified, start with this thickness
+        if(sim.slab_L != 0):
+            curr_slab_cif_name = create_slab_ase(options.cif_file, sim.slab_face, 
+                                                             curr_slab_L,
+                                                             sim.slab_vacuum)
+            max_slab_L=2*curr_slab_L
+        # otherwise estimate slab_L for a given target_thick
+        else:
+            initial_slab_L=get_initial_slab_L_ase(options.cif_file,
+                                                  sim.slab_face,
+                                                  1,
+                                                  sim.slab_vacuum)
+            curr_slab_cif_name=create_slab_ase(options.cif_file, sim.slab_face, 
+                                                            initial_slab_L,
+                                                            sim.slab_vacuum)
+            curr_slab_L = int(initial_slab_L)
+            max_slab_L  = 2*initial_slab_L
+   
+ 
+        # Booleans to determine if we are finished with this surface    
+        next_iter=True
+        slab_is_2D_periodic=False
+        slab_meets_thickness_criteria=False
+        ############################
+        # END AUTOMATED ASE SLAB GENERATION CRITERIA 
+        ############################
+
+
+
+        ############################
+        # START AUTOMATED ASE SLAB GENERATION
+        ############################
+        # try to make surfaces until we hit stopping criteria
+        while(next_iter==True):
+            # reset everything to beginning
+            sim = LammpsSimulation(options)                                             
+            sim.slab_face         = options.slab_face.split('x')
+            sim.slab_L            = options.slab_L
+            sim.slab_vacuum       = options.slab_vacuum
+            sim.slab_target_thick = options.slab_target_thick
+            sim.slab_verbose      = options.slab_verbose
+
+            # reset the structure properties to reflect the newest ASE slab
+            cell, graph = from_CIF(curr_slab_cif_name)                                    
+            sim.set_cell(cell)                                                          
+            sim.set_graph(graph)                                                        
+            sim.split_graph()                                                           
+            sim.assign_force_fields()                                                   
+
+
+            # Beginning of routines for surface generation
+            sim.slabgraph=SlabGraph(sim.graph,cell) 
+            sim.slabgraph.check_if_zeolite()                                            
+                                                                                        
+            sim.merge_graphs()                                                          
+
+            # DEBUG file writing: reprint the slab graph since ASE cif can't be read by mercury
+            sim.slabgraph.write_slabgraph_cif(cell,bond_block=False,descriptor=None,relabel=False) 
+                                                                                        
+            # creating slab graph                                                       
+            sim.slabgraph.remove_erroneous_disconnected_comps()                         
+            sim.slabgraph.condense_graph()                                              
+            sim.slabgraph.identify_undercoordinated_surface_nodes()                     
+            
+            # DEBUG file writing                                                                    
+            if(sim.slab_verbose):
+                sim.slabgraph.write_slabgraph_cif(cell,bond_block=False,descriptor="debug",relabel=False) 
+
+            # Here we need to manipulate the edge properties of the graph
+            sim.slabgraph.normalize_bulk_edge_weights()                                 
+            sim.slabgraph.connect_super_surface_nodes()                                 
+
+            # Create a directed copy for max-flow/min-cut st problem
+            sim.slabgraph.convert_to_digraph()                                            
+
+            # As a test run the stoer wagner algorithm on the undirected copy of the graph
+            #sim.slabgraph.nx_stoer_wagner_cut_custom(weight_barrier=False)
+
+            sim.slabgraph.nx_near_min_cut_digraph_custom(weight_barrier=True)               
+            # Execute max-flow/min-cut calculation
+            sim.slabgraph.nx_min_cut_digraph_custom(weight_barrier=True)               
+
+            # exclude graph partitions on the "outside" of the min cut
+            sim.slabgraph.remove_surface_partitions()                                   
+                                                                                        
+            # Add back in all missing oxygens                                           
+            sim.slabgraph.add_all_connecting_nodes()                                    
+
+            # DEBUG file writing
+            if(sim.slab_verbose):
+                sim.slabgraph.write_slabgraph_cif(cell,bond_block=False,descriptor="deH",relabel=False)   
+                                                                                        
+            # add missing hydrogen caps and validate structural properties 
+            sim.slabgraph.add_missing_hydrogens()                                       
+            # check approximate slab thickness
+            min_thickness = sim.slabgraph.check_approximate_slab_thickness()
+            max_thickness = sim.slabgraph.check_approximate_slab_thickness_v2()
+            approximate_thickness = (max_thickness+min_thickness)/2
+            # check if generated slab is 2D periodic
+            slab_is_2D_periodic   = sim.slabgraph.check_slab_is_2D_periodic()
+           
+ 
+            # check if we need to do another iteration with an L+=1 ASE slab
+            if(slab_is_2D_periodic):
+                print("Identified slab is periodic")
+                if(sim.slab_L>0):
+                    next_iter=False
+                    print("Current slab_L %d >= specified_slab_L: %d"%(curr_slab_L, sim.slab_L))
+                    print("Stopping slab genertion")
+                elif(sim.slab_L==0):
+                    if(approximate_thickness>sim.slab_target_thick):
+                        next_iter=False
+                        print("Current slab thickness %.4f > target thickness %.4f"%
+                              (approximate_thickness, sim.slab_target_thick))
+                        print("Stopping slab genertion")
+
+                    else:
+                        next_iter=True
+                        curr_slab_L+=1
+                        print("Current slab thickness %.4f < target thickness %.4f"%
+                              (approximate_thickness, sim.slab_target_thick))
+                        print("Moving on to ASE slab genertion with L = %d"%curr_slab_L)
+            else:
+                next_iter=True
+                curr_slab_L+=1
+                print("Identified slab is NOT periodic")
+                print("Moving on to ASE slab genertion with L = %d"%curr_slab_L)
+            
+            # finally, we need some override stopping criteria in case something weird going on
+            if(curr_slab_L>max_slab_L):
+                print("Error! Maximum slab L exceeded without finding periodic solution")
+                next_iter=False
+
+            # if we are going to do another iteration, need to create the next iteration of ASE slab
+            if(next_iter==True):
+                print("Removing ASE slab: %s"%curr_slab_cif_name)
+                print("\n\n\n")
+                if(not sim.slab_verbose):
+                    os.remove(curr_slab_cif_name)
+                curr_slab_cif_name=create_slab_ase(options.cif_file, sim.slab_face, 
+                                                                curr_slab_L,
+                                                                sim.slab_vacuum)
+            else:
+                # if we have succeeded can write the final files here if verbose
+                if(sim.slab_verbose):
+                    sim.slabgraph.write_slabgraph_cif(cell,bond_block=False,descriptor="addH",relabel=False)   
+                    sim.slabgraph.write_average_silanol_density(curr_slab_cif_name[:-4]+".addH.dat")
+                # and if not verbose only write if we suceeded to minimize # of files written
+                else:
+                    if(slab_is_2D_periodic):
+                        sim.slabgraph.write_slabgraph_cif(cell,bond_block=False,descriptor="addH",relabel=False)   
+                        sim.slabgraph.write_average_silanol_density(curr_slab_cif_name[:-4]+".addH.dat")
+                pass
+        ############################
+        # END AUTOMATED ASE SLAB GENERATION
+        ############################
+
+    else:
+        ############################
+        # START AUTOMATED PYMATGEN SLAB GENERATION
+        ############################
+
+        # slab parameters
+        sim.slab_face         = options.slab_face.split('x')
+        sim.slab_L            = options.slab_L # no matter what will be overwritten in pymatgen
+        sim.slab_vacuum       = options.slab_vacuum
+        sim.slab_target_thick = options.slab_target_thick
+        sim.slab_verbose      = options.slab_verbose
+
+        # min cut parameters
+        sim.mincut_eps = options.mincut_eps
+        sim.mincut_k   = options.mincut_k
+
+        # create pymatgen structure and get layer properties
+        layer_props=create_slab_pym(options.cif_file,sim.slab_face,sim.slab_target_thick,sim.slab_vacuum)
+
+        # reset the structure properties to reflect the newest Pymatgen slab
+        curr_slab_cif_name=str(layer_props[2])+".cif"
         cell, graph = from_CIF(curr_slab_cif_name)                                    
         sim.set_cell(cell)                                                          
         sim.set_graph(graph)                                                        
         sim.split_graph()                                                           
         sim.assign_force_fields()                                                   
-
-
+                                                                                
         # Beginning of routines for surface generation
         sim.slabgraph=SlabGraph(sim.graph,cell) 
         sim.slabgraph.check_if_zeolite()                                            
                                                                                     
         sim.merge_graphs()                                                          
 
-        # DEBUG file writing: reprint the slab graph since ASE cif can't be read by mercury
+
+
+        # DEBUG file writing: reprint the slab graph since Pymatgen cif can't be read by mercury
         sim.slabgraph.write_slabgraph_cif(cell,bond_block=False,descriptor=None,relabel=False) 
                                                                                     
-        # creating slab graph                                                       
+        # assign the slab layers to the initial pymatgen slab
+        sim.slabgraph.assign_slab_layers(layer_props)
+
+        # creating slabgraph and condensing it to Si only graph 
         sim.slabgraph.remove_erroneous_disconnected_comps()                         
         sim.slabgraph.condense_graph()                                              
+
+        # DEBUG file writing: output cif with false elements corresponding to slablayer for visualization
+        sim.slabgraph.debug_slab_layers()
+
+        # identify the undercoordinated surface nodes
         sim.slabgraph.identify_undercoordinated_surface_nodes()                     
         
         # DEBUG file writing                                                                    
@@ -2133,9 +2466,8 @@ def main():
         # Create a directed copy for max-flow/min-cut st problem
         sim.slabgraph.convert_to_digraph()                                            
 
-        # As a test run the stoer wagner algorithm on the undirected copy of the graph
-        #sim.slabgraph.nx_stoer_wagner_cut_custom(weight_barrier=False)
-
+        # Balcioglu and Wood 2003
+        sim.slabgraph.nx_near_min_cut_digraph_custom(sim.mincut_eps, sim.mincut_k, weight_barrier=True, layer_props=layer_props)               
         # Execute max-flow/min-cut calculation
         sim.slabgraph.nx_min_cut_digraph_custom(weight_barrier=True)               
 
@@ -2157,64 +2489,10 @@ def main():
         approximate_thickness = (max_thickness+min_thickness)/2
         # check if generated slab is 2D periodic
         slab_is_2D_periodic   = sim.slabgraph.check_slab_is_2D_periodic()
-       
- 
-        # check if we need to do another iteration with an L+=1 ASE slab
-        if(slab_is_2D_periodic):
-            print("Identified slab is periodic")
-            if(sim.slab_L>0):
-                next_iter=False
-                print("Current slab_L %d >= specified_slab_L: %d"%(curr_slab_L, sim.slab_L))
-                print("Stopping slab genertion")
-            elif(sim.slab_L==0):
-                if(approximate_thickness>sim.slab_target_thick):
-                    next_iter=False
-                    print("Current slab thickness %.4f > target thickness %.4f"%
-                          (approximate_thickness, sim.slab_target_thick))
-                    print("Stopping slab genertion")
 
-                else:
-                    next_iter=True
-                    curr_slab_L+=1
-                    print("Current slab thickness %.4f < target thickness %.4f"%
-                          (approximate_thickness, sim.slab_target_thick))
-                    print("Moving on to ASE slab genertion with L = %d"%curr_slab_L)
-        else:
-            next_iter=True
-            curr_slab_L+=1
-            print("Identified slab is NOT periodic")
-            print("Moving on to ASE slab genertion with L = %d"%curr_slab_L)
-        
-        # finally, we need some override stopping criteria in case something weird going on
-        if(curr_slab_L>max_slab_L):
-            print("Error! Maximum slab L exceeded without finding periodic solution")
-            next_iter=False
-
-        # if we are going to do another iteration, need to create the next iteration of ASE slab
-        if(next_iter==True):
-            print("Removing ASE slab: %s"%curr_slab_cif_name)
-            print("\n\n\n")
-            if(not sim.slab_verbose):
-                os.remove(curr_slab_cif_name)
-            curr_slab_cif_name=create_slab_ase(options.cif_file, sim.slab_face, 
-                                                            curr_slab_L,
-                                                            sim.slab_vacuum)
-        else:
-            # if we have succeeded can write the final files here if verbose
-            if(sim.slab_verbose):
-                sim.slabgraph.write_slabgraph_cif(cell,bond_block=False,descriptor="addH",relabel=False)   
-                sim.slabgraph.write_average_silanol_density(curr_slab_cif_name[:-4]+".addH.dat")
-            # and if not verbose only write if we suceeded to minimize # of files written
-            else:
-                if(slab_is_2D_periodic):
-                    sim.slabgraph.write_slabgraph_cif(cell,bond_block=False,descriptor="addH",relabel=False)   
-                    sim.slabgraph.write_average_silanol_density(curr_slab_cif_name[:-4]+".addH.dat")
-            pass
-    ############################
-    # END AUTOMATED SLAB GENERATION
-    ############################
-                                                                                
-                                                                                
+        ############################
+        # END AUTOMATED PYMATGEN SLAB GENERATION
+        ############################
                                                                                 
                                                                                 
     # Additional capability to write RASPA files if requested                   

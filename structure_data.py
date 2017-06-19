@@ -19,18 +19,21 @@ from uff import UFF_DATA
 import networkx as nx
 import operator
 
+from collections import OrderedDict
+from atomic import MASS, ATOMIC_NUMBER, COVALENT_RADII
+from atomic import organic, non_metals, noble_gases, metalloids, lanthanides, actinides, transition_metals
+from atomic import alkali, alkaline_earth, main_group, metals
+from ccdc import CCDC_BOND_ORDERS
+DEG2RAD=np.pi/180.
+
 try:
     from writeNodesEdges import writeObjects
-
-
 except:
     print("Warning! vtk for python necessary for graph debugging necessary. Code will ImportError if you try to use the functionality to draw a SlabGraph to a VTK style visualization file")
 
 try:
     import networkx as nx
     from networkx.algorithms import approximation
-
-
 except ImportError:
     print("Warning: could not load networkx module, this is needed to produce the lammps data file.")
     sys.exit()
@@ -41,12 +44,6 @@ try:
 except:
     print("Not able to load custom nx algorithms (make sure at most recent git commit")
 
-from collections import OrderedDict
-from atomic import MASS, ATOMIC_NUMBER, COVALENT_RADII
-from atomic import organic, non_metals, noble_gases, metalloids, lanthanides, actinides, transition_metals
-from atomic import alkali, alkaline_earth, main_group, metals
-from ccdc import CCDC_BOND_ORDERS
-DEG2RAD=np.pi/180.
 
 class MolecularGraph(nx.Graph):
     """Class to contain all information relating a structure file
@@ -1617,9 +1614,9 @@ class SlabGraph(MolecularGraph):
             # our new slabgraph after the disconnected components have been removed
             self.refgraph=self.slabgraph.copy()
 
-        print("Reference graph:")
-        for node, data in self.refgraph.nodes_iter(data=True):
-            print(node, data['ciflabel'],data['element'])
+        #print("Reference graph:")
+        #for node, data in self.refgraph.nodes_iter(data=True):
+        #    print(node, data['ciflabel'],data['element'])
 
     def condense_graph(self):
         """
@@ -1671,12 +1668,12 @@ class SlabGraph(MolecularGraph):
         #    elif(data['element']=='Si'):
         #        print("Si has %d neighbors"%len(self.slabgraph.neighbors(node)))
 
-        print("All nodes to remove:")
-        print(self.removed_nodes)
-        print("All edges to remove:")
-        print(self.removed_edges)
-        print("All edges to add:")
-        print(self.added_edges)
+        #print("All nodes to remove:")
+        #print(self.removed_nodes)
+        #print("All edges to remove:")
+        #print(self.removed_edges)
+        #print("All edges to add:")
+        #print(self.added_edges)
 
 
         # remove Si-O or Al-O edges
@@ -1804,8 +1801,8 @@ class SlabGraph(MolecularGraph):
                 # any fully coordinated node is automatically a bulk node
                 self.bulk_nodes.append(node)
 
-        print("Bulk nodes:")
-        print(self.bulk_nodes)
+        #print("Bulk nodes:")
+        #print(self.bulk_nodes)
         print("Surface 0 nodes:")
         print(self.surface_nodes_0)
         print("Surface max nodes:")
@@ -1981,6 +1978,70 @@ class SlabGraph(MolecularGraph):
         self.slabgraphtree=self.slabgraph.to_directed()
         self.create_weighted_barrier_on_super_surface_edges(super_surface_weight='max')
 
+    def redirect_slab_tree_by_coordinate_directionality(self,start="min"):
+        """
+        Redirect the edges in the directed version of the slab graph
+        solely based on the fractional coordinate that represents the
+        crystallographic position perpendicular to the surface (parallel to the
+        vacuum)
+
+        if start=='min', the parent node must have a vacuum_coord < child node
+        if start=='max', the parent node must have a vacuum_coord > child node
+        """
+
+        edges_to_reverse=[]
+        for edge in self.slabgraphtree.edges_iter():
+            n1=edge[0]
+            n2=edge[1]
+
+            to_reverse=False
+            
+            if(self.vacuum_direc==0):
+                if(self.slabgraph.node[n1]['_atom_site_fract_x']<
+                   self.slabgraph.node[n2]['_atom_site_fract_x']):
+                    if(start=="max"):
+                        to_reverse=True
+                else:
+                    if(start=="min"):
+                        to_reverse=True
+            elif(self.vacuum_direc==1):
+                if(self.slabgraph.node[n1]['_atom_site_fract_y']<
+                   self.slabgraph.node[n2]['_atom_site_fract_y']):
+                    if(start=="max"):
+                        to_reverse=True
+                else:
+                    if(start=="min"):
+                        to_reverse=True
+            elif(self.vacuum_direc==2):
+                if(self.slabgraph.node[n1]['_atom_site_fract_z']<
+                   self.slabgraph.node[n2]['_atom_site_fract_z']):
+                    if(start=="max"):
+                        to_reverse=True
+                else:
+                    if(start=="min"):
+                        to_reverse=True
+                        
+            # Take special care to ensure the correct directionality each edge 
+            # betweeen the super surface node and the first bulk node
+            if(start=="min"):
+                if(n2 == self.super_surface_node_0):
+                    to_reverse=True
+            elif(start=="max"):
+                if(n1 == self.super_surface_node_max):
+                    to_reverse=True
+    
+            if(to_reverse):
+                data=self.slabgraphtree[n1][n2].copy()
+                edges_to_reverse.append((n1,n2,data))
+
+
+
+        for n1,n2,data in edges_to_reverse:
+            print("Reversing! ",n1,n2, data)
+            self.slabgraphtree.remove_edge(n1,n2)
+            self.slabgraphtree.add_edge(n2,n1,data)
+
+
 
     def create_weighted_barrier_on_super_surface_edges(self,super_surface_weight='one'):
         """
@@ -2049,102 +2110,70 @@ class SlabGraph(MolecularGraph):
             #print(self.slabgraphtree.edge[edge[0]][edge[1]]['capacity'])
 
 
-    def redirect_slab_tree_by_coordinate_directionality(self,start="min"):
+    def create_weighted_barrier_on_two_outer_surface_layers(self,new_weight='inf'):
         """
-        Redirect the edges in the directed version of the slab graph
-        solely based on the fractional coordinate that represents the
-        crystallographic position perpendicular to the surface (parallel to the
-        vacuum)
-
-        if start=='min', the parent node must have a vacuum_coord < child node
-        if start=='max', the parent node must have a vacuum_coord > child node
+        Reweight the edges that have both nodes in the 2-n layers of the slab
         """
+        if(new_weight=='one'):
+            surface_0_weight=1
+            surface_max_weight=1
+        elif(new_weight=='max'):
+            surface_0_weight=float(self.super_surface_node_0_weight)
+            surface_max_weight=float(self.super_surface_node_max_weight)
+        elif(new_weight=='inf'):
+            surface_0_weight=100000
+            surface_max_weight=100000
+        else:
+            print("Error, weight to super surface node can only be 'one','max', or 'inf'")
+            sys.exit()
 
-        edges_to_reverse=[]
+        # already iterates over forward and reverse edges
         for edge in self.slabgraphtree.edges_iter():
-            n1=edge[0]
-            n2=edge[1]
 
-            to_reverse=False
+            #print(self.slabgraphtree.node[edge[0]]['slablayer'])
+            #print(self.slabgraphtree.node[edge[1]]['slablayer'])
+            if(self.slabgraphtree.node[edge[0]]['slablayer']>=2 and
+               self.slabgraphtree.node[edge[1]]['slablayer']>=2):
             
-            if(self.vacuum_direc==0):
-                if(self.slabgraph.node[n1]['_atom_site_fract_x']<
-                   self.slabgraph.node[n2]['_atom_site_fract_x']):
-                    if(start=="max"):
-                        to_reverse=True
-                else:
-                    if(start=="min"):
-                        to_reverse=True
-            elif(self.vacuum_direc==1):
-                if(self.slabgraph.node[n1]['_atom_site_fract_y']<
-                   self.slabgraph.node[n2]['_atom_site_fract_y']):
-                    if(start=="max"):
-                        to_reverse=True
-                else:
-                    if(start=="min"):
-                        to_reverse=True
-            elif(self.vacuum_direc==2):
-                if(self.slabgraph.node[n1]['_atom_site_fract_z']<
-                   self.slabgraph.node[n2]['_atom_site_fract_z']):
-                    if(start=="max"):
-                        to_reverse=True
-                else:
-                    if(start=="min"):
-                        to_reverse=True
-                        
-            # Take special care to ensure the correct directionality each edge 
-            # betweeen the super surface node and the first bulk node
-            if(start=="min"):
-                if(n2 == self.super_surface_node_0):
-                    to_reverse=True
-            elif(start=="max"):
-                if(n1 == self.super_surface_node_max):
-                    to_reverse=True
-    
-            if(to_reverse):
-                data=self.slabgraphtree[n1][n2].copy()
-                edges_to_reverse.append((n1,n2,data))
+                self.slabgraphtree.edge[edge[0]][edge[1]]['capacity'] = \
+                    surface_max_weight
+                self.slabgraphtree.edge[edge[0]][edge[1]]['weight'] = \
+                    surface_max_weight
 
+    # NOTE not really needed at all anymore (I think)                       
+    #def create_weighted_barrier_at_slab_center(self, start='weight'):
+    #    """
+    #    Here just set a high weight for any edge that is bisected by the center plane
+    #    of the vacuum_direc coordinate
 
+    #    i.e. node1 has a c-coordinate less than 0.5 and and node2 has a 
+    #    c-coordinate greater than 0.5
+    #    """
 
-        for n1,n2,data in edges_to_reverse:
-            print("Reversing! ",n1,n2, data)
-            self.slabgraphtree.remove_edge(n1,n2)
-            self.slabgraphtree.add_edge(n2,n1,data)
-                        
-    def create_weighted_barrier_at_slab_center(self, start='weight'):
-        """
-        Here just set a high weight for any edge that is bisected by the center plane
-        of the vacuum_direc coordinate
+    #    for edge in self.slabgraphtree.edges_iter():
+    #        n1=edge[0]
+    #        n2=edge[1]
 
-        i.e. node1 has a c-coordinate less than 0.5 and and node2 has a 
-        c-coordinate greater than 0.5
-        """
-
-        for edge in self.slabgraphtree.edges_iter():
-            n1=edge[0]
-            n2=edge[1]
-
-            if(n1 in self.bulk_nodes and n2 in self.bulk_nodes):
-                if(start=='weight'):
-                    if(self.vacuum_direc==0):
-                        if(((float(self.slabgraph.node[n1]['_atom_site_fract_x'])-0.5) < 0) !=\
-                           ((float(self.slabgraph.node[n2]['_atom_site_fract_x'])-0.5) < 0)):
-                            self.slabgraphtree.edge[n1][n2]['capacity'] = 1000000
-                            self.slabgraphtree.edge[n1][n2]['weight'] = 1000000
-                    elif(self.vacuum_direc==1):
-                        if(((float(self.slabgraph.node[n1]['_atom_site_fract_y'])-0.5) < 0) !=\
-                           ((float(self.slabgraph.node[n2]['_atom_site_fract_y'])-0.5) < 0)):
-                            self.slabgraphtree.edge[n1][n2]['capacity'] = 1000000
-                            self.slabgraphtree.edge[n1][n2]['weight'] = 1000000
-                    elif(self.vacuum_direc==2):
-                        if(((float(self.slabgraph.node[n1]['_atom_site_fract_z'])-0.5) < 0) !=\
-                           ((float(self.slabgraph.node[n2]['_atom_site_fract_z'])-0.5) < 0)):
-                            self.slabgraphtree.edge[n1][n2]['capacity'] = 1000000
-                            self.slabgraphtree.edge[n1][n2]['weight'] = 1000000
-                elif(start=='unweight'):
-                    self.slabgraphtree.edge[n1][n2]['capacity'] = 1
-                    self.slabgraphtree.edge[n1][n2]['weight'] = 1
+    #        if(n1 in self.bulk_nodes and n2 in self.bulk_nodes):
+    #            if(start=='weight'):
+    #                if(self.vacuum_direc==0):
+    #                    if(((float(self.slabgraph.node[n1]['_atom_site_fract_x'])-0.5) < 0) !=\
+    #                       ((float(self.slabgraph.node[n2]['_atom_site_fract_x'])-0.5) < 0)):
+    #                        self.slabgraphtree.edge[n1][n2]['capacity'] = 1000000
+    #                        self.slabgraphtree.edge[n1][n2]['weight'] = 1000000
+    #                elif(self.vacuum_direc==1):
+    #                    if(((float(self.slabgraph.node[n1]['_atom_site_fract_y'])-0.5) < 0) !=\
+    #                       ((float(self.slabgraph.node[n2]['_atom_site_fract_y'])-0.5) < 0)):
+    #                        self.slabgraphtree.edge[n1][n2]['capacity'] = 1000000
+    #                        self.slabgraphtree.edge[n1][n2]['weight'] = 1000000
+    #                elif(self.vacuum_direc==2):
+    #                    if(((float(self.slabgraph.node[n1]['_atom_site_fract_z'])-0.5) < 0) !=\
+    #                       ((float(self.slabgraph.node[n2]['_atom_site_fract_z'])-0.5) < 0)):
+    #                        self.slabgraphtree.edge[n1][n2]['capacity'] = 1000000
+    #                        self.slabgraphtree.edge[n1][n2]['weight'] = 1000000
+    #            elif(start=='unweight'):
+    #                self.slabgraphtree.edge[n1][n2]['capacity'] = 1
+    #                self.slabgraphtree.edge[n1][n2]['weight'] = 1
 
             
     def create_weighted_barrier_on_opposite_half(self, start='min'):
@@ -2303,9 +2332,9 @@ class SlabGraph(MolecularGraph):
     def enumerate_cuts(self, G, s, t, e_incl, e_excl, max_weight, all_min_cuts):
         """
         Recursive algorithm to enumerate cuts constrained to contain various
-        edges and exclude others
+        edges and exclude others (Balcioglu 2003)
 
-        The inclusion/exclusion depends on the stage of the recursion tree
+        The inclusion/exclusion depends on the depth of the recursion tree
         """
         Gp=deepcopy(G)
 
@@ -2378,13 +2407,18 @@ class SlabGraph(MolecularGraph):
         return
         
 
-    def nx_near_min_cut_digraph_custom(self,weight_barrier=False):
+    def nx_near_min_cut_digraph_custom(self, eps, k, weight_barrier=False,layer_props=None):
 
         print("\n\nNx near minimum cut function on directed slab graph...")
         # Firt create a barrier on all super surface edges
         # handles when aspect ratio of the slab is too large and the solution is a tunnel from s to t
         if(weight_barrier):
             self.create_weighted_barrier_on_super_surface_edges(super_surface_weight='inf')
+
+        if(layer_props is not None):
+            # create a weighted barrier on all but the outer 2 most surface layers
+            self.create_weighted_barrier_on_two_outer_surface_layers(new_weight='inf')
+            #pass
 
         self.cut_value1, self.partition1, self.sat_edges1= nxmfc.minimum_cut(
                 self.slabgraphtree,
@@ -2402,9 +2436,13 @@ class SlabGraph(MolecularGraph):
         e_excl = set()
 
         # For now not interested in finding near minimal, only minimal
-        fract_tol=0.0
-        int_tol=1
-        max_weight=(self.cut_value1+int_tol)*(1+fract_tol)
+        fract_tol=eps
+        int_tol=k
+
+        if(int_tol != 0):
+            max_weight=self.cut_value1+int_tol
+        else:
+            max_weight=self.cut_value1*(1+fract_tol)
 
         # to track all min cuts
         all_min_cuts=[]
@@ -2442,6 +2480,35 @@ class SlabGraph(MolecularGraph):
         # reset edges                                                       
         for node in tmp_nodes:                                              
             self.slabgraph.remove_node(node)
+
+    def assign_slab_layers(self, layer_props):
+
+        print("Assigning each atoms in slab to the correct slab layer")
+
+        tosort= [(n, data) for n, data in self.slabgraph.nodes_iter(data=True)]
+
+        sort_on_c=sorted(tosort, key=lambda tup: tup[1]['_atom_site_fract_z'])
+   
+         
+        for i in range(len(sort_on_c)):
+            node=sort_on_c[i][0]
+            slablayer=int(np.floor(i/layer_props[1]))
+            self.slabgraph.node[node]['slablayer']=slablayer
+
+    def debug_slab_layers(self):
+
+        # reassign element type based on its slablayer
+        for n,data in self.slabgraph.nodes_iter(data=True):
+            slablayer=data['slablayer']
+            # just to give it better coloring to start than an H atom in Mercury
+            slablayer+=3
+            data['element']=ATOMIC_NUMBER[slablayer]
+            
+        self.write_slabgraph_cif(self.cell,bond_block=False,descriptor="layer.debug",relabel=False)
+
+        # reset element
+        for n,data in self.slabgraph.nodes_iter(data=True):
+            data['element']=self.refgraph.node[n]['element']
 
     def nx_min_cut_digraph_custom(self,weight_barrier=False):
 
@@ -2754,6 +2821,13 @@ class SlabGraph(MolecularGraph):
         # remove the midpoint barrier
         if(weight_barrier):
             self.create_weighted_barrier_on_opposite_half(start='neutral')
+
+    def remove_surface_partitions_v2(self):
+        """
+        disconnect a graph based on two cutsets, keep the con
+        """
+    
+        pass
 
     def remove_surface_partitions(self):
         """
