@@ -1966,6 +1966,9 @@ class LammpsSimulation(object):
                 print("something went wrong")
         return mgraph
 
+###############################################################################
+# START Pymatgen slab helper functions
+###############################################################################
 
 def get_nlayers(this_slabgen):
     """
@@ -2135,6 +2138,15 @@ def create_slab_pym(ifname,slab_face,slab_thickness,slab_vacuum):
     print("Layer properties: %s"%str((slab_L, a_per_l, ofname)))
     return slab_L, a_per_l, ofname
 
+def
+
+###############################################################################
+# END Pymatgen slab helper functions
+###############################################################################
+
+###############################################################################
+# START ASE slab helper functions
+###############################################################################
 
 def get_initial_slab_L_ase(ifname,slab_face,slab_L,slab_vacuum):
     """
@@ -2170,9 +2182,9 @@ def create_slab_ase(ifname,slab_face,slab_L,slab_vacuum):
     write(ofname,slab)
     return ofname
 
-def return_current_slab_name(ifname,slab_face,slab_L,vacuum):
-    pass
-
+###############################################################################
+# END ASE slab helper functions
+###############################################################################
 
 def main():                                                                     
                                                                                 
@@ -2322,10 +2334,7 @@ def main():
             # Create a directed copy for max-flow/min-cut st problem
             sim.slabgraph.convert_to_digraph()                                            
 
-            # As a test run the stoer wagner algorithm on the undirected copy of the graph
-            #sim.slabgraph.nx_stoer_wagner_cut_custom(weight_barrier=False)
-
-            sim.slabgraph.nx_near_min_cut_digraph_custom(weight_barrier=True)               
+            #sim.slabgraph.nx_near_min_cut_digraph_custom(weight_barrier=True)               
             # Execute max-flow/min-cut calculation
             sim.slabgraph.nx_min_cut_digraph_custom(weight_barrier=True)               
 
@@ -2467,7 +2476,7 @@ def main():
         sim.slabgraph.convert_to_digraph()                                            
 
         # Balcioglu and Wood 2003
-        sim.slabgraph.nx_near_min_cut_digraph_custom(sim.mincut_eps, sim.mincut_k, weight_barrier=True, layer_props=layer_props)               
+        #sim.slabgraph.nx_near_min_cut_digraph_custom(sim.mincut_eps, sim.mincut_k, weight_barrier=True, layer_props=layer_props)               
         # Execute max-flow/min-cut calculation
         sim.slabgraph.nx_min_cut_digraph_custom(weight_barrier=True)               
 

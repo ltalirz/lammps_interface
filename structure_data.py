@@ -1893,14 +1893,14 @@ class SlabGraph(MolecularGraph):
         """
         Turn the slabgraph into a tree
         """
-        #self.slabgraphtree = nx.bfs_tree(self.slabgraph, self.super_surface_node_0)
+        #self.slabgraphdirec = nx.bfs_tree(self.slabgraph, self.super_surface_node_0)
         #self.iterative_BFS_tree_structure(self.super_surface_node_0)
 
         # keep copy of the old undirected graph
         self.slabgraphundirected=self.slabgraph.copy()
 
         # create directed copy of the slabgraph
-        self.slabgraphtree=self.slabgraph.to_directed()
+        self.slabgraphdirec=self.slabgraph.to_directed()
 
         # add large weight to all edges from the super surface node to the first layer
         # of bulk nodes
@@ -1914,7 +1914,7 @@ class SlabGraph(MolecularGraph):
         and the value is a set of all nodes at that depth                       
         """                                                  
 
-        if(nx.is_tree(self.slabgraphtree)):                   
+        if(nx.is_tree(self.slabgraphdirec)):                   
             print("\n\nPRINTING SLAB GRAPH AT EACH LEVEL OF TREE DEPTH")                       
             print("--------------------------------------")                         
                                                                                     
@@ -1938,7 +1938,7 @@ class SlabGraph(MolecularGraph):
                 for up_node in stack.copy():                                        
                                                                                     
                     # get all down nodes from this up_node                          
-                    for down_node in self.slabgraphtree.successors_iter(up_node):            
+                    for down_node in self.slabgraphdirec.successors_iter(up_node):            
                         stack.add(down_node)                                        
                                                                                     
                     # after we've gotten all down nodes, remove this up node        
@@ -1965,17 +1965,17 @@ class SlabGraph(MolecularGraph):
                     for n2 in self.BFS_tree_dict[i+1]:
                         directed_edge=(n1, n2)
                         rev_directed_edge=(n2, n1)
-                        if(directed_edge not in self.slabgraphtree.edges()):
+                        if(directed_edge not in self.slabgraphdirec.edges()):
                             if(directed_edge in self.slabgraph.edges() or
                                rev_directed_edge in self.slabgraph.edges()):
                                 #print("Adding directed edge: %s"%str(directed_edge))
-                                self.slabgraphtree.add_edge(*directed_edge)
+                                self.slabgraphdirec.add_edge(*directed_edge)
 
         else:
             # we already have made sure one child can have multiple parents
             pass
         
-        self.slabgraphtree=self.slabgraph.to_directed()
+        self.slabgraphdirec=self.slabgraph.to_directed()
         self.create_weighted_barrier_on_super_surface_edges(super_surface_weight='max')
 
     def redirect_slab_tree_by_coordinate_directionality(self,start="min"):
@@ -1990,7 +1990,7 @@ class SlabGraph(MolecularGraph):
         """
 
         edges_to_reverse=[]
-        for edge in self.slabgraphtree.edges_iter():
+        for edge in self.slabgraphdirec.edges_iter():
             n1=edge[0]
             n2=edge[1]
 
@@ -2031,15 +2031,15 @@ class SlabGraph(MolecularGraph):
                     to_reverse=True
     
             if(to_reverse):
-                data=self.slabgraphtree[n1][n2].copy()
+                data=self.slabgraphdirec[n1][n2].copy()
                 edges_to_reverse.append((n1,n2,data))
 
 
 
         for n1,n2,data in edges_to_reverse:
             print("Reversing! ",n1,n2, data)
-            self.slabgraphtree.remove_edge(n1,n2)
-            self.slabgraphtree.add_edge(n2,n1,data)
+            self.slabgraphdirec.remove_edge(n1,n2)
+            self.slabgraphdirec.add_edge(n2,n1,data)
 
 
 
@@ -2069,10 +2069,10 @@ class SlabGraph(MolecularGraph):
             sys.exit()
 
         # now reweight each edge between the supersurface node and the bulk node neighbors
-        for edge in self.slabgraphtree.edges_iter():
-            self.slabgraphtree.edge[edge[0]][edge[1]]['capacity']=\
+        for edge in self.slabgraphdirec.edges_iter():
+            self.slabgraphdirec.edge[edge[0]][edge[1]]['capacity']=\
                 float(self.slabgraph.edge[edge[0]][edge[1]]['weight'])
-            self.slabgraphtree.edge[edge[0]][edge[1]]['weight']=\
+            self.slabgraphdirec.edge[edge[0]][edge[1]]['weight']=\
                 float(self.slabgraph.edge[edge[0]][edge[1]]['weight'])
 
             # However, if one node in the edge is the super surface node,
@@ -2080,9 +2080,9 @@ class SlabGraph(MolecularGraph):
             if(edge[0] == self.super_surface_node_0 or \
                edge[1] == self.super_surface_node_0):
                 # adjust directed graph edge properties
-                self.slabgraphtree.edge[edge[0]][edge[1]]['capacity'] = \
+                self.slabgraphdirec.edge[edge[0]][edge[1]]['capacity'] = \
                     surface_0_weight 
-                self.slabgraphtree.edge[edge[0]][edge[1]]['weight'] = \
+                self.slabgraphdirec.edge[edge[0]][edge[1]]['weight'] = \
                     surface_0_weight 
 
                 # adjust undirected graph edge properties
@@ -2094,9 +2094,9 @@ class SlabGraph(MolecularGraph):
             elif(edge[0] == self.super_surface_node_max or \
                  edge[1] == self.super_surface_node_max):
                 # adjust directed graph edge properties
-                self.slabgraphtree.edge[edge[0]][edge[1]]['capacity'] = \
+                self.slabgraphdirec.edge[edge[0]][edge[1]]['capacity'] = \
                     surface_max_weight
-                self.slabgraphtree.edge[edge[0]][edge[1]]['weight'] = \
+                self.slabgraphdirec.edge[edge[0]][edge[1]]['weight'] = \
                     surface_max_weight
 
                 # adjust undirected graph edge properties
@@ -2107,7 +2107,7 @@ class SlabGraph(MolecularGraph):
 
 
             #print(edge)
-            #print(self.slabgraphtree.edge[edge[0]][edge[1]]['capacity'])
+            #print(self.slabgraphdirec.edge[edge[0]][edge[1]]['capacity'])
 
 
     def create_weighted_barrier_on_two_outer_surface_layers(self,new_weight='inf'):
@@ -2128,16 +2128,16 @@ class SlabGraph(MolecularGraph):
             sys.exit()
 
         # already iterates over forward and reverse edges
-        for edge in self.slabgraphtree.edges_iter():
+        for edge in self.slabgraphdirec.edges_iter():
 
-            #print(self.slabgraphtree.node[edge[0]]['slablayer'])
-            #print(self.slabgraphtree.node[edge[1]]['slablayer'])
-            if(self.slabgraphtree.node[edge[0]]['slablayer']>=2 and
-               self.slabgraphtree.node[edge[1]]['slablayer']>=2):
+            #print(self.slabgraphdirec.node[edge[0]]['slablayer'])
+            #print(self.slabgraphdirec.node[edge[1]]['slablayer'])
+            if(self.slabgraphdirec.node[edge[0]]['slablayer']>=2 and
+               self.slabgraphdirec.node[edge[1]]['slablayer']>=2):
             
-                self.slabgraphtree.edge[edge[0]][edge[1]]['capacity'] = \
+                self.slabgraphdirec.edge[edge[0]][edge[1]]['capacity'] = \
                     surface_max_weight
-                self.slabgraphtree.edge[edge[0]][edge[1]]['weight'] = \
+                self.slabgraphdirec.edge[edge[0]][edge[1]]['weight'] = \
                     surface_max_weight
 
     # NOTE not really needed at all anymore (I think)                       
@@ -2150,7 +2150,7 @@ class SlabGraph(MolecularGraph):
     #    c-coordinate greater than 0.5
     #    """
 
-    #    for edge in self.slabgraphtree.edges_iter():
+    #    for edge in self.slabgraphdirec.edges_iter():
     #        n1=edge[0]
     #        n2=edge[1]
 
@@ -2159,21 +2159,21 @@ class SlabGraph(MolecularGraph):
     #                if(self.vacuum_direc==0):
     #                    if(((float(self.slabgraph.node[n1]['_atom_site_fract_x'])-0.5) < 0) !=\
     #                       ((float(self.slabgraph.node[n2]['_atom_site_fract_x'])-0.5) < 0)):
-    #                        self.slabgraphtree.edge[n1][n2]['capacity'] = 1000000
-    #                        self.slabgraphtree.edge[n1][n2]['weight'] = 1000000
+    #                        self.slabgraphdirec.edge[n1][n2]['capacity'] = 1000000
+    #                        self.slabgraphdirec.edge[n1][n2]['weight'] = 1000000
     #                elif(self.vacuum_direc==1):
     #                    if(((float(self.slabgraph.node[n1]['_atom_site_fract_y'])-0.5) < 0) !=\
     #                       ((float(self.slabgraph.node[n2]['_atom_site_fract_y'])-0.5) < 0)):
-    #                        self.slabgraphtree.edge[n1][n2]['capacity'] = 1000000
-    #                        self.slabgraphtree.edge[n1][n2]['weight'] = 1000000
+    #                        self.slabgraphdirec.edge[n1][n2]['capacity'] = 1000000
+    #                        self.slabgraphdirec.edge[n1][n2]['weight'] = 1000000
     #                elif(self.vacuum_direc==2):
     #                    if(((float(self.slabgraph.node[n1]['_atom_site_fract_z'])-0.5) < 0) !=\
     #                       ((float(self.slabgraph.node[n2]['_atom_site_fract_z'])-0.5) < 0)):
-    #                        self.slabgraphtree.edge[n1][n2]['capacity'] = 1000000
-    #                        self.slabgraphtree.edge[n1][n2]['weight'] = 1000000
+    #                        self.slabgraphdirec.edge[n1][n2]['capacity'] = 1000000
+    #                        self.slabgraphdirec.edge[n1][n2]['weight'] = 1000000
     #            elif(start=='unweight'):
-    #                self.slabgraphtree.edge[n1][n2]['capacity'] = 1
-    #                self.slabgraphtree.edge[n1][n2]['weight'] = 1
+    #                self.slabgraphdirec.edge[n1][n2]['capacity'] = 1
+    #                self.slabgraphdirec.edge[n1][n2]['weight'] = 1
 
             
     def create_weighted_barrier_on_opposite_half(self, start='min'):
@@ -2186,7 +2186,7 @@ class SlabGraph(MolecularGraph):
         else if start == 'neutral'
              all non-super surface edges reset to weigth 1
         """
-        for edge in self.slabgraphtree.edges_iter():
+        for edge in self.slabgraphdirec.edges_iter():
             n1=edge[0]
             n2=edge[1]
 
@@ -2197,39 +2197,39 @@ class SlabGraph(MolecularGraph):
                     if(self.vacuum_direc==0):
                         if(float(self.slabgraph.node[n1]['_atom_site_fract_x']) < 0.5 and 
                            float(self.slabgraph.node[n2]['_atom_site_fract_x']) < 0.5):
-                            self.slabgraphtree.edge[n1][n2]['capacity'] = 1000000
-                            self.slabgraphtree.edge[n1][n2]['weight'] = 1000000
+                            self.slabgraphdirec.edge[n1][n2]['capacity'] = 1000000
+                            self.slabgraphdirec.edge[n1][n2]['weight'] = 1000000
                     elif(self.vacuum_direc==1):
                         if(float(self.slabgraph.node[n1]['_atom_site_fract_y']) < 0.5 and 
                            float(self.slabgraph.node[n2]['_atom_site_fract_y']) < 0.5):
-                            self.slabgraphtree.edge[n1][n2]['capacity'] = 1000000
-                            self.slabgraphtree.edge[n1][n2]['weight'] = 1000000
+                            self.slabgraphdirec.edge[n1][n2]['capacity'] = 1000000
+                            self.slabgraphdirec.edge[n1][n2]['weight'] = 1000000
                     elif(self.vacuum_direc==2):
                         if(float(self.slabgraph.node[n1]['_atom_site_fract_z']) < 0.5 and 
                            float(self.slabgraph.node[n2]['_atom_site_fract_z']) < 0.5):
-                            self.slabgraphtree.edge[n1][n2]['capacity'] = 1000000
-                            self.slabgraphtree.edge[n1][n2]['weight'] = 1000000
+                            self.slabgraphdirec.edge[n1][n2]['capacity'] = 1000000
+                            self.slabgraphdirec.edge[n1][n2]['weight'] = 1000000
 
                 elif(start=='max'):
                     if(self.vacuum_direc==0):
                         if(float(self.slabgraph.node[n1]['_atom_site_fract_x']) > 0.5 and 
                            float(self.slabgraph.node[n2]['_atom_site_fract_x']) > 0.5):
-                            self.slabgraphtree.edge[n1][n2]['capacity'] = 1000000
-                            self.slabgraphtree.edge[n1][n2]['weight'] = 1000000
+                            self.slabgraphdirec.edge[n1][n2]['capacity'] = 1000000
+                            self.slabgraphdirec.edge[n1][n2]['weight'] = 1000000
                     elif(self.vacuum_direc==1):
                         if(float(self.slabgraph.node[n1]['_atom_site_fract_y']) > 0.5 and 
                            float(self.slabgraph.node[n2]['_atom_site_fract_y']) > 0.5):
-                            self.slabgraphtree.edge[n1][n2]['capacity'] = 1000000
-                            self.slabgraphtree.edge[n1][n2]['weight'] = 1000000
+                            self.slabgraphdirec.edge[n1][n2]['capacity'] = 1000000
+                            self.slabgraphdirec.edge[n1][n2]['weight'] = 1000000
                     elif(self.vacuum_direc==2):
                         if(float(self.slabgraph.node[n1]['_atom_site_fract_z']) > 0.5 and 
                            float(self.slabgraph.node[n2]['_atom_site_fract_z']) > 0.5):
-                            self.slabgraphtree.edge[n1][n2]['capacity'] = 1000000
-                            self.slabgraphtree.edge[n1][n2]['weight'] = 1000000
+                            self.slabgraphdirec.edge[n1][n2]['capacity'] = 1000000
+                            self.slabgraphdirec.edge[n1][n2]['weight'] = 1000000
                 
                 elif(start=='neutral'):
-                    self.slabgraphtree.edge[n1][n2]['capacity'] = 1
-                    self.slabgraphtree.edge[n1][n2]['weight'] = 1
+                    self.slabgraphdirec.edge[n1][n2]['capacity'] = 1
+                    self.slabgraphdirec.edge[n1][n2]['weight'] = 1
 
                 else:
                     print("Error! only three options for weighted barrier (min, max, neutral)")
@@ -2252,22 +2252,6 @@ class SlabGraph(MolecularGraph):
             self.slabgraph.add_edge(*edge,weight=1000000,attr_dict=edge_data)
 
 
-    def add_bulk_loop_edges(self):
-        """
-        If node is not a surface node, add a loop to itself with high weight
-        """
-        self.bulk_loop_edges=[]
-        edge_data={ 'order':1000000, 'length': 4.0, 'symflag':'--' } 
-        for i in range(0,len(self.bulk_nodes)):
-            edge=(self.bulk_nodes[i],self.surface_nodes[0])
-            self.bulk_loop_edges.append(edge)
-            self.slabgraph.add_edge(*edge,weight=1000000,attr_dict=edge_data)
-
-
-    def stoer_wagner_slab_cut(self):
-        cut_value, partition = nx.stoer_wagner(self.slabgraph)
-        print(cut_value)        
-        print(partition)
 
     def nx_stoer_wagner_cut_custom(self, weight_barrier=False):
         print("\n\nNx stoer_wagner function on undirected slab graph...")
@@ -2279,11 +2263,6 @@ class SlabGraph(MolecularGraph):
 
         sys.exit()
 
-    def kcutsets_slab_cut(self):
-        cutsets = list(nx.all_node_cuts(self.slabgraph))
-        print(len(cutsets))
-        for cutset in cutsets:
-            print(cutset)
 
     def minimum_edge_slab_cut(self):
 
@@ -2296,7 +2275,7 @@ class SlabGraph(MolecularGraph):
 
     def minimum_edge_slab_tree_cut(self):
 
-        edge_cut_set=nx.minimum_edge_cut(self.slabgraphtree,
+        edge_cut_set=nx.minimum_edge_cut(self.slabgraphdirec,
                                          s=self.super_surface_node_0,
                                          t=self.super_surface_node_max)
 
@@ -2320,11 +2299,14 @@ class SlabGraph(MolecularGraph):
         return new_set
 
     def get_edges_between_partitions(self,partition):
+        """
+        Given two sets of nodes find all edges that connect the two components
+        """
 
         edges_that_were_cut=[]
         for s in partition[0]:
             for t in partition[1]:
-                if((s,t) in self.slabgraphtree.edges()):
+                if((s,t) in self.slabgraphdirec.edges()):
                     edges_that_were_cut.append((s,t))
 
         return edges_that_were_cut
@@ -2333,8 +2315,6 @@ class SlabGraph(MolecularGraph):
         """
         Recursive algorithm to enumerate cuts constrained to contain various
         edges and exclude others (Balcioglu 2003)
-
-        The inclusion/exclusion depends on the depth of the recursion tree
         """
         Gp=deepcopy(G)
 
@@ -2372,7 +2352,7 @@ class SlabGraph(MolecularGraph):
 
         # ensure that despite the adding of the artificial edges, the proposed cut
         # is indeed still minimal in the original graph
-        tmp_weight=sum([self.slabgraphtree.edge[edge[0]][edge[1]]['capacity'] for edge in Cp])
+        tmp_weight=sum([self.slabgraphdirec.edge[edge[0]][edge[1]]['capacity'] for edge in Cp])
         if(tmp_weight<=(max_weight*1.000001)):
             print(tmp_weight, Cp)
             all_min_cuts.append(Cp)
@@ -2407,7 +2387,23 @@ class SlabGraph(MolecularGraph):
         return
         
 
-    def nx_near_min_cut_digraph_custom(self, eps, k, weight_barrier=False,layer_props=None):
+    def nx_near_min_cut_digraph_custom(self, eps=0, k=0, weight_barrier=False,
+                                                         layer_props=None,
+                                                         max_num_cuts=None):
+        """
+        Find all near min cuts in a graph
+
+        "nearness" controlled by eps and k
+
+        weight barrier is important for the application 
+            -ensures we find a solution independent of the initial surface termination
+            -esures the solution maintains 2D periodicity of the slab
+
+        layer_props tells us info about which nodes belong to which layers
+
+        max_num_cuts allows us to return after finding the value of the min cut
+            rather than enumerating all solutions
+        """ 
 
         print("\n\nNx near minimum cut function on directed slab graph...")
         # Firt create a barrier on all super surface edges
@@ -2421,7 +2417,7 @@ class SlabGraph(MolecularGraph):
             #pass
 
         self.cut_value1, self.partition1, self.sat_edges1= nxmfc.minimum_cut(
-                self.slabgraphtree,
+                self.slabgraphdirec,
                 self.super_surface_node_0,
                 self.super_surface_node_max,
                 flow_func=nx.algorithms.flow.shortest_augmenting_path)
@@ -2430,6 +2426,10 @@ class SlabGraph(MolecularGraph):
 
         print("Initial solution:")
         print(self.cut_value1, C)
+
+        if(max_num_cuts==1):
+            # provide escape option if we only care about the value of the min cut
+            return
 
         # the edge inclusion and exclusion sets
         e_incl = set()
@@ -2448,21 +2448,39 @@ class SlabGraph(MolecularGraph):
         all_min_cuts=[]
 
         # run
-        self.enumerate_cuts(self.slabgraphtree,
+        self.enumerate_cuts(self.slabgraphdirec,
                        self.super_surface_node_0, 
                        self.super_surface_node_max,
                        e_incl,
                        e_excl,
                        max_weight,
                        all_min_cuts)
+
+
+
+
+    ###########################################################################
+    # START visualization functions
+    ###########################################################################
         
     def debug_min_cuts(self,cutset,step):
+        """
+        Add an O atom to slabgraph for every corresponding edge in the min cut
+    
+        """
+
+        # reassign element type based on its slablayer
+        for n,data in self.slabgraph.nodes_iter(data=True):
+            slablayer=data['slablayer']
+            # just to give it better coloring to start than an H atom in Mercury
+            slablayer+=3
+            data['element']=ATOMIC_NUMBER[slablayer]
 
         tmp_nodes=[]
         for (u,v) in cutset:                                    
             # color nodes                                                   
-            self.slabgraph.node[u]['element']='Ge'                          
-            self.slabgraph.node[v]['element']='Ge'                          
+            #self.slabgraph.node[u]['element']='Ge' 
+            #self.slabgraph.node[v]['element']='Ge'                          
                                                                             
             # color edges                                                   
             this_intersect = set(self.refgraph.neighbors(u)).intersection(self.refgraph.neighbors(v))
@@ -2474,14 +2492,21 @@ class SlabGraph(MolecularGraph):
                                                                             
         self.write_slabgraph_cif(self.cell,bond_block=False,descriptor="cutset%04d"%step,relabel=False)
         # reset nodes                                                       
-        for (u,v) in cutset:                                    
-            self.slabgraph.node[u]['element']='Si'                          
-            self.slabgraph.node[v]['element']='Si'                          
+        for n,data in self.slabgraph.nodes_iter(data=True):
+            data['element']=self.refgraph.node[n]['element']
+        #for (u,v) in cutset:                                    
+        #    self.slabgraph.node[u]['element']='Si'                          
+        #    self.slabgraph.node[v]['element']='Si'                          
         # reset edges                                                       
         for node in tmp_nodes:                                              
             self.slabgraph.remove_node(node)
 
+
     def assign_slab_layers(self, layer_props):
+        """
+        Assing a new node attribute correspoding to its layer in the slab
+        (the layer it belongs to must be calculated w/pymatgen
+        """ 
 
         print("Assigning each atoms in slab to the correct slab layer")
 
@@ -2495,7 +2520,12 @@ class SlabGraph(MolecularGraph):
             slablayer=int(np.floor(i/layer_props[1]))
             self.slabgraph.node[node]['slablayer']=slablayer
 
+
     def debug_slab_layers(self):
+        """
+        Assign a false atom type based on the node's slablayer attribute
+        so that we can vis what layer it's in
+        """
 
         # reassign element type based on its slablayer
         for n,data in self.slabgraph.nodes_iter(data=True):
@@ -2510,6 +2540,11 @@ class SlabGraph(MolecularGraph):
         for n,data in self.slabgraph.nodes_iter(data=True):
             data['element']=self.refgraph.node[n]['element']
 
+    ###########################################################################
+    # END DEBUG visualization functions
+    ###########################################################################
+
+
     def nx_min_cut_digraph_custom(self,weight_barrier=False):
 
         print("\n\nNx minimum_cut function on directed slab graph...")
@@ -2523,7 +2558,7 @@ class SlabGraph(MolecularGraph):
         # uses stoer-wagner to do max flow (and indirectly min cut)
         # given source and target node
         self.cut_value1, self.partition1, self.sat_edges1= nxmfc.minimum_cut(
-                self.slabgraphtree,
+                self.slabgraphdirec,
                 self.super_surface_node_0,
                 self.super_surface_node_max,
                 flow_func=nx.algorithms.flow.shortest_augmenting_path)
@@ -2545,19 +2580,19 @@ class SlabGraph(MolecularGraph):
                 # augment capacity of one edge for the current cutset
                 # this will destroy this cutset as the minimum cut, so we will
                 # find another minimum cut with equal max flow if it exists
-                self.slabgraphtree.edge[edge[0]][edge[1]]['capacity']+=1
-                self.slabgraphtree.edge[edge[1]][edge[0]]['capacity']+=1
+                self.slabgraphdirec.edge[edge[0]][edge[1]]['capacity']+=1
+                self.slabgraphdirec.edge[edge[1]][edge[0]]['capacity']+=1
 
                 this_cut_value1, this_partition1, this_sat_edges= nxmfc.minimum_cut(
-                        self.slabgraphtree,
+                        self.slabgraphdirec,
                         self.super_surface_node_0,
                         self.super_surface_node_max,
                         flow_func=nx.algorithms.flow.preflow_push)
 
                 this_cutset1=self.get_edges_between_partitions(this_partition1)
                 # reset the capacity back to the normal graph
-                #self.slabgraphtree.edge[edge[0]][edge[1]]['capacity']-=1
-                #self.slabgraphtree.edge[edge[1]][edge[0]]['capacity']-=1
+                #self.slabgraphdirec.edge[edge[0]][edge[1]]['capacity']-=1
+                #self.slabgraphdirec.edge[edge[1]][edge[0]]['capacity']-=1
 
                 # if this new cut has same minimum value AND
                 # is unique to all previously identified minimum cutsets
@@ -2577,8 +2612,8 @@ class SlabGraph(MolecularGraph):
                     curr_min_cutsets.append(this_cutset1)
 
                     # reset the capacity back to the normal graph
-                    #self.slabgraphtree.edge[edge[0]][edge[1]]['capacity']-=1
-                    #self.slabgraphtree.edge[edge[1]][edge[0]]['capacity']-=1
+                    #self.slabgraphdirec.edge[edge[0]][edge[1]]['capacity']-=1
+                    #self.slabgraphdirec.edge[edge[1]][edge[0]]['capacity']-=1
 
                     # move on to newest identified min cut
                     break
@@ -2677,12 +2712,12 @@ class SlabGraph(MolecularGraph):
 
         # now reverse the tree and reverse the source and target nodes
         # NOTE obsolete now that we have a directed graph and not a tree
-        self.slabgraphtreeREV=self.slabgraphtree.reverse(copy=True)
+        self.slabgraphdirecREV=self.slabgraphdirec.reverse(copy=True)
         #  create a barrier (aspect ratio of the slab is too large)
         if(weight_barrier):
             self.create_weighted_barrier_on_opposite_half(start='max')
         self.cut_value2, self.partition2, self.cutset2 = nxmfc.minimum_cut(
-                self.slabgraphtreeREV,
+                self.slabgraphdirecREV,
                 self.super_surface_node_max,
                 self.super_surface_node_0,
                 flow_func=nx.algorithms.flow.shortest_augmenting_path)
@@ -2742,7 +2777,7 @@ class SlabGraph(MolecularGraph):
         # uses stoer-wagner to do max flow (and indirectly min cut)
         # given source and target node
         self.cut_value1, self.partition1 = nx.minimum_cut(
-                self.slabgraphtree,
+                self.slabgraphdirec,
                 self.super_surface_node_0,
                 self.super_surface_node_max)#,
                 #flow_func=nx.algorithms.flow.shortest_augmenting_path)
@@ -2781,12 +2816,12 @@ class SlabGraph(MolecularGraph):
             self.create_weighted_barrier_on_opposite_half(start='neutral')
 
         # now reverse the tree and reverse the source and target nodes
-        self.slabgraphtreeREV=self.slabgraphtree.reverse(copy=True)
+        self.slabgraphdirecREV=self.slabgraphdirec.reverse(copy=True)
         #  create a barrier (aspect ratio of the slab is too large)
         if(weight_barrier):
             self.create_weighted_barrier_on_opposite_half(start='max')
         self.cut_value2, self.partition2 = nx.minimum_cut(
-                self.slabgraphtreeREV,
+                self.slabgraphdirecREV,
                 self.super_surface_node_max,
                 self.super_surface_node_0)#,
                 #flow_func=nx.algorithms.flow.shortest_augmenting_path)
