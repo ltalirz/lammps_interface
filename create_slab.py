@@ -2031,7 +2031,7 @@ def unique_typing(structure,dataset,debug=False):
         if dataset['equivalent_atoms'][i] in unique_descr_to_int.keys():        
             descr.append(unique_descr_to_int[dataset['equivalent_atoms'][i]])   
             unique_descr_count[unique_descr_to_int[dataset['equivalent_atoms'][i]]] += 1
-            unique_descr_to_sites[unique_descr_to_int[dataset['equivalent_atoms'][i]]].append(i+1)
+            unique_descr_to_sites[unique_descr_to_int[dataset['equivalent_atoms'][i]]].append(i)
         # not discovered                                                        
         else:                                                                   
             element=structure.sites[i].species_string                           
@@ -2054,7 +2054,7 @@ def unique_typing(structure,dataset,debug=False):
             unique_descr_to_int[dataset['equivalent_atoms'][i]]=this_descr      
             unique_descr_count[unique_descr_to_int[dataset['equivalent_atoms'][i]]] = 1
             descr.append(unique_descr_to_int[dataset['equivalent_atoms'][i]])   
-            unique_descr_to_sites[unique_descr_to_int[dataset['equivalent_atoms'][i]]]=[i+1]
+            unique_descr_to_sites[unique_descr_to_int[dataset['equivalent_atoms'][i]]]=[i]
                                                                                 
     #print("All descriptions:")                                                 
     #print(descr)                                                               
@@ -2064,9 +2064,13 @@ def unique_typing(structure,dataset,debug=False):
     print("All sites for this key")                                             
     print(unique_descr_to_sites[debug_key])                   
 
+    return unique_descr_to_sites
+
 
 def create_slab_pym(ifname,slab_face,slab_thickness,slab_vacuum):
-   
+  
+    print("\nCreatig Pymatgen initial slab:") 
+
     # initial pymatgen structure object 
     parser=pic.CifParser(ifname)
     structure=parser.get_structures()[0]                      
@@ -2076,6 +2080,7 @@ def create_slab_pym(ifname,slab_face,slab_thickness,slab_vacuum):
                  (int(slab_face[0]),int(slab_face[1]),int(slab_face[2])),
                  min_slab_size=slab_thickness, 
                  min_vacuum_size=slab_vacuum,
+                 primitive=True,
                  lll_reduce=True, center_slab=True
                          )
     print("Projection height of slab for this face: %.3f"%(slabgen._proj_height))
@@ -2083,7 +2088,7 @@ def create_slab_pym(ifname,slab_face,slab_thickness,slab_vacuum):
     # recalculate the new min slab thickness to have two additional layers
     layers_list=get_nlayers(slabgen)
     new_min_slab_size=(layers_list[0]+4)*slabgen._proj_height-0.1
-    print("%d slab layers for thickness of %.1f"%(layers_list[0],slab_thickness))
+    print("%d slab layers for MIN thickness of %.1f"%(layers_list[0],slab_thickness))
 
     # create modified slabgen object
     slabgen=SlabGenerator(structure, 
@@ -2110,7 +2115,6 @@ def create_slab_pym(ifname,slab_face,slab_thickness,slab_vacuum):
     tol=0.3
     sg = pymatgen.symmetry.analyzer.SpacegroupAnalyzer(slab, symprec=tol)       
     pg = sg.get_point_group_symbol()                                            
-    print(pg)                                                                   
     if str(pg) in laue:                                                         
         #return slab                                                            
         print("Laue symmetry found!: " + pg)                                    
@@ -2121,24 +2125,110 @@ def create_slab_pym(ifname,slab_face,slab_thickness,slab_vacuum):
         sys.exit()
    
     # get equivalent atom types by symmetry:
-    symm_struct=sg.get_symmetrized_structure()
-    symm_dataset=sg.get_symmetry_dataset()
-    unique_typing(symm_struct,symm_dataset) 
-    
-    
-    # re-write new slab to CIF so LAMMPS interface can find minimum truncation surface
+    symm_struct  = sg.get_symmetrized_structure()
+    symm_dataset = sg.get_symmetry_dataset()
+    unique_type_dataset = unique_typing(symm_struct,symm_dataset)
+    inversion_dataset   = inversion_mapping(symm_dataset, unique_type_dataset,slab)
+    #inversion_dataset = {}
+
+    # re-write new slab to CIF so LAMMPS interface can re-interpret this new slab
     ofname = str(ifname[:-4])+"_"+\
              str(slab_face[0])+str(slab_face[1])+str(slab_face[2])+"_"+\
              str(slab_L)+"_slab_pym"
     outputter = pic.CifWriter(slab)
     outputter.write_file(ofname+".cif")
-    
+  
+
 
     # return (# of slab layers, atoms per layer, ofname)
-    print("Layer properties: %s"%str((slab_L, a_per_l, ofname)))
-    return slab_L, a_per_l, ofname
+    print("Layer properties: # of slab layers, atoms_layer, ocifname, inv_dataset")
+    print("%s"%str((slab_L, a_per_l, ofname, )))
+    return {'slab_L':slab_L, 'a_per_l':a_per_l, 'proj_height':slabgen._proj_height,
+            'ofname':ofname, 'inversion_mapping':inversion_dataset}
 
-def
+def inversion_mapping(symm_dataset,unique_type_dataset,slab):
+    """
+    Get the mapping between any atom and its -1*I+T equivalent 
+    aka inversion symmetry across the slab
+    """
+    
+    print("\nCreating inversion dictionary:")
+    inversion_dictionary = {}
+
+    # inversion rotation matrix
+    inv_rot   = np.array([[-1,0,0],[0,-1,0],[0,0,-1]]) 
+    # index in Pymatgen rotations key
+    inv_ind   = -1
+   
+    # find the corresponding translation for this rotation 
+    for i in range(len(symm_dataset['rotations'])):
+        if(np.array_equal(symm_dataset['rotations'][i],inv_rot)):
+            inv_ind = i
+    if(inv_ind==-1):
+        print("No inversion matrix found -1*I (-1 diagonal matrix)")
+        sys.exit()
+    trans     = symm_dataset['translations'][inv_ind]
+
+    print("All rotations:")
+    print(symm_dataset['rotations']) 
+    print("Corresponding translations:")
+    print(symm_dataset['translations']) 
+    print("Rot and trans corresponding to the inversion:")
+    print(inv_rot, trans)
+
+    # This gets messy... there must be a way to do this in Pymatgen ...
+    for key in unique_type_dataset.keys():
+        all_equiv_sites=unique_type_dataset[key]
+        all_equiv_coords=[slab.sites[site]._fcoords for site in all_equiv_sites]
+        #print(key, all_equiv_sites)
+        #print(key, all_equiv_coords)
+        match_ind=-1
+        for site in all_equiv_sites:
+            #print("Site %d:"%site, slab.sites[site]._fcoords)
+            rot=np.dot(inv_rot,slab.sites[site]._fcoords)
+            rotptrans=rot+trans
+            rotptrans = wrap_between_0_and_1(rotptrans)
+            #print("Mirror %d:"%site, rotptrans)
+
+            found_mirror=False
+            for j in range(len(all_equiv_coords)):
+                if(np.allclose(rotptrans, all_equiv_coords[j],atol=1e-4)):
+                    found_mirror=True
+                    match_ind = j 
+
+            # This means we messed up because Pymatgen already said we have inversion symm
+            if(not found_mirror):
+                print("Oops, inversion symmetry site not found, exit for now...")
+                sys.exit()
+            
+            site_match_ind=all_equiv_sites[match_ind]
+            #print("Matches site %d"%site_match_ind)
+        
+            # add 1 to both indices since equivalent sites are starting index 0
+            # but labels and nodes in lammps interface start at 1
+            inversion_dictionary[site+1]=site_match_ind+1
+
+    return inversion_dictionary
+
+def wrap_between_0_and_1(it):
+    """
+    wrap  a 1-D iterable of floats to between 0 and 1
+    """
+    for i in range(len(it)):
+        while(it[i]>1.0):
+            it[i]-=1
+        while(it[i]<0.0):
+            it[i]+=1
+
+    return it
+
+
+def layer_translations(slab):
+    """
+    Find the translation transformation to make equivalent two slab layers
+    """
+    
+    pass
 
 ###############################################################################
 # END Pymatgen slab helper functions
@@ -2433,7 +2523,7 @@ def main():
         layer_props=create_slab_pym(options.cif_file,sim.slab_face,sim.slab_target_thick,sim.slab_vacuum)
 
         # reset the structure properties to reflect the newest Pymatgen slab
-        curr_slab_cif_name=str(layer_props[2])+".cif"
+        curr_slab_cif_name=str(layer_props['ofname'])+".cif"
         cell, graph = from_CIF(curr_slab_cif_name)                                    
         sim.set_cell(cell)                                                          
         sim.set_graph(graph)                                                        
@@ -2449,7 +2539,7 @@ def main():
 
 
         # DEBUG file writing: reprint the slab graph since Pymatgen cif can't be read by mercury
-        sim.slabgraph.write_slabgraph_cif(cell,bond_block=False,descriptor=None,relabel=False) 
+        sim.slabgraph.write_slabgraph_cif(sim.slabgraph.slabgraph,cell,bond_block=False,descriptor=None,relabel=False) 
                                                                                     
         # assign the slab layers to the initial pymatgen slab
         sim.slabgraph.assign_slab_layers(layer_props)
@@ -2464,21 +2554,25 @@ def main():
         # identify the undercoordinated surface nodes
         sim.slabgraph.identify_undercoordinated_surface_nodes()                     
         
-        # DEBUG file writing                                                                    
-        if(sim.slab_verbose):
-            sim.slabgraph.write_slabgraph_cif(cell,bond_block=False,descriptor="debug",relabel=False) 
-
         # Here we need to manipulate the edge properties of the graph
         sim.slabgraph.normalize_bulk_edge_weights()                                 
-        sim.slabgraph.connect_super_surface_nodes()                                 
+        sim.slabgraph.connect_super_surface_nodes_v2() 
 
         # Create a directed copy for max-flow/min-cut st problem
         sim.slabgraph.convert_to_digraph()                                            
 
+        # DEBUG file writing before graph cutting 
+        if(sim.slab_verbose):
+            sim.slabgraph.write_slabgraph_cif(sim.slabgraph.slabgraph,cell,bond_block=False,descriptor="debug",relabel=False) 
+
         # Balcioglu and Wood 2003
-        #sim.slabgraph.nx_near_min_cut_digraph_custom(sim.mincut_eps, sim.mincut_k, weight_barrier=True, layer_props=layer_props)               
+        sim.slabgraph.nx_near_min_cut_digraph_custom(sim.mincut_eps, sim.mincut_k, weight_barrier=True, layer_props=layer_props)               
+        # generate all slabs from all cutsets
+        sim.slabgraph.generate_all_slabs_from_cutsets()
+
         # Execute max-flow/min-cut calculation
-        sim.slabgraph.nx_min_cut_digraph_custom(weight_barrier=True)               
+        #sim.slabgraph.nx_min_cut_digraph_custom(weight_barrier=True)               
+        sim.slabgraph.nx_min_cut_digraph(weight_barrier=True,layer_props=layer_props)
 
         # exclude graph partitions on the "outside" of the min cut
         sim.slabgraph.remove_surface_partitions()                                   
@@ -2488,16 +2582,17 @@ def main():
 
         # DEBUG file writing
         if(sim.slab_verbose):
-            sim.slabgraph.write_slabgraph_cif(cell,bond_block=False,descriptor="deH",relabel=False)   
+            sim.slabgraph.write_slabgraph_cif(sim.slabgraph.slabgraph,cell,bond_block=False,descriptor="deH",relabel=False)   
                                                                                     
         # add missing hydrogen caps and validate structural properties 
         sim.slabgraph.add_missing_hydrogens()                                       
         # check approximate slab thickness
-        min_thickness = sim.slabgraph.check_approximate_slab_thickness()
-        max_thickness = sim.slabgraph.check_approximate_slab_thickness_v2()
-        approximate_thickness = (max_thickness+min_thickness)/2
+        #min_thickness = sim.slabgraph.check_approximate_slab_thickness()
+        #max_thickness = sim.slabgraph.check_approximate_slab_thickness_v2()
+        #approximate_thickness = (max_thickness+min_thickness)/2
         # check if generated slab is 2D periodic
         slab_is_2D_periodic   = sim.slabgraph.check_slab_is_2D_periodic()
+        sim.slabgraph.write_slabgraph_cif(sim.slabgraph.slabgraph,cell,bond_block=False,descriptor="addH",relabel=False)   
 
         ############################
         # END AUTOMATED PYMATGEN SLAB GENERATION
