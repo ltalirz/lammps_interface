@@ -2466,25 +2466,40 @@ class SlabGraph(MolecularGraph):
         return new_list, new_ids
 
 
-    def remove_duplicate_cuts_in_c(self, layer_props, all_cut_C0, all_cut_ids,c_min_max):
+    def remove_duplicate_cuts_in_c(self, layer_props, all_cut_C0, all_cut_ids,c_min_max,debug=True):
         """
         Huge pain in the but
 
         Find out if the first cut of cutsets is eqiuvalent to any other first cut
         and if so exclude it from the final set of slabs
+
+        layer_props - relevant layer info for the slab
+
+        all_cut_C0 - all (near) min cuts of the form [(cut
+
+        c_min_max - if a duplicate cut is found (same a and b for each cut but 
+        a constant c shift equal to the width of the layer) keep the cut that
+        either has the min or the max c-coordinate
         """
 
         print("\nRemoving duplicate c cuts")
         print(all_cut_C0)
+
+        # create copy of data so the refernence object not altered
+        all_cut_C0=deepcopy(all_cut_C0)        
+        all_cut_ids=deepcopy(all_cut_ids)        
+
         # list for unique cuts
         new_list=[]
         new_ids=[]
 
         c_offset = layer_props['proj_height']/self.cell.c
-        tol = 1e-4
+        tol = np.float64(1e-4)
+        print("c layer shift = %.5f"%c_offset)
         for i in range(len(all_cut_C0)):
             # cut one of ith cutset, edge order determined by min c coordinate
             cut= []
+            # for each edge of the cut (u,v) is listed such that u has the minimal c-coord
             for u,v in all_cut_C0[i][0]:
                 if(self.refgraph.node[u]['_atom_site_fract_z']<
                    self.refgraph.node[v]['_atom_site_fract_z']):
@@ -2502,17 +2517,21 @@ class SlabGraph(MolecularGraph):
                                      float(self.refgraph.node[u]['_atom_site_fract_y']),
                                      float(self.refgraph.node[u]['_atom_site_fract_z'])]))
 
-            # sort sites based on a first then b
+            # sort each edges position in the cut based on a fract of that edge's first node (u) first, 
+            # then on b fract of that edge's first node (u)
             cut=sorted(cut, key=lambda tup: tup[2][0]) 
             cut=sorted(cut, key=lambda tup: tup[2][1]) 
             
             # find a cutset to compare to
             # don't duplicate comparisons by starting at i
+            to_keep = True # whether or not to keep cut i: (if a duplicate is found in cut j), it j will be included later when it becomes i
             for j in range(i+1,len(all_cut_C0)):
+                # if we find an equivalent cut
 
 
                 # cut one of jth cutset (cutset to compare to)
                 cut_compare=[]
+                # for each edge of the cut (u,v) is listed such that u has the minimal c-coord
                 for u,v in all_cut_C0[j][0]:
                     if(self.refgraph.node[u]['_atom_site_fract_z']<
                        self.refgraph.node[v]['_atom_site_fract_z']):
@@ -2530,69 +2549,178 @@ class SlabGraph(MolecularGraph):
                                                  float(self.refgraph.node[u]['_atom_site_fract_y']),
                                                  float(self.refgraph.node[u]['_atom_site_fract_z'])]))
 
-                # sort sites based on a first then b
+                # sort each edges position in the cut based on a fract of that edge's first node (u) first, 
+                # then on b fract of that edge's first node (u)
                 cut_compare=sorted(cut_compare, key=lambda tup: tup[2][0]) 
                 cut_compare=sorted(cut_compare, key=lambda tup: tup[2][1]) 
 
-                print("Comparing first cuts of cutset %d and %d"%(i,j))
-                print(cut)
-                print(cut_compare)
+                if(debug):
+                    print("Comparing first cuts of cutset i=%d and j=%d"%(i,j))
+                    print(cut)
+                    print(cut_compare)
 
-                to_keep = False # whether or not to keep cut i 
+
                 if(len(cut)!=len(cut_compare)):
                     # Definitely can't be equivalent cuts
                     to_keep=True
+                    if(debug):
+                        print("Cuts of non-equivalent length")
             
                 else:
-                    # need to check if cuts are equivalent            
-                    list_of_shifts=[]
+                    # a temporary bool as we make the criteria for a duplicate cut stricter and stricter
+                    to_continue=True
 
+                    # keep printing for debug
+                    keep_printing=True
+
+                    # check if (a, b) coordinates are consistent througout both cuts
                     for k in range(len(cut)):
-                        # c-offset between first nodes of edge tuple
-                        list_of_shifts.append(cut_compare[k][2][2]-cut[k][2][2])
-                        # c-offset between second nodes of edge tuple
-                        list_of_shifts.append(cut_compare[k][3][2]-cut[k][3][2])
-                
-                    print(list_of_shifts)
-
-                    # first check that cuts are equivalent by a constant c shift    
-                    avg_shift=np.average(list_of_shifts)
-                    tmp_keep=True
-                    for shift in list_of_shifts:
-                        if(shift<=(1+tol)*avg_shift or shift<=(1-tol)*avg_shift):
-                            tmp_keep=False
+                        # make sure a coordinates of 1st node in both cuts equivalent
+                        if(cut[k][2][0]>(cut_compare[k][2][0]+tol) or 
+                           cut[k][2][0]<(cut_compare[k][2][0]-tol)):
+                            to_continue=False
+                            break
+                        # make sure b coordinates of 1st node in both cuts equivalent
+                        if(cut[k][2][1]>(cut_compare[k][2][1]+tol) or 
+                           cut[k][2][1]<(cut_compare[k][2][1]-tol)):
+                            to_continue=False
+                            break
+                        # make sure a coordinates of 2nd node in both cuts equivalent
+                        if(cut[k][3][0]>(cut_compare[k][3][0]+tol) or 
+                           cut[k][3][0]<(cut_compare[k][3][0]-tol)):
+                            to_continue=False
+                            break
+                        # make sure b coordinates of 2nd node in both cuts equivalent
+                        if(cut[k][3][1]>(cut_compare[k][3][1]+tol) or 
+                           cut[k][3][1]<(cut_compare[k][3][1]-tol)):
+                            to_continue=False
                             break
 
+                    # now check c coordinates 
+                    if(to_continue): 
+
+                        # need to check if cuts are equivalent            
+                        list_of_shifts=[]
+
+                        for k in range(len(cut)):
+                            # c-offset between first nodes of edge tuple
+                            list_of_shifts.append(cut_compare[k][2][2]-cut[k][2][2])
+                            # c-offset between second nodes of edge tuple
+                            list_of_shifts.append(cut_compare[k][3][2]-cut[k][3][2])
+                    
+                        # first check that cuts are equivalent by a constant c shift    
+                        avg_shift=np.average(list_of_shifts)
+                        if(debug):
+                            print("avg shift: all shifts")
+                            print(avg_shift,":",list_of_shifts)
+                        for shift in list_of_shifts:
+                            if(shift>(avg_shift+tol) or shift<(avg_shift-tol)):
+                                if(debug):
+                                    print("non-unique (this shift, avg shift + tol, avg_shift -tol")
+                                    print(shift, avg_shift+tol, avg_shift-tol)
+                                to_continue=False
+                                break
+                    else:
+                        if(debug and keep_printing):
+                            print("Not equivalent a b positions")
+                        keep_printing=False
+
                     # if still equivalent, make sure c shift is equal to the c shift of each layer
-                    if(tmp_keep):
-                        if(avg_shift<(1+tol)*c_offset or avg_shift<=(1-tol)*c_offset):
-                            tmp_keep=False
+                    if(to_continue):
+                        # NOTE, if avg_shift is positive, it means cut_compare has greater c coordinates
+                        # NOTE, if avg_shift is negative, it means cut has greater c coordinates
+                        if(np.abs(avg_shift)>(c_offset+tol) or np.abs(avg_shift)<(c_offset-tol)):
+                            to_continue=False
+                    else:
+                        if(debug and keep_printing):
+                            print("Not all coords have the same c shift")
+                        keep_printing=False
 
-                    # finally, if we still have identified as identical (to_keep=False)
-                    if(tmp_keep):
-                        # we can only keep the ith cutset in the double for loop to avoid repetition
-                        # the jth cutset will be included eventually when it becomes the ith cutset
-                        if(c_min_max=='max' and avg_shift >= 0):
-                            to_keep=True
-                        elif(c_min_max=='min' and avg_shift <= 0):
-                            to_keep=True
+                    # finally, if we have satisfied all checks for equivalency...
+                    # WE CANNOT keep cut i, rather we either pass on adding it to the new list
+                    # or we replace cut j with cut i if cut i is the one we want to keep
+                    if(to_continue):
+                        if(debug):
+                            print("Cut %d has duplicate in %d"%(i,j))
+                        # cut i has a duplicate, therefore can't be kept
+                        to_keep = False
+                    
+                        # if we want to keep only the identical cut with maximal c
+                        if(c_min_max=='max'):
+                            if(debug):
+                                print("Want cut with maximum c coords")
+                            if(avg_shift > 0):
+                                # cut_compare (index j) has a LARGER c, therefore we DO want to keep index j
+                                # do nothing
+                                if(debug):
+                                    print("Cut j=%d has LARGER c coords, do nothing for now"%(j))
+                                pass
+                                # this cut j will eventually become cut i,
+                                #      after which it will be kept if no subsequent equivalencies found
+                            else:
+                                # cut_compare (index j) has a SMALLER c, therefore we DO NOT want to keep index j
+                                # therefore index j should be REPLACED with index i
+                                if(debug):
+                                    print("Cut j=%d has SMALLER c coords, need to replace with cut i=%d"%(j,i))
+                                all_cut_C0[j]  = deepcopy(all_cut_C0[i])
+                                all_cut_ids[j] = deepcopy(all_cut_ids[i])
+
+                        # if we want to keep only the identical cut with minimal c
+                        elif(c_min_max=='min'):
+                            if(debug):
+                                print("Want cut with minimum c coords")
+                            if(avg_shift > 0):
+                                # cut_compare (index j) has LARGER c, therefore we DO NOT want to keep index j
+                                # therefore index j should be REPLACED with index i
+                                if(debug):
+                                    print("Cut j=%d has LARGER c coords, need to replace with cut i=%d"%(j,i))
+                                all_cut_C0[j]  = deepcopy(all_cut_C0[i])
+                                all_cut_ids[j] = deepcopy(all_cut_ids[i])
+                            else:
+                                # cut_compare (index j) has SMALLER c, therefore we DO want to keep index j
+                                # do nothing
+                                if(debug):
+                                    print("Cut j=%d has SMALLER c coords, do nothing for now"%(j))
+                                pass
+                                # this cut j will eventually become cut i,
+                                #      after which it will be kept if no subsequent equivalencies found
+                        else:
+                            print("For eliminating duplicate cuts, c_min_max can only be 'min' or 'max'") 
+                            sys.exit()
+                    else:
+                        if(debug and keep_printing):
+                            print("Although all coords have same c shift, it is not equivalent to the c layer shift")
+                        keep_printing=False
+                    
+                                
+                    if(to_keep==False):
+                        break
+
    
-                if(to_keep==True):
-                    new_list.append(all_cut_C0[i]) 
-                    new_ids.append(all_cut_ids[i]) 
+            if(to_keep==True):
+                new_list.append(all_cut_C0[i]) 
+                new_ids.append(all_cut_ids[i]) 
 
-        print("\nCutsets that are independent of c - shift (%d):"%(len(new_list)))
+        print("\nCutsets that are identical except for a constant c - shift (%d):"%(len(new_list)))
         print(new_list)
         print(new_ids)    
+        
+
+        return new_list, new_ids
             
 
         
 
-    def enumerate_cuts(self, G, s, t, e_incl, e_excl, max_weight, all_min_cuts):
+    def enumerate_cuts(self, G, s, t, e_incl, e_excl, max_weight, all_min_cuts,max_num_cuts):
         """
         Recursive algorithm to enumerate cuts constrained to contain various
         edges and exclude others (Balcioglu 2003)
         """
+        # return if we reach the max number of cuts
+        if(max_num_cuts is not None):
+            if(len(all_min_cuts)>=max_num_cuts):
+                return
+
         Gp=deepcopy(G)
 
         # weight exclusion edges
@@ -2625,7 +2753,6 @@ class SlabGraph(MolecularGraph):
         # return if non near minimal cut
         if(cut_value > max_weight):
             return
-        # TODO return if symmetric version of previously identified cut
 
         # ensure that despite the adding of the artificial edges, the proposed cut
         # is indeed still minimal in the original graph
@@ -2646,7 +2773,7 @@ class SlabGraph(MolecularGraph):
             #e_excl = e_excl + edge
             #e_excl = self.union_2_tuple(e_excl, edge)
 
-            self.enumerate_cuts(G, s, t, e_incl, e_excl, max_weight, all_min_cuts)
+            self.enumerate_cuts(G, s, t, e_incl, e_excl, max_weight, all_min_cuts,max_num_cuts)
 
             #print("e_excl")
             #print(e_excl)
@@ -2666,7 +2793,7 @@ class SlabGraph(MolecularGraph):
 
     def nx_near_min_cut_digraph_custom(self, eps=0, k=0, weight_barrier=False,
                                                          layer_props=None,
-                                                         max_num_cuts=None):
+                                                         max_num_cuts=10):
         """
         Find all near min cuts in a graph
 
@@ -2764,7 +2891,8 @@ class SlabGraph(MolecularGraph):
                                e_incl,
                                e_excl,
                                max_weight,
-                               all_min_cuts)
+                               all_min_cuts,
+                               max_num_cuts)
 
                 self.all_cut_C0=[(list(C),self.id_symmetric_cut(list(C),layer_props)) for C in all_min_cuts]
                 self.all_cut_ids=["%05d"%i for i in range(len(self.all_cut_C0))]
@@ -2773,10 +2901,10 @@ class SlabGraph(MolecularGraph):
                 print(self.all_cut_ids)
 
 
-                self.all_cut_C0, self.all_cut_ids=self.keep_cut_in_N_layers(1, self.all_cut_C0, self.all_cut_ids)
+                self.all_cut_C0, self.all_cut_ids = self.keep_cut_in_N_layers(1, self.all_cut_C0, self.all_cut_ids)
 
 
-                self.remove_duplicate_cuts_in_c(layer_props, self.all_cut_C0, self.all_cut_ids,c_min_max='max')
+                self.all_cut_C0, self.all_cut_ids = self.remove_duplicate_cuts_in_c(layer_props, self.all_cut_C0, self.all_cut_ids,c_min_max='max')
 
         else:
            

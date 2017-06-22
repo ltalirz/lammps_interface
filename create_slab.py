@@ -2572,27 +2572,27 @@ def main():
 
         # Execute max-flow/min-cut calculation
         #sim.slabgraph.nx_min_cut_digraph_custom(weight_barrier=True)               
-        sim.slabgraph.nx_min_cut_digraph(weight_barrier=True,layer_props=layer_props)
+        #sim.slabgraph.nx_min_cut_digraph(weight_barrier=True,layer_props=layer_props)
 
-        # exclude graph partitions on the "outside" of the min cut
-        sim.slabgraph.remove_surface_partitions()                                   
-                                                                                    
-        # Add back in all missing oxygens                                           
-        sim.slabgraph.add_all_connecting_nodes()                                    
+        ## exclude graph partitions on the "outside" of the min cut
+        #sim.slabgraph.remove_surface_partitions()                                   
+        #                                                                            
+        ## Add back in all missing oxygens                                           
+        #sim.slabgraph.add_all_connecting_nodes()                                    
 
-        # DEBUG file writing
-        if(sim.slab_verbose):
-            sim.slabgraph.write_slabgraph_cif(sim.slabgraph.slabgraph,cell,bond_block=False,descriptor="deH",relabel=False)   
-                                                                                    
-        # add missing hydrogen caps and validate structural properties 
-        sim.slabgraph.add_missing_hydrogens()                                       
-        # check approximate slab thickness
-        #min_thickness = sim.slabgraph.check_approximate_slab_thickness()
-        #max_thickness = sim.slabgraph.check_approximate_slab_thickness_v2()
-        #approximate_thickness = (max_thickness+min_thickness)/2
-        # check if generated slab is 2D periodic
-        slab_is_2D_periodic   = sim.slabgraph.check_slab_is_2D_periodic()
-        sim.slabgraph.write_slabgraph_cif(sim.slabgraph.slabgraph,cell,bond_block=False,descriptor="addH",relabel=False)   
+        ## DEBUG file writing
+        #if(sim.slab_verbose):
+        #    sim.slabgraph.write_slabgraph_cif(sim.slabgraph.slabgraph,cell,bond_block=False,descriptor="deH",relabel=False)   
+        #                                                                            
+        ## add missing hydrogen caps and validate structural properties 
+        #sim.slabgraph.add_missing_hydrogens()                                       
+        ## check approximate slab thickness
+        ##min_thickness = sim.slabgraph.check_approximate_slab_thickness()
+        ##max_thickness = sim.slabgraph.check_approximate_slab_thickness_v2()
+        ##approximate_thickness = (max_thickness+min_thickness)/2
+        ## check if generated slab is 2D periodic
+        #slab_is_2D_periodic   = sim.slabgraph.check_slab_is_2D_periodic()
+        #sim.slabgraph.write_slabgraph_cif(sim.slabgraph.slabgraph,cell,bond_block=False,descriptor="addH",relabel=False)   
 
         ############################
         # END AUTOMATED PYMATGEN SLAB GENERATION
