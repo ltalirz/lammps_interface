@@ -2091,18 +2091,70 @@ def create_slab_pym(ifname,slab_face,slab_thickness,slab_vacuum):
     print("%d slab layers for MIN thickness of %.1f"%(layers_list[0],slab_thickness))
 
     # create modified slabgen object
+    slabgen_no_lll=SlabGenerator(structure, 
+                 (int(slab_face[0]),int(slab_face[1]),int(slab_face[2])),
+                 min_slab_size=new_min_slab_size, 
+                 min_vacuum_size=slab_vacuum,
+                 primitive=True,
+                 lll_reduce=False, center_slab=True
+                         )
+
     slabgen=SlabGenerator(structure, 
                  (int(slab_face[0]),int(slab_face[1]),int(slab_face[2])),
                  min_slab_size=new_min_slab_size, 
                  min_vacuum_size=slab_vacuum,
+                 primitive=True,
                  lll_reduce=True, center_slab=True
                          )
     layers_list=get_nlayers(slabgen)
     print("%d slab layers for thickness of %.1f"%(layers_list[0],new_min_slab_size))
 
+
+    frac_coords=slabgen.oriented_unit_cell.frac_coords
+    print("frac_coords in oriented unit cell")
+    print(frac_coords)
+
+
+    shift=0
+    frac_coords = np.array(frac_coords) +\
+                  np.array([0, 0, -shift])[None, :]
+    print("frac_coords plus some shift")
+    print(frac_coords)
+
+    frac_coords[:, 2] = frac_coords[:, 2] / layers_list[2]
+    print("frac_coords modded by n layers (%d)"%layers_list[2])
+    print(frac_coords)
+
+    oriented_lattice = slabgen.oriented_unit_cell.lattice
+    print("Oriented lattice vectors")
+    print(oriented_lattice)
+
+
     # create slab
     slab = slabgen.get_slab()
 
+    print("Orig lab lattice")
+    print
+    scale_factor= slabgen.slab_scale_factor
+    lll_slab = slab.copy(sanitize=True)
+    mapping = lll_slab.lattice.find_mapping(slab.lattice)
+    scale_factor = np.dot(mapping[2], scale_factor)
+    print("Mapping, scale factor")
+    print(mapping)
+    print(scale_factor)
+
+
+    print("reg lattice")
+    print(structure._lattice)
+    reduced_latt =structure._lattice.get_lll_reduced_lattice()
+    print("reduced_latt")
+    print(reduced_latt)
+
+    # get a b shift
+    print("frac coords")
+    print(slab.sites[0]._fcoords)
+    #print(slab.sites[a_per_l]._fcoords)
+    
     # compute # of atoms per slab layer
     slab_L=layers_list[0]
     a_per_l = int(len(slab.sites)/slab_L)
@@ -2143,6 +2195,8 @@ def create_slab_pym(ifname,slab_face,slab_thickness,slab_vacuum):
     # return (# of slab layers, atoms per layer, ofname)
     print("Layer properties: # of slab layers, atoms_layer, ocifname, inv_dataset")
     print("%s"%str((slab_L, a_per_l, ofname, )))
+
+
     return {'slab_L':slab_L, 'a_per_l':a_per_l, 'proj_height':slabgen._proj_height,
             'ofname':ofname, 'inversion_mapping':inversion_dataset}
 
@@ -2550,6 +2604,7 @@ def main():
 
         # DEBUG file writing: output cif with false elements corresponding to slablayer for visualization
         sim.slabgraph.debug_slab_layers()
+        sys.exit()
 
         # identify the undercoordinated surface nodes
         sim.slabgraph.identify_undercoordinated_surface_nodes()                     
