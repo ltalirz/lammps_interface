@@ -36,7 +36,7 @@ except:
 try:
     import pymatgen
     import pymatgen.io.cif as pic                                                   
-    from pymatgen.core.surface import Slab, SlabGenerator,generate_all_slabs 
+    from pymatgen.core.surface import Slab, SlabGenerator,generate_all_slabs, Structure, PeriodicSite
 except:
     print("Error Pymatgen not found! Pymatgen import failed, cannot build initial slab guess with Pymatgen!")
     sys.exit()
@@ -1969,6 +1969,128 @@ class LammpsSimulation(object):
 ###############################################################################
 # START Pymatgen slab helper functions
 ###############################################################################
+def custom_pymatgen_slab_copy(slab,site_properties=None,sanitize=False):
+    """
+    Convenience method to get a copy of the structure, with options to add
+    site properties.
+
+    Args:
+        site_properties (dict): Properties to add or override. The
+            properties are specified in the same way as the constructor,
+            i.e., as a dict of the form {property: [values]}. The
+            properties should be in the order of the *original* structure
+            if you are performing sanitization.
+        sanitize (bool): If True, this method will return a sanitized
+            structure. Sanitization performs a few things: (i) The sites are
+            sorted by electronegativity, (ii) a LLL lattice reduction is
+            carried out to obtain a relatively orthogonalized cell,
+            (iii) all fractional coords for sites are mapped into the
+            unit cell.
+
+    Returns:
+        A copy of the Structure, with optionally new site_properties and
+        optionally sanitized.
+    """
+    if (not site_properties) and (not sanitize):
+        # This is not really a good solution, but if we are not changing
+        # the site_properties or sanitizing, initializing an empty
+        # structure and setting _sites to be sites is much faster (~100x)
+        # than doing the full initialization.
+        s_copy = slab.__class__(lattice=self._lattice, species=[],
+                                coords=[])
+        s_copy._sites = list(slab._sites)
+        return s_copy
+    props = slab.site_properties
+    if site_properties:
+        props.update(site_properties)
+    if not sanitize:
+        return slab.__class__(slab._lattice,
+                              slab.species_and_occu,
+                              slab.frac_coords,
+                              site_properties=props)
+    else:
+        reduced_latt = slab._lattice.get_lll_reduced_lattice()
+        new_sites = []
+        for i, site in enumerate(slab):
+            frac_coords = reduced_latt.get_fractional_coords(site.coords)
+            site_props = {}
+            for p in props:
+                site_props[p] = props[p][i]
+            new_sites.append(PeriodicSite(site.species_and_occu,
+                                          frac_coords, reduced_latt,
+                                          to_unit_cell=True,
+                                          properties=site_props))
+        #new_sites = sorted(new_sites)
+        return slab.__class__.from_sites(new_sites)
+
+
+def custom_pymatgen_get_slab(this_slabgen, shift=0, tol=0.1, energy=None):
+    """
+    This method takes in shift value for the c lattice direction and
+    generates a slab based on the given shift. You should rarely use this
+    method. Instead, it is used by other generation algorithms to obtain
+    all slabs.
+
+    Arg:
+        shift (float): A shift value in Angstrom that determines how much a
+            slab should be shifted.
+        tol (float): Tolerance to determine primitive cell.
+        energy (float): An energy to assign to the slab.
+
+    Returns:
+        (Slab) A Slab object with a particular shifted oriented unit cell.
+    """
+
+    h = this_slabgen._proj_height
+    nlayers_slab = int(math.ceil(this_slabgen.min_slab_size / h))
+    nlayers_vac = int(math.ceil(this_slabgen.min_vac_size / h))
+    nlayers = nlayers_slab + nlayers_vac
+
+    species = this_slabgen.oriented_unit_cell.species_and_occu
+    props = this_slabgen.oriented_unit_cell.site_properties
+    props = {k: v * nlayers_slab for k, v in props.items()}
+    frac_coords = this_slabgen.oriented_unit_cell.frac_coords
+    frac_coords = np.array(frac_coords) +\
+                  np.array([0, 0, -shift])[None, :]
+    frac_coords -= np.floor(frac_coords)
+    a, b, c = this_slabgen.oriented_unit_cell.lattice.matrix
+    new_lattice = [a, b, nlayers * c]
+    frac_coords[:, 2] = frac_coords[:, 2] / nlayers
+    all_coords = []
+    for i in range(nlayers_slab):
+        fcoords = frac_coords.copy()
+        fcoords[:, 2] += i / nlayers
+        all_coords.extend(fcoords)
+
+    slab = Structure(new_lattice, species * nlayers_slab, all_coords,
+                     site_properties=props)
+
+    scale_factor = this_slabgen.slab_scale_factor
+    # Whether or not to orthogonalize the structure
+    if this_slabgen.lll_reduce:
+        # NOTE old command: lll_slab = slab.copy(sanitize=True)
+        # NOTE modified command to prevent resorting
+        lll_slab = custom_pymatgen_slab_copy(slab, sanitize=True)
+        mapping = lll_slab.lattice.find_mapping(slab.lattice)
+        scale_factor = np.dot(mapping[2], scale_factor)
+        slab = lll_slab
+
+    # Whether or not to center the slab layer around the vacuum
+    if this_slabgen.center_slab:
+        avg_c = np.average([c[2] for c in slab.frac_coords])
+        slab.translate_sites(list(range(len(slab))), [0, 0, 0.5 - avg_c])
+
+    if this_slabgen.primitive:
+        prim = slab.get_primitive_structure(tolerance=tol)
+        if energy is not None:
+            energy = prim.volume / slab.volume * energy
+        slab = prim
+
+    return Slab(slab.lattice, slab.species_and_occu,
+                slab.frac_coords, this_slabgen.miller_index,
+                this_slabgen.oriented_unit_cell, shift,
+                    scale_factor, site_properties=slab.site_properties,
+                    energy=energy)
 
 def get_nlayers(this_slabgen):
     """
@@ -2111,77 +2233,84 @@ def create_slab_pym(ifname,slab_face,slab_thickness,slab_vacuum):
 
 
     frac_coords=slabgen.oriented_unit_cell.frac_coords
-    print("frac_coords in oriented unit cell")
-    print(frac_coords)
+    #print("frac_coords in oriented unit cell")
+    #print(frac_coords)
 
 
     shift=0
     frac_coords = np.array(frac_coords) +\
                   np.array([0, 0, -shift])[None, :]
-    print("frac_coords plus some shift")
-    print(frac_coords)
+    #print("frac_coords plus some shift")
+    #print(frac_coords)
 
     frac_coords[:, 2] = frac_coords[:, 2] / layers_list[2]
-    print("frac_coords modded by n layers (%d)"%layers_list[2])
-    print(frac_coords)
+    #print("frac_coords modded by n layers (%d)"%layers_list[2])
+    #print(frac_coords)
 
     oriented_lattice = slabgen.oriented_unit_cell.lattice
-    print("Oriented lattice vectors")
-    print(oriented_lattice)
+    #print("Oriented lattice vectors")
+    #print(oriented_lattice)
 
 
     # create slab
-    slab = slabgen.get_slab()
+    #slab = slabgen.get_slab()
+    slab = custom_pymatgen_get_slab(slabgen)
 
-    print("Orig lab lattice")
-    print
+    #print("Orig lab lattice")
+    #print
     scale_factor= slabgen.slab_scale_factor
     lll_slab = slab.copy(sanitize=True)
     mapping = lll_slab.lattice.find_mapping(slab.lattice)
     scale_factor = np.dot(mapping[2], scale_factor)
-    print("Mapping, scale factor")
-    print(mapping)
-    print(scale_factor)
+    #print("Mapping, scale factor")
+    #print(mapping)
+    #print(scale_factor)
 
 
-    print("reg lattice")
-    print(structure._lattice)
+    #print("reg lattice")
+    #print(structure._lattice)
     reduced_latt =structure._lattice.get_lll_reduced_lattice()
-    print("reduced_latt")
-    print(reduced_latt)
+    #print("reduced_latt")
+    #print(reduced_latt)
 
     # get a b shift
-    print("frac coords")
-    print(slab.sites[0]._fcoords)
+    #print("frac coords")
+    #print(slab.sites[0]._fcoords)
     #print(slab.sites[a_per_l]._fcoords)
     
     # compute # of atoms per slab layer
     slab_L=layers_list[0]
     a_per_l = int(len(slab.sites)/slab_L)
+    # number of Si per layer
+    Si_per_l = a_per_l/3
+    
 
 
     # make sure has inversion symmetry, otherwise for now error
     # when we find a min cut, we know that the other is just the -1 symm group
     laue = ["-1", "2/m", "mmm", "4/m", "4/mmm",                                 
             "-3", "-3m", "6/m", "6/mmm", "m-3", "m-3m"] 
-    tol=0.3
+
+    tol=0.5
     sg = pymatgen.symmetry.analyzer.SpacegroupAnalyzer(slab, symprec=tol)       
     pg = sg.get_point_group_symbol()                                            
     if str(pg) in laue:                                                         
         #return slab                                                            
-        print("Laue symmetry found!: " + pg)                                    
+        print("Point group is %s"%pg)
+        print("Laue symmetry found!")                                    
     else:                                                                       
+        print("Point group is %s"%pg)
         print("No Laue symmetry found...")   
-        print("For now not working with non-symmetric slabs") 
-        print("Exit code: NoSymmetry")
-        sys.exit()
+        print("Result will give cleavage energy (see Pymatgen paper) rather than the rigorous surface energy of this truncation")
+        #sys.exit()
    
     # get equivalent atom types by symmetry:
     symm_struct  = sg.get_symmetrized_structure()
     symm_dataset = sg.get_symmetry_dataset()
     unique_type_dataset = unique_typing(symm_struct,symm_dataset)
     inversion_dataset   = inversion_mapping(symm_dataset, unique_type_dataset,slab)
-    #inversion_dataset = {}
+    # get translationally equivalent atom types between slab layers
+    translation_dataset = translation_mapping(slab_L,a_per_l,slab)
 
     # re-write new slab to CIF so LAMMPS interface can re-interpret this new slab
     ofname = str(ifname[:-4])+"_"+\
@@ -2191,14 +2320,54 @@ def create_slab_pym(ifname,slab_face,slab_thickness,slab_vacuum):
     outputter.write_file(ofname+".cif")
   
 
+    layer_props = {'slab_L':slab_L, 'a_per_l':a_per_l, 'proj_height':slabgen._proj_height,
+                   'ofname':ofname, 'inversion_mapping':inversion_dataset, 
+                   'translation_mapping':translation_dataset}
 
-    # return (# of slab layers, atoms per layer, ofname)
-    print("Layer properties: # of slab layers, atoms_layer, ocifname, inv_dataset")
-    print("%s"%str((slab_L, a_per_l, ofname, )))
+    print("Layer properties:") 
+    print(layer_props)
+
+    return layer_props 
 
 
-    return {'slab_L':slab_L, 'a_per_l':a_per_l, 'proj_height':slabgen._proj_height,
-            'ofname':ofname, 'inversion_mapping':inversion_dataset}
+def translation_mapping(slab_L, a_per_l, slab):
+    """
+    slab_L = number of layers (starting at index 0)
+    a_per_L = number of atoms in a layer
+
+    Map a site in layer i (starts at index 0) to a site in layer (slab_L-1-i)
+    """
+    # NOTE important this is not rigorous since we are sorting possible identical c -values
+    # need to get the layer data directly from pymatgen
+    
+    print("\nCreating translation dictionary:")
+    translation_dataset = {}
+
+    # the annoying thing is that Pymatgen may have re-ordered the list of sites
+    # to group similar atom types together (but preserving the c-order within that type group)
+    # therefore get the order back for all sites 
+
+    # to get around this we need to make sure that the list of sites has 
+    # not been altered by Pymatgen sort, hence the custom functions above
+
+    for i in range(len(slab.sites)):
+        #print(slab.sites[i])
+
+        # layer of site i is (starting at index 0:
+        this_layer=int(np.floor(i/a_per_l))
+
+        opp_layer=(slab_L-1)-this_layer
+
+        delta_layer=opp_layer-this_layer
+
+        # "opposite" site
+        opp_of_i = int(delta_layer*a_per_l+i)
+
+        # NOTE nodes start at index 1
+        translation_dataset[i+1]        = opp_of_i+1
+        
+    return translation_dataset
+
 
 def inversion_mapping(symm_dataset,unique_type_dataset,slab):
     """
@@ -2220,15 +2389,18 @@ def inversion_mapping(symm_dataset,unique_type_dataset,slab):
             inv_ind = i
     if(inv_ind==-1):
         print("No inversion matrix found -1*I (-1 diagonal matrix)")
-        sys.exit()
+        #sys.exit()
+        return None
+
+
     trans     = symm_dataset['translations'][inv_ind]
 
-    print("All rotations:")
-    print(symm_dataset['rotations']) 
-    print("Corresponding translations:")
-    print(symm_dataset['translations']) 
-    print("Rot and trans corresponding to the inversion:")
-    print(inv_rot, trans)
+    #print("All rotations:")
+    #print(symm_dataset['rotations']) 
+    #print("Corresponding translations:")
+    #print(symm_dataset['translations']) 
+    #print("Rot and trans corresponding to the inversion:")
+    #print(inv_rot, trans)
 
     # This gets messy... there must be a way to do this in Pymatgen ...
     for key in unique_type_dataset.keys():
@@ -2252,8 +2424,8 @@ def inversion_mapping(symm_dataset,unique_type_dataset,slab):
 
             # This means we messed up because Pymatgen already said we have inversion symm
             if(not found_mirror):
-                print("Oops, inversion symmetry site not found, exit for now...")
-                sys.exit()
+                print("Oops, inversion symmetry supposed to exist but symmetric site not found, check source code...")
+                return None
             
             site_match_ind=all_equiv_sites[match_ind]
             #print("Matches site %d"%site_match_ind)
@@ -2263,6 +2435,8 @@ def inversion_mapping(symm_dataset,unique_type_dataset,slab):
             inversion_dictionary[site+1]=site_match_ind+1
 
     return inversion_dictionary
+
+
 
 def wrap_between_0_and_1(it):
     """
@@ -2342,7 +2516,8 @@ def main():
     sim.split_graph()                                                           
     sim.assign_force_fields()                                                   
     sim.merge_graphs()
-    write_CIF(graph,cell,bond_block=False,descriptor="original")
+
+    write_CIF(graph,cell,bond_block=False,descriptor="original",relabel=True)
 
     # TODO May need a big preparation step here that each Si is more than 2 eges away
     # from its periodic image
@@ -2581,7 +2756,7 @@ def main():
         cell, graph = from_CIF(curr_slab_cif_name)                                    
         sim.set_cell(cell)                                                          
         sim.set_graph(graph)                                                        
-        sim.split_graph()                                                           
+        #sim.split_graph()                                                           
         sim.assign_force_fields()                                                   
                                                                                 
         # Beginning of routines for surface generation
@@ -2604,7 +2779,6 @@ def main():
 
         # DEBUG file writing: output cif with false elements corresponding to slablayer for visualization
         sim.slabgraph.debug_slab_layers()
-        sys.exit()
 
         # identify the undercoordinated surface nodes
         sim.slabgraph.identify_undercoordinated_surface_nodes()                     
@@ -2621,6 +2795,7 @@ def main():
             sim.slabgraph.write_slabgraph_cif(sim.slabgraph.slabgraph,cell,bond_block=False,descriptor="debug",relabel=False) 
 
         # Balcioglu and Wood 2003
+        # add arg max_num_cuts=1 for regular s-t min cut from 
         sim.slabgraph.nx_near_min_cut_digraph_custom(sim.mincut_eps, sim.mincut_k, weight_barrier=True, layer_props=layer_props)               
         # generate all slabs from all cutsets
         sim.slabgraph.generate_all_slabs_from_cutsets()

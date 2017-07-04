@@ -26,10 +26,10 @@ from atomic import alkali, alkaline_earth, main_group, metals
 from ccdc import CCDC_BOND_ORDERS
 DEG2RAD=np.pi/180.
 
-try:
-    from writeNodesEdges import writeObjects
-except:
-    print("Warning! vtk for python necessary for graph debugging necessary. Code will ImportError if you try to use the functionality to draw a SlabGraph to a VTK style visualization file")
+#try:
+#    from writeNodesEdges import writeObjects
+#except:
+#    print("Warning! vtk for python necessary for graph debugging necessary. Code will ImportError if you try to use the functionality to draw a SlabGraph to a VTK style visualization file")
 
 try:
     import networkx as nx
@@ -1512,79 +1512,79 @@ class SlabGraph(MolecularGraph):
         pass
         
 
-    def draw_slabgraph(self):
+    #def draw_slabgraph(self):
 
-        print("\n\nAttempting to output graph as VTK file for visualization debugging")
-        numberNodes, numberEdges = 100, 500
-        H = nx.gnm_random_graph(numberNodes,numberEdges)
-        #print 'nodes:', H.nodes()
-        #print 'edges:', H.edges()
-        # return a dictionary of positions keyed by node
-        pos = nx.random_layout(H,dim=3)
-        # convert to list of positions (each is a list)
-        xyz = [list(pos[i]) for i in pos]
-        print(xyz)
-        print(H.edges())
-        print(type(xyz))
-        print(type(xyz[0]))
-        print(type(xyz[0][0]))
-        degree = H.degree().values()
-        print(type(degree))
-        print(degree)
-        #print(type(degree[0]))
-        writeObjects(xyz, edges=H.edges(), scalar=degree, name='degree', fileout='network')    
+    #    print("\n\nAttempting to output graph as VTK file for visualization debugging")
+    #    numberNodes, numberEdges = 100, 500
+    #    H = nx.gnm_random_graph(numberNodes,numberEdges)
+    #    #print 'nodes:', H.nodes()
+    #    #print 'edges:', H.edges()
+    #    # return a dictionary of positions keyed by node
+    #    pos = nx.random_layout(H,dim=3)
+    #    # convert to list of positions (each is a list)
+    #    xyz = [list(pos[i]) for i in pos]
+    #    print(xyz)
+    #    print(H.edges())
+    #    print(type(xyz))
+    #    print(type(xyz[0]))
+    #    print(type(xyz[0][0]))
+    #    degree = H.degree().values()
+    #    print(type(degree))
+    #    print(degree)
+    #    #print(type(degree[0]))
+    #    writeObjects(xyz, edges=H.edges(), scalar=degree, name='degree', fileout='network')    
 
-        degree=[]
-        xyz=[]
-        node_convert_dict={}
-        node_convert_dict_rev={}
-        iterate=0
-        for node,data in self.slabgraph.nodes_iter(data=True):
-            #xyz.append([np.float64(data['cartesian_coordinates'][0]),
-            #            np.float64(data['cartesian_coordinates'][1]),
-            #            np.float64(data['cartesian_coordinates'][2])])
-            xyz.append([np.float64(data['_atom_site_fract_x']),
-                        np.float64(data['_atom_site_fract_y']),
-                        np.float64(data['_atom_site_fract_z'])])
-            if(data['element']=="Si"):
-                degree.append(5)
-            elif(data['element']=="X"):
-                degree.append(20)
-            else:
-                degree.append(1)
+    #    degree=[]
+    #    xyz=[]
+    #    node_convert_dict={}
+    #    node_convert_dict_rev={}
+    #    iterate=0
+    #    for node,data in self.slabgraph.nodes_iter(data=True):
+    #        #xyz.append([np.float64(data['cartesian_coordinates'][0]),
+    #        #            np.float64(data['cartesian_coordinates'][1]),
+    #        #            np.float64(data['cartesian_coordinates'][2])])
+    #        xyz.append([np.float64(data['_atom_site_fract_x']),
+    #                    np.float64(data['_atom_site_fract_y']),
+    #                    np.float64(data['_atom_site_fract_z'])])
+    #        if(data['element']=="Si"):
+    #            degree.append(5)
+    #        elif(data['element']=="X"):
+    #            degree.append(20)
+    #        else:
+    #            degree.append(1)
 
-            node_convert_dict[iterate]=node
-            node_convert_dict_rev[node]=iterate
-            iterate+=1
+    #        node_convert_dict[iterate]=node
+    #        node_convert_dict_rev[node]=iterate
+    #        iterate+=1
 
-        duplicate_edges=[]
-        for edge in self.slabgraph.edges():
-            n1=edge[0]
-            n2=edge[1]
-            duplicate_edges.append((node_convert_dict_rev[n1],
-                                    node_convert_dict_rev[n2]))
+    #    duplicate_edges=[]
+    #    for edge in self.slabgraph.edges():
+    #        n1=edge[0]
+    #        n2=edge[1]
+    #        duplicate_edges.append((node_convert_dict_rev[n1],
+    #                                node_convert_dict_rev[n2]))
 
 
 
-        #writeObjects(xyz, edges=self.slabgraph.edges(), scalar=degree, name='degree', fileout='network')    
-        writeObjects(xyz, edges=duplicate_edges, scalar=degree, name='degree', fileout='network')    
-        print(type(xyz))
-        print(type(xyz[0]))
-        print(type(xyz[0][0]))
-        print(type(degree))
-        print(degree)
-        print(xyz)
-        print(self.slabgraph.edges())
-        print(duplicate_edges)
-        #print(type(degree[0]))
+    #    #writeObjects(xyz, edges=self.slabgraph.edges(), scalar=degree, name='degree', fileout='network')    
+    #    writeObjects(xyz, edges=duplicate_edges, scalar=degree, name='degree', fileout='network')    
+    #    print(type(xyz))
+    #    print(type(xyz[0]))
+    #    print(type(xyz[0][0]))
+    #    print(type(degree))
+    #    print(degree)
+    #    print(xyz)
+    #    print(self.slabgraph.edges())
+    #    print(duplicate_edges)
+    #    #print(type(degree[0]))
 
-        print(len(degree))
-        print(len(xyz))
-        f=open('test.xyz','w')
-        f.write("%d\n\n"%(len(xyz)))
-        for elem in xyz:
-            f.write("Si %.5f %.5f %.5f\n"%(elem[0],elem[1],elem[2]))
-        f.close()
+    #    print(len(degree))
+    #    print(len(xyz))
+    #    f=open('test.xyz','w')
+    #    f.write("%d\n\n"%(len(xyz)))
+    #    for elem in xyz:
+    #        f.write("Si %.5f %.5f %.5f\n"%(elem[0],elem[1],elem[2]))
+    #    f.close()
 
 
 
@@ -2466,249 +2466,329 @@ class SlabGraph(MolecularGraph):
         return new_list, new_ids
 
 
-    def remove_duplicate_cuts_in_c(self, layer_props, all_cut_C0, all_cut_ids,c_min_max,debug=True):
+    #def remove_duplicate_cuts_in_c(self, layer_props, all_cut_C0, all_cut_ids,c_min_max,debug=True):
+    #    """
+    #    Huge pain in the but
+
+    #    Find out if the first cut of cutsets is eqiuvalent to any other first cut
+    #    and if so exclude it from the final set of slabs
+
+    #    layer_props - relevant layer info for the slab
+
+    #    all_cut_C0 - all (near) min cuts of the form [(cut
+
+    #    c_min_max - if a duplicate cut is found (same a and b for each cut but 
+    #    a constant c shift equal to the width of the layer) keep the cut that
+    #    either has the min or the max c-coordinate
+    #    """
+
+    #    print("\nRemoving duplicate c cuts")
+    #    print(all_cut_C0)
+
+    #    # create copy of data so the refernence object not altered
+    #    all_cut_C0=deepcopy(all_cut_C0)        
+    #    all_cut_ids=deepcopy(all_cut_ids)        
+
+    #    # list for unique cuts
+    #    new_list=[]
+    #    new_ids=[]
+
+    #    c_offset = layer_props['proj_height']/self.cell.c
+    #    tol = np.float64(1e-4)
+    #    print("c layer shift = %.5f"%c_offset)
+    #    for i in range(len(all_cut_C0)):
+    #        # cut one of ith cutset, edge order determined by min c coordinate
+    #        cut= []
+    #        # for each edge of the cut (u,v) is listed such that u has the minimal c-coord
+    #        for u,v in all_cut_C0[i][0]:
+    #            if(self.refgraph.node[u]['_atom_site_fract_z']<
+    #               self.refgraph.node[v]['_atom_site_fract_z']):
+    #                cut.append((u,v,[float(self.refgraph.node[u]['_atom_site_fract_x']),
+    #                                 float(self.refgraph.node[u]['_atom_site_fract_y']),
+    #                                 float(self.refgraph.node[u]['_atom_site_fract_z'])],
+    #                                [float(self.refgraph.node[v]['_atom_site_fract_x']),
+    #                                 float(self.refgraph.node[v]['_atom_site_fract_y']),
+    #                                 float(self.refgraph.node[v]['_atom_site_fract_z'])]))
+    #            else:
+    #                cut.append((v,u,[float(self.refgraph.node[v]['_atom_site_fract_x']),
+    #                                 float(self.refgraph.node[v]['_atom_site_fract_y']),
+    #                                 float(self.refgraph.node[v]['_atom_site_fract_z'])],
+    #                                [float(self.refgraph.node[u]['_atom_site_fract_x']),
+    #                                 float(self.refgraph.node[u]['_atom_site_fract_y']),
+    #                                 float(self.refgraph.node[u]['_atom_site_fract_z'])]))
+
+    #        # sort each edges position in the cut based on a fract of that edge's first node (u) first, 
+    #        # then on b fract of that edge's first node (u)
+    #        cut=sorted(cut, key=lambda tup: tup[2][0]) 
+    #        cut=sorted(cut, key=lambda tup: tup[2][1]) 
+    #        
+    #        # find a cutset to compare to
+    #        # don't duplicate comparisons by starting at i
+    #        to_keep = True # whether or not to keep cut i: (if a duplicate is found in cut j), it j will be included later when it becomes i
+    #        for j in range(i+1,len(all_cut_C0)):
+    #            # if we find an equivalent cut
+
+
+    #            # cut one of jth cutset (cutset to compare to)
+    #            cut_compare=[]
+    #            # for each edge of the cut (u,v) is listed such that u has the minimal c-coord
+    #            for u,v in all_cut_C0[j][0]:
+    #                if(self.refgraph.node[u]['_atom_site_fract_z']<
+    #                   self.refgraph.node[v]['_atom_site_fract_z']):
+    #                    cut_compare.append((u,v,[float(self.refgraph.node[u]['_atom_site_fract_x']),
+    #                                             float(self.refgraph.node[u]['_atom_site_fract_y']),
+    #                                             float(self.refgraph.node[u]['_atom_site_fract_z'])],
+    #                                            [float(self.refgraph.node[v]['_atom_site_fract_x']),
+    #                                             float(self.refgraph.node[v]['_atom_site_fract_y']),
+    #                                             float(self.refgraph.node[v]['_atom_site_fract_z'])]))
+    #                else:
+    #                    cut_compare.append((v,u,[float(self.refgraph.node[v]['_atom_site_fract_x']),
+    #                                             float(self.refgraph.node[v]['_atom_site_fract_y']),
+    #                                             float(self.refgraph.node[v]['_atom_site_fract_z'])],
+    #                                            [float(self.refgraph.node[u]['_atom_site_fract_x']),
+    #                                             float(self.refgraph.node[u]['_atom_site_fract_y']),
+    #                                             float(self.refgraph.node[u]['_atom_site_fract_z'])]))
+
+    #            # sort each edges position in the cut based on a fract of that edge's first node (u) first, 
+    #            # then on b fract of that edge's first node (u)
+    #            cut_compare=sorted(cut_compare, key=lambda tup: tup[2][0]) 
+    #            cut_compare=sorted(cut_compare, key=lambda tup: tup[2][1]) 
+
+    #            if(debug):
+    #                print("Comparing first cuts of cutset i=%d and j=%d"%(i,j))
+    #                print(cut)
+    #                print(cut_compare)
+
+
+    #            if(len(cut)!=len(cut_compare)):
+    #                # Definitely can't be equivalent cuts
+    #                to_keep=True
+    #                if(debug):
+    #                    print("Cuts of non-equivalent length")
+    #        
+    #            else:
+    #                # a temporary bool as we make the criteria for a duplicate cut stricter and stricter
+    #                to_continue=True
+
+    #                # keep printing for debug
+    #                keep_printing=True
+
+    #                # check if (a, b) coordinates are consistent througout both cuts
+    #                for k in range(len(cut)):
+    #                    # make sure a coordinates of 1st node in both cuts equivalent
+    #                    if(cut[k][2][0]>(cut_compare[k][2][0]+tol) or 
+    #                       cut[k][2][0]<(cut_compare[k][2][0]-tol)):
+    #                        to_continue=False
+    #                        break
+    #                    # make sure b coordinates of 1st node in both cuts equivalent
+    #                    if(cut[k][2][1]>(cut_compare[k][2][1]+tol) or 
+    #                       cut[k][2][1]<(cut_compare[k][2][1]-tol)):
+    #                        to_continue=False
+    #                        break
+    #                    # make sure a coordinates of 2nd node in both cuts equivalent
+    #                    if(cut[k][3][0]>(cut_compare[k][3][0]+tol) or 
+    #                       cut[k][3][0]<(cut_compare[k][3][0]-tol)):
+    #                        to_continue=False
+    #                        break
+    #                    # make sure b coordinates of 2nd node in both cuts equivalent
+    #                    if(cut[k][3][1]>(cut_compare[k][3][1]+tol) or 
+    #                       cut[k][3][1]<(cut_compare[k][3][1]-tol)):
+    #                        to_continue=False
+    #                        break
+
+    #                # now check c coordinates 
+    #                if(to_continue): 
+
+    #                    # need to check if cuts are equivalent            
+    #                    list_of_shifts=[]
+
+    #                    for k in range(len(cut)):
+    #                        # c-offset between first nodes of edge tuple
+    #                        list_of_shifts.append(cut_compare[k][2][2]-cut[k][2][2])
+    #                        # c-offset between second nodes of edge tuple
+    #                        list_of_shifts.append(cut_compare[k][3][2]-cut[k][3][2])
+    #                
+    #                    # first check that cuts are equivalent by a constant c shift    
+    #                    avg_shift=np.average(list_of_shifts)
+    #                    if(debug):
+    #                        print("avg shift: all shifts")
+    #                        print(avg_shift,":",list_of_shifts)
+    #                    for shift in list_of_shifts:
+    #                        if(shift>(avg_shift+tol) or shift<(avg_shift-tol)):
+    #                            if(debug):
+    #                                print("non-unique (this shift, avg shift + tol, avg_shift -tol")
+    #                                print(shift, avg_shift+tol, avg_shift-tol)
+    #                            to_continue=False
+    #                            break
+    #                else:
+    #                    if(debug and keep_printing):
+    #                        print("Not equivalent a b positions")
+    #                    keep_printing=False
+
+    #                # if still equivalent, make sure c shift is equal to the c shift of each layer
+    #                if(to_continue):
+    #                    # NOTE, if avg_shift is positive, it means cut_compare has greater c coordinates
+    #                    # NOTE, if avg_shift is negative, it means cut has greater c coordinates
+    #                    if(np.abs(avg_shift)>(c_offset+tol) or np.abs(avg_shift)<(c_offset-tol)):
+    #                        to_continue=False
+    #                else:
+    #                    if(debug and keep_printing):
+    #                        print("Not all coords have the same c shift")
+    #                    keep_printing=False
+
+    #                # finally, if we have satisfied all checks for equivalency...
+    #                # WE CANNOT keep cut i, rather we either pass on adding it to the new list
+    #                # or we replace cut j with cut i if cut i is the one we want to keep
+    #                if(to_continue):
+    #                    if(debug):
+    #                        print("Cut %d has duplicate in %d"%(i,j))
+    #                    # cut i has a duplicate, therefore can't be kept
+    #                    to_keep = False
+    #                
+    #                    # if we want to keep only the identical cut with maximal c
+    #                    if(c_min_max=='max'):
+    #                        if(debug):
+    #                            print("Want cut with maximum c coords")
+    #                        if(avg_shift > 0):
+    #                            # cut_compare (index j) has a LARGER c, therefore we DO want to keep index j
+    #                            # do nothing
+    #                            if(debug):
+    #                                print("Cut j=%d has LARGER c coords, do nothing for now"%(j))
+    #                            pass
+    #                            # this cut j will eventually become cut i,
+    #                            #      after which it will be kept if no subsequent equivalencies found
+    #                        else:
+    #                            # cut_compare (index j) has a SMALLER c, therefore we DO NOT want to keep index j
+    #                            # therefore index j should be REPLACED with index i
+    #                            if(debug):
+    #                                print("Cut j=%d has SMALLER c coords, need to replace with cut i=%d"%(j,i))
+    #                            all_cut_C0[j]  = deepcopy(all_cut_C0[i])
+    #                            all_cut_ids[j] = deepcopy(all_cut_ids[i])
+
+    #                    # if we want to keep only the identical cut with minimal c
+    #                    elif(c_min_max=='min'):
+    #                        if(debug):
+    #                            print("Want cut with minimum c coords")
+    #                        if(avg_shift > 0):
+    #                            # cut_compare (index j) has LARGER c, therefore we DO NOT want to keep index j
+    #                            # therefore index j should be REPLACED with index i
+    #                            if(debug):
+    #                                print("Cut j=%d has LARGER c coords, need to replace with cut i=%d"%(j,i))
+    #                            all_cut_C0[j]  = deepcopy(all_cut_C0[i])
+    #                            all_cut_ids[j] = deepcopy(all_cut_ids[i])
+    #                        else:
+    #                            # cut_compare (index j) has SMALLER c, therefore we DO want to keep index j
+    #                            # do nothing
+    #                            if(debug):
+    #                                print("Cut j=%d has SMALLER c coords, do nothing for now"%(j))
+    #                            pass
+    #                            # this cut j will eventually become cut i,
+    #                            #      after which it will be kept if no subsequent equivalencies found
+    #                    else:
+    #                        print("For eliminating duplicate cuts, c_min_max can only be 'min' or 'max'") 
+    #                        sys.exit()
+    #                else:
+    #                    if(debug and keep_printing):
+    #                        print("Although all coords have same c shift, it is not equivalent to the c layer shift")
+    #                    keep_printing=False
+    #                
+    #                            
+    #                if(to_keep==False):
+    #                    break
+
+   
+    #        if(to_keep==True):
+    #            new_list.append(all_cut_C0[i]) 
+    #            new_ids.append(all_cut_ids[i]) 
+
+    #    print("\nCutsets that are identical except for a constant c - shift (%d):"%(len(new_list)))
+    #    print(new_list)
+    #    print(new_ids)    
+    #    
+
+    #    return new_list, new_ids
+            
+
+    def remove_duplicate_cuts_in_c_v2(self, layer_props, all_cut_C0, 
+                                      all_cut_ids,c_min_max,debug=True):
         """
-        Huge pain in the but
 
-        Find out if the first cut of cutsets is eqiuvalent to any other first cut
-        and if so exclude it from the final set of slabs
-
-        layer_props - relevant layer info for the slab
-
-        all_cut_C0 - all (near) min cuts of the form [(cut
-
-        c_min_max - if a duplicate cut is found (same a and b for each cut but 
-        a constant c shift equal to the width of the layer) keep the cut that
-        either has the min or the max c-coordinate
+        c_min_max - if 2 duplicate cuts are found, remove the one with either 
+        the min or max coords
+    
         """
-
-        print("\nRemoving duplicate c cuts")
-        print(all_cut_C0)
-
-        # create copy of data so the refernence object not altered
-        all_cut_C0=deepcopy(all_cut_C0)        
-        all_cut_ids=deepcopy(all_cut_ids)        
-
-        # list for unique cuts
         new_list=[]
         new_ids=[]
 
-        c_offset = layer_props['proj_height']/self.cell.c
-        tol = np.float64(1e-4)
-        print("c layer shift = %.5f"%c_offset)
+        # iterate through all cuts
         for i in range(len(all_cut_C0)):
-            # cut one of ith cutset, edge order determined by min c coordinate
-            cut= []
-            # for each edge of the cut (u,v) is listed such that u has the minimal c-coord
-            for u,v in all_cut_C0[i][0]:
-                if(self.refgraph.node[u]['_atom_site_fract_z']<
-                   self.refgraph.node[v]['_atom_site_fract_z']):
-                    cut.append((u,v,[float(self.refgraph.node[u]['_atom_site_fract_x']),
-                                     float(self.refgraph.node[u]['_atom_site_fract_y']),
-                                     float(self.refgraph.node[u]['_atom_site_fract_z'])],
-                                    [float(self.refgraph.node[v]['_atom_site_fract_x']),
-                                     float(self.refgraph.node[v]['_atom_site_fract_y']),
-                                     float(self.refgraph.node[v]['_atom_site_fract_z'])]))
-                else:
-                    cut.append((v,u,[float(self.refgraph.node[v]['_atom_site_fract_x']),
-                                     float(self.refgraph.node[v]['_atom_site_fract_y']),
-                                     float(self.refgraph.node[v]['_atom_site_fract_z'])],
-                                    [float(self.refgraph.node[u]['_atom_site_fract_x']),
-                                     float(self.refgraph.node[u]['_atom_site_fract_y']),
-                                     float(self.refgraph.node[u]['_atom_site_fract_z'])]))
+            this_i_cut=set()
+            for elem in all_cut_C0[i][0]:
+                this_i_cut.add(elem[0])
+                this_i_cut.add(elem[1])
 
-            # sort each edges position in the cut based on a fract of that edge's first node (u) first, 
-            # then on b fract of that edge's first node (u)
-            cut=sorted(cut, key=lambda tup: tup[2][0]) 
-            cut=sorted(cut, key=lambda tup: tup[2][1]) 
-            
-            # find a cutset to compare to
-            # don't duplicate comparisons by starting at i
-            to_keep = True # whether or not to keep cut i: (if a duplicate is found in cut j), it j will be included later when it becomes i
+            to_keep_cut_i=True
+            # compare w/all cuts w/index greater than i to avoid double counting
             for j in range(i+1,len(all_cut_C0)):
-                # if we find an equivalent cut
+                this_j_cut=set()
+                for elem in all_cut_C0[j][0]:
+                    this_j_cut.add(elem[0])
+                    this_j_cut.add(elem[1])
+                print(this_j_cut)
 
+                # if j is identical to i, ignore it.  j will become i later on for comparison
+                if(this_i_cut==this_j_cut):
+                    to_keep_cut_i=False
+                    break
 
-                # cut one of jth cutset (cutset to compare to)
-                cut_compare=[]
-                # for each edge of the cut (u,v) is listed such that u has the minimal c-coord
-                for u,v in all_cut_C0[j][0]:
-                    if(self.refgraph.node[u]['_atom_site_fract_z']<
-                       self.refgraph.node[v]['_atom_site_fract_z']):
-                        cut_compare.append((u,v,[float(self.refgraph.node[u]['_atom_site_fract_x']),
-                                                 float(self.refgraph.node[u]['_atom_site_fract_y']),
-                                                 float(self.refgraph.node[u]['_atom_site_fract_z'])],
-                                                [float(self.refgraph.node[v]['_atom_site_fract_x']),
-                                                 float(self.refgraph.node[v]['_atom_site_fract_y']),
-                                                 float(self.refgraph.node[v]['_atom_site_fract_z'])]))
+                # check if j is a larger c duplicate of i
+                this_i_cut_plus=set([elem+int(layer_props['a_per_l']/3) for elem in this_i_cut])
+                if(this_i_cut_plus == this_j_cut):
+                    # found a duplicate
+                    if(c_min_max=='max'):
+                        # j will become i at a later point and will be kept, so do nothing
+                        to_keep_cut_i=False
+                        break
+                    elif(c_min_max=='min'):
+                        # we want to keep i, but we don't know if we will find another
+                        # duplicate later on, therefore replace j w/i and continue
+                        all_cut_C0[j]  = deepcopy(all_cut_C0[i])
+                        all_cut_ids[j] = deepcopy(all_cut_ids[i])
+
+                        to_keep_cut_i=False
+                        break
                     else:
-                        cut_compare.append((v,u,[float(self.refgraph.node[v]['_atom_site_fract_x']),
-                                                 float(self.refgraph.node[v]['_atom_site_fract_y']),
-                                                 float(self.refgraph.node[v]['_atom_site_fract_z'])],
-                                                [float(self.refgraph.node[u]['_atom_site_fract_x']),
-                                                 float(self.refgraph.node[u]['_atom_site_fract_y']),
-                                                 float(self.refgraph.node[u]['_atom_site_fract_z'])]))
-
-                # sort each edges position in the cut based on a fract of that edge's first node (u) first, 
-                # then on b fract of that edge's first node (u)
-                cut_compare=sorted(cut_compare, key=lambda tup: tup[2][0]) 
-                cut_compare=sorted(cut_compare, key=lambda tup: tup[2][1]) 
-
-                if(debug):
-                    print("Comparing first cuts of cutset i=%d and j=%d"%(i,j))
-                    print(cut)
-                    print(cut_compare)
+                        raise TypeError("c_min_max can only be 'min' or 'max'")
 
 
-                if(len(cut)!=len(cut_compare)):
-                    # Definitely can't be equivalent cuts
-                    to_keep=True
-                    if(debug):
-                        print("Cuts of non-equivalent length")
-            
-                else:
-                    # a temporary bool as we make the criteria for a duplicate cut stricter and stricter
-                    to_continue=True
+                # check if j is a smaller c duplicate of i
+                this_i_cut_minus=set([elem-int(layer_props['a_per_l']/3) for elem in this_i_cut])
+                if(this_i_cut_minus == this_j_cut):
+                    # found a duplicate
+                    if(c_min_max=='max'):
+                        # we want to keep i, but we don't know if we will find another
+                        # duplicate later on, therefore replace j w/i and continue
+                        all_cut_C0[j]  = deepcopy(all_cut_C0[i])
+                        all_cut_ids[j] = deepcopy(all_cut_ids[i])
 
-                    # keep printing for debug
-                    keep_printing=True
+                        to_keep_cut_i=False
+                        break
+                    elif(c_min_max=='min'):
 
-                    # check if (a, b) coordinates are consistent througout both cuts
-                    for k in range(len(cut)):
-                        # make sure a coordinates of 1st node in both cuts equivalent
-                        if(cut[k][2][0]>(cut_compare[k][2][0]+tol) or 
-                           cut[k][2][0]<(cut_compare[k][2][0]-tol)):
-                            to_continue=False
-                            break
-                        # make sure b coordinates of 1st node in both cuts equivalent
-                        if(cut[k][2][1]>(cut_compare[k][2][1]+tol) or 
-                           cut[k][2][1]<(cut_compare[k][2][1]-tol)):
-                            to_continue=False
-                            break
-                        # make sure a coordinates of 2nd node in both cuts equivalent
-                        if(cut[k][3][0]>(cut_compare[k][3][0]+tol) or 
-                           cut[k][3][0]<(cut_compare[k][3][0]-tol)):
-                            to_continue=False
-                            break
-                        # make sure b coordinates of 2nd node in both cuts equivalent
-                        if(cut[k][3][1]>(cut_compare[k][3][1]+tol) or 
-                           cut[k][3][1]<(cut_compare[k][3][1]-tol)):
-                            to_continue=False
-                            break
-
-                    # now check c coordinates 
-                    if(to_continue): 
-
-                        # need to check if cuts are equivalent            
-                        list_of_shifts=[]
-
-                        for k in range(len(cut)):
-                            # c-offset between first nodes of edge tuple
-                            list_of_shifts.append(cut_compare[k][2][2]-cut[k][2][2])
-                            # c-offset between second nodes of edge tuple
-                            list_of_shifts.append(cut_compare[k][3][2]-cut[k][3][2])
-                    
-                        # first check that cuts are equivalent by a constant c shift    
-                        avg_shift=np.average(list_of_shifts)
-                        if(debug):
-                            print("avg shift: all shifts")
-                            print(avg_shift,":",list_of_shifts)
-                        for shift in list_of_shifts:
-                            if(shift>(avg_shift+tol) or shift<(avg_shift-tol)):
-                                if(debug):
-                                    print("non-unique (this shift, avg shift + tol, avg_shift -tol")
-                                    print(shift, avg_shift+tol, avg_shift-tol)
-                                to_continue=False
-                                break
-                    else:
-                        if(debug and keep_printing):
-                            print("Not equivalent a b positions")
-                        keep_printing=False
-
-                    # if still equivalent, make sure c shift is equal to the c shift of each layer
-                    if(to_continue):
-                        # NOTE, if avg_shift is positive, it means cut_compare has greater c coordinates
-                        # NOTE, if avg_shift is negative, it means cut has greater c coordinates
-                        if(np.abs(avg_shift)>(c_offset+tol) or np.abs(avg_shift)<(c_offset-tol)):
-                            to_continue=False
-                    else:
-                        if(debug and keep_printing):
-                            print("Not all coords have the same c shift")
-                        keep_printing=False
-
-                    # finally, if we have satisfied all checks for equivalency...
-                    # WE CANNOT keep cut i, rather we either pass on adding it to the new list
-                    # or we replace cut j with cut i if cut i is the one we want to keep
-                    if(to_continue):
-                        if(debug):
-                            print("Cut %d has duplicate in %d"%(i,j))
-                        # cut i has a duplicate, therefore can't be kept
-                        to_keep = False
-                    
-                        # if we want to keep only the identical cut with maximal c
-                        if(c_min_max=='max'):
-                            if(debug):
-                                print("Want cut with maximum c coords")
-                            if(avg_shift > 0):
-                                # cut_compare (index j) has a LARGER c, therefore we DO want to keep index j
-                                # do nothing
-                                if(debug):
-                                    print("Cut j=%d has LARGER c coords, do nothing for now"%(j))
-                                pass
-                                # this cut j will eventually become cut i,
-                                #      after which it will be kept if no subsequent equivalencies found
-                            else:
-                                # cut_compare (index j) has a SMALLER c, therefore we DO NOT want to keep index j
-                                # therefore index j should be REPLACED with index i
-                                if(debug):
-                                    print("Cut j=%d has SMALLER c coords, need to replace with cut i=%d"%(j,i))
-                                all_cut_C0[j]  = deepcopy(all_cut_C0[i])
-                                all_cut_ids[j] = deepcopy(all_cut_ids[i])
-
-                        # if we want to keep only the identical cut with minimal c
-                        elif(c_min_max=='min'):
-                            if(debug):
-                                print("Want cut with minimum c coords")
-                            if(avg_shift > 0):
-                                # cut_compare (index j) has LARGER c, therefore we DO NOT want to keep index j
-                                # therefore index j should be REPLACED with index i
-                                if(debug):
-                                    print("Cut j=%d has LARGER c coords, need to replace with cut i=%d"%(j,i))
-                                all_cut_C0[j]  = deepcopy(all_cut_C0[i])
-                                all_cut_ids[j] = deepcopy(all_cut_ids[i])
-                            else:
-                                # cut_compare (index j) has SMALLER c, therefore we DO want to keep index j
-                                # do nothing
-                                if(debug):
-                                    print("Cut j=%d has SMALLER c coords, do nothing for now"%(j))
-                                pass
-                                # this cut j will eventually become cut i,
-                                #      after which it will be kept if no subsequent equivalencies found
-                        else:
-                            print("For eliminating duplicate cuts, c_min_max can only be 'min' or 'max'") 
-                            sys.exit()
-                    else:
-                        if(debug and keep_printing):
-                            print("Although all coords have same c shift, it is not equivalent to the c layer shift")
-                        keep_printing=False
-                    
-                                
-                    if(to_keep==False):
+                        # j will become i at a later point and will be kept, so do nothing
+                        to_keep_cut_i=False
                         break
 
-   
-            if(to_keep==True):
+                    else:
+                        raise TypeError("c_min_max can only be 'min' or 'max'")
+
+
+            if(to_keep_cut_i==True):
                 new_list.append(all_cut_C0[i]) 
                 new_ids.append(all_cut_ids[i]) 
-
-        print("\nCutsets that are identical except for a constant c - shift (%d):"%(len(new_list)))
-        print(new_list)
-        print(new_ids)    
-        
+                
 
         return new_list, new_ids
-            
-
         
 
     def enumerate_cuts(self, G, s, t, e_incl, e_excl, max_weight, all_min_cuts,max_num_cuts):
@@ -2793,7 +2873,7 @@ class SlabGraph(MolecularGraph):
 
     def nx_near_min_cut_digraph_custom(self, eps=0, k=0, weight_barrier=False,
                                                          layer_props=None,
-                                                         max_num_cuts=10):
+                                                         max_num_cuts=1):
         """
         Find all near min cuts in a graph
 
@@ -2849,17 +2929,41 @@ class SlabGraph(MolecularGraph):
         print(self.cut_value1, C)
 
     
-        # if no inversion symmetry, there is no point in being careful about the 
-        # cuts, just find one, switch s and t, find the other, and finish
-
-        if('inversion_mapping' in layer_props.keys()):
+        # We need all the layer properties to do anything fancy with the cuts
+        if(layer_props is not None):
 
             if(max_num_cuts==1):
                 # provide escape option if we only care about the value of the min cut
                 C  = list(C)
-                Cp = self.id_symmetric_cut(C,layer_props)
+                self.debug_min_cuts(C,0)
 
+                # if we know the inversion_mapping, find the symmetric cut
+                if(layer_props['inversion_mapping'] is not None):
+                    Cp = self.id_symmetric_cut(C,layer_props)
+                # if we don't have inversion symmetry, do the next best thing
+                # find the same cut in the opposite slab layer
+                elif(layer_props['translation_mapping'] is not None):
+                    Cp = self.id_trans_layer_cut(C,layer_props)
+                # if no inversion or translation info between layers, get naiive sol'n   
+                else:
+                    # reverse s and t nodes and find a min cut on the other side of the slab 
+                    self.cut_value2, self.partition2 = nx.minimum_cut(
+                            #self.slabgraphdirec,
+                            #self.super_surface_node_max,
+                            #self.super_surface_node_0,
+                            Gred,
+                            s,
+                            t,
+                            flow_func=nx.algorithms.flow.shortest_augmenting_path)
+
+                    Cp = set(self.get_edges_between_partitions(self.partition2))
+
+                # finalize opposite cut as a list
+                Cp = list(Cp)
+
+                # create the all cutset list
                 self.all_cut_C0.append((C,Cp))
+                self.all_cut_ids=["%05d"%0]
 
             else:
                 # All near min cut of Balcioglu                
@@ -2894,18 +2998,32 @@ class SlabGraph(MolecularGraph):
                                all_min_cuts,
                                max_num_cuts)
 
-                self.all_cut_C0=[(list(C),self.id_symmetric_cut(list(C),layer_props)) for C in all_min_cuts]
+                if(layer_props['inversion_mapping'] is not None):
+                    self.all_cut_C0=[(list(C),self.id_symmetric_cut(list(C),layer_props)) for C in all_min_cuts]
+                elif(layer_props['translation_mapping'] is not None):
+                    self.all_cut_C0=[(list(C),self.id_trans_layer_cut(list(C),layer_props)) for C in all_min_cuts]
+                else:
+                    # TODO how to handle this case if no tranlation mapping
+                    # i.e. slabs not made w/pymatgen
+                    print("For now, can't handle multiple cuts w/o inversion or translation mapping to find the opposite cut")
+                    sys.exit()
+
                 self.all_cut_ids=["%05d"%i for i in range(len(self.all_cut_C0))]
                 print("\nAll initial cutsets (%d):"%len(self.all_cut_C0))
                 print(self.all_cut_C0)
                 print(self.all_cut_ids)
 
 
-                self.all_cut_C0, self.all_cut_ids = self.keep_cut_in_N_layers(1, self.all_cut_C0, self.all_cut_ids)
+                self.all_cut_C0, self.all_cut_ids = self.keep_cut_in_N_layers(\
+                    1, self.all_cut_C0, self.all_cut_ids)
 
 
-                self.all_cut_C0, self.all_cut_ids = self.remove_duplicate_cuts_in_c(layer_props, self.all_cut_C0, self.all_cut_ids,c_min_max='max')
+                self.all_cut_C0, self.all_cut_ids = self.remove_duplicate_cuts_in_c_v2(\
+                    layer_props, self.all_cut_C0, self.all_cut_ids,c_min_max='max')
+        
 
+        # if no layer properties known, there is no point in being careful about the 
+        # cuts, just find one, switch s and t, find the other, and finish
         else:
            
             # reverse s and t nodes and find a min cut on the other side of the slab 
@@ -2932,337 +3050,336 @@ class SlabGraph(MolecularGraph):
 
 
 
+    #def nx_min_cut_digraph_custom(self,weight_barrier=False):
 
-    def nx_min_cut_digraph_custom(self,weight_barrier=False):
+    #    print("\n\nNx minimum_cut function on directed slab graph...")
+    #    all_min_cutsets=[]
+    #    curr_min_cutsets=[]
 
-        print("\n\nNx minimum_cut function on directed slab graph...")
-        all_min_cutsets=[]
-        curr_min_cutsets=[]
+    #    # Firt create a barrier (aspect ratio of the slab is too large)
+    #    if(weight_barrier):
+    #        #self.create_weighted_barrier_on_opposite_half(start='min')
+    #        self.create_weighted_barrier_on_super_surface_edges(super_surface_weight='inf')
+    #    # uses stoer-wagner to do max flow (and indirectly min cut)
+    #    # given source and target node
+    #    self.cut_value1, self.partition1, self.sat_edges1= nxmfc.minimum_cut(
+    #            self.slabgraphdirec,
+    #            self.super_surface_node_0,
+    #            self.super_surface_node_max,
+    #            flow_func=nx.algorithms.flow.shortest_augmenting_path)
 
-        # Firt create a barrier (aspect ratio of the slab is too large)
-        if(weight_barrier):
-            #self.create_weighted_barrier_on_opposite_half(start='min')
-            self.create_weighted_barrier_on_super_surface_edges(super_surface_weight='inf')
-        # uses stoer-wagner to do max flow (and indirectly min cut)
-        # given source and target node
-        self.cut_value1, self.partition1, self.sat_edges1= nxmfc.minimum_cut(
-                self.slabgraphdirec,
-                self.super_surface_node_0,
-                self.super_surface_node_max,
-                flow_func=nx.algorithms.flow.shortest_augmenting_path)
+    #    print("Num saturated edges: %d (%d total edges)"%(len(self.sat_edges1),self.slabgraph.number_of_edges()))
+    #    print("Actual min cut value: %d"%int(self.cut_value1))
 
-        print("Num saturated edges: %d (%d total edges)"%(len(self.sat_edges1),self.slabgraph.number_of_edges()))
-        print("Actual min cut value: %d"%int(self.cut_value1))
+    #    this_cutset=self.get_edges_between_partitions(self.partition1)
+    #    all_min_cutsets.append(this_cutset.copy())
+    #    curr_min_cutsets.append(this_cutset.copy())
 
-        this_cutset=self.get_edges_between_partitions(self.partition1)
-        all_min_cutsets.append(this_cutset.copy())
-        curr_min_cutsets.append(this_cutset.copy())
+    #    #print(curr_min_cutsets)
+    #    while(len(curr_min_cutsets)!=0):
+    #        print("Iterating cutset:" + str(curr_min_cutsets[0]))
 
-        #print(curr_min_cutsets)
-        while(len(curr_min_cutsets)!=0):
-            print("Iterating cutset:" + str(curr_min_cutsets[0]))
+    #        for edge in curr_min_cutsets[0]:
+    #            print("Augmenting edge:"+str(edge))
 
-            for edge in curr_min_cutsets[0]:
-                print("Augmenting edge:"+str(edge))
+    #            # augment capacity of one edge for the current cutset
+    #            # this will destroy this cutset as the minimum cut, so we will
+    #            # find another minimum cut with equal max flow if it exists
+    #            self.slabgraphdirec.edge[edge[0]][edge[1]]['capacity']+=1
+    #            self.slabgraphdirec.edge[edge[1]][edge[0]]['capacity']+=1
 
-                # augment capacity of one edge for the current cutset
-                # this will destroy this cutset as the minimum cut, so we will
-                # find another minimum cut with equal max flow if it exists
-                self.slabgraphdirec.edge[edge[0]][edge[1]]['capacity']+=1
-                self.slabgraphdirec.edge[edge[1]][edge[0]]['capacity']+=1
+    #            this_cut_value1, this_partition1, this_sat_edges= nxmfc.minimum_cut(
+    #                    self.slabgraphdirec,
+    #                    self.super_surface_node_0,
+    #                    self.super_surface_node_max,
+    #                    flow_func=nx.algorithms.flow.preflow_push)
 
-                this_cut_value1, this_partition1, this_sat_edges= nxmfc.minimum_cut(
-                        self.slabgraphdirec,
-                        self.super_surface_node_0,
-                        self.super_surface_node_max,
-                        flow_func=nx.algorithms.flow.preflow_push)
+    #            this_cutset1=self.get_edges_between_partitions(this_partition1)
+    #            # reset the capacity back to the normal graph
+    #            #self.slabgraphdirec.edge[edge[0]][edge[1]]['capacity']-=1
+    #            #self.slabgraphdirec.edge[edge[1]][edge[0]]['capacity']-=1
 
-                this_cutset1=self.get_edges_between_partitions(this_partition1)
-                # reset the capacity back to the normal graph
-                #self.slabgraphdirec.edge[edge[0]][edge[1]]['capacity']-=1
-                #self.slabgraphdirec.edge[edge[1]][edge[0]]['capacity']-=1
+    #            # if this new cut has same minimum value AND
+    #            # is unique to all previously identified minimum cutsets
+    #            # keep it
+    #            if(this_cut_value1 == self.cut_value1 and this_cutset1 not in all_min_cutsets):
+    #                print("Found new cutset!:")
+    #                print(str(this_cutset1))
+    #                print(
+    #                      [(self.slabgraph.node[n1]['ciflabel'],
+    #                        self.slabgraph.node[n2]['ciflabel']) 
+    #                       for (n1, n2) in this_cutset1] 
+    #                     )
+    #                # keep a copy of this new min cutset
+    #                all_min_cutsets.append(this_cutset1)
+    #                # add this new min cutset to the stack of cuts that need to be
+    #                # augmented to find a new one
+    #                curr_min_cutsets.append(this_cutset1)
 
-                # if this new cut has same minimum value AND
-                # is unique to all previously identified minimum cutsets
-                # keep it
-                if(this_cut_value1 == self.cut_value1 and this_cutset1 not in all_min_cutsets):
-                    print("Found new cutset!:")
-                    print(str(this_cutset1))
-                    print(
-                          [(self.slabgraph.node[n1]['ciflabel'],
-                            self.slabgraph.node[n2]['ciflabel']) 
-                           for (n1, n2) in this_cutset1] 
-                         )
-                    # keep a copy of this new min cutset
-                    all_min_cutsets.append(this_cutset1)
-                    # add this new min cutset to the stack of cuts that need to be
-                    # augmented to find a new one
-                    curr_min_cutsets.append(this_cutset1)
+    #                # reset the capacity back to the normal graph
+    #                #self.slabgraphdirec.edge[edge[0]][edge[1]]['capacity']-=1
+    #                #self.slabgraphdirec.edge[edge[1]][edge[0]]['capacity']-=1
 
-                    # reset the capacity back to the normal graph
-                    #self.slabgraphdirec.edge[edge[0]][edge[1]]['capacity']-=1
-                    #self.slabgraphdirec.edge[edge[1]][edge[0]]['capacity']-=1
-
-                    # move on to newest identified min cut
-                    break
-
-
-            curr_min_cutsets.pop(0)
-
-        print("Multiple min cutsets identified (%d):"%len(all_min_cutsets))
-        print(all_min_cutsets)
-        print([
-                [(self.slabgraph.node[n1]['ciflabel'],
-                  self.slabgraph.node[n2]['ciflabel']) 
-                for (n1, n2) in all_min_cutsets[i]] 
-                for i in range(len(all_min_cutsets))
-              ])
-        print("Debugging structures to cif:")
-        for i in range(len(all_min_cutsets)):
-            # change element so we can vis it
-            tmp_nodes=[]
-            for (u,v) in all_min_cutsets[i]:
-                # color nodes
-                self.slabgraph.node[u]['element']='Ge'
-                self.slabgraph.node[v]['element']='Ge'
-                
-                # color edges
-                this_intersect = set(self.refgraph.neighbors(u)).intersection(self.refgraph.neighbors(v))     
-                if(len(this_intersect) == 1):
-                    n_to_add=next(iter(this_intersect))
-                    this_data = self.refgraph.node[n_to_add]
-                    self.slabgraph.add_node(n_to_add, this_data)
-                    tmp_nodes.append(n_to_add)
-
-            self.write_slabgraph_cif(self.cell,bond_block=False,descriptor="cutset%d"%i,relabel=False)
-            # reset nodes
-            for (u,v) in all_min_cutsets[i]:
-                self.slabgraph.node[u]['element']='Si'
-                self.slabgraph.node[v]['element']='Si'
-            # reset edges
-            for node in tmp_nodes:
-                self.slabgraph.remove_node(node)
-        
-        # Debug vis all saturated edges' nodes
-        tmp_nodes=[]
-        for (u,v) in self.sat_edges1:
-            # find common neighbor between u and v
-            this_intersect = set(self.refgraph.neighbors(u)).intersection(self.refgraph.neighbors(v))     
-            if(len(this_intersect) == 1):
-                n_to_add=next(iter(this_intersect))
-                this_data = self.refgraph.node[n_to_add]
-                self.slabgraph.add_node(n_to_add, this_data)
-                tmp_nodes.append(n_to_add)
-        self.write_slabgraph_cif(self.cell,bond_block=False,descriptor="satedges",relabel=False)
-        for node in tmp_nodes:
-            self.slabgraph.remove_node(node)
-            
-
-        # wichever partition is the biggest is the one we keep
-        # for now I am hoping that the algo always finds the symmetrically unique
-        # cut CLOSEST to either the sink or source node
-        if(len(self.partition1[0])>len(self.partition1[1])):
-            self.keep_partition_1=self.partition1[0].copy()
-            self.remove_partition_1=self.partition1[1].copy()
-        else:
-            self.keep_partition_1=self.partition1[1].copy()
-            self.remove_partition_1=self.partition1[0].copy()
-
-        # useful to also have a copy of the  partition sets with ciflabels
-        self.partition1_labeled=[[],[]]
-        for node in self.partition1[0]:
-            self.partition1_labeled[0].append((node,self.refgraph.node[node]['ciflabel']))
-        for node in self.partition1[1]:
-            self.partition1_labeled[1].append((node,self.refgraph.node[node]['ciflabel']))
+    #                # move on to newest identified min cut
+    #                break
 
 
-        print("\nForward s-t cut value:")
-        print(self.cut_value1)        
-        print("\nForward s-t cut edges:")
-        self.forward_edges=self.get_edges_between_partitions(self.partition1)
-        print(self.forward_edges)
-        print("\nForward s-t cut labeled:")
-        print([(self.slabgraph.node[n1]['ciflabel'],self.slabgraph.node[n2]['ciflabel']) for (n1, n2) in self.forward_edges])
+    #        curr_min_cutsets.pop(0)
 
-        
-        #print("Partition 1, set 0:")
-        #print(self.partition1[0])
-        #print("Partition 1, set 1:")
-        #print(self.partition1[1])
-        print("Forward cut (node, ciflabel) partition1:")
-        print(self.partition1_labeled[0])
-        print("Forward cut (node, ciflabel) partition2:")
-        print(self.partition1_labeled[1])
+    #    print("Multiple min cutsets identified (%d):"%len(all_min_cutsets))
+    #    print(all_min_cutsets)
+    #    print([
+    #            [(self.slabgraph.node[n1]['ciflabel'],
+    #              self.slabgraph.node[n2]['ciflabel']) 
+    #            for (n1, n2) in all_min_cutsets[i]] 
+    #            for i in range(len(all_min_cutsets))
+    #          ])
+    #    print("Debugging structures to cif:")
+    #    for i in range(len(all_min_cutsets)):
+    #        # change element so we can vis it
+    #        tmp_nodes=[]
+    #        for (u,v) in all_min_cutsets[i]:
+    #            # color nodes
+    #            self.slabgraph.node[u]['element']='Ge'
+    #            self.slabgraph.node[v]['element']='Ge'
+    #            
+    #            # color edges
+    #            this_intersect = set(self.refgraph.neighbors(u)).intersection(self.refgraph.neighbors(v))     
+    #            if(len(this_intersect) == 1):
+    #                n_to_add=next(iter(this_intersect))
+    #                this_data = self.refgraph.node[n_to_add]
+    #                self.slabgraph.add_node(n_to_add, this_data)
+    #                tmp_nodes.append(n_to_add)
 
-        # remove the midpoint barrier
-        if(weight_barrier):
-            self.create_weighted_barrier_on_opposite_half(start='neutral')
+    #        self.write_slabgraph_cif(self.cell,bond_block=False,descriptor="cutset%d"%i,relabel=False)
+    #        # reset nodes
+    #        for (u,v) in all_min_cutsets[i]:
+    #            self.slabgraph.node[u]['element']='Si'
+    #            self.slabgraph.node[v]['element']='Si'
+    #        # reset edges
+    #        for node in tmp_nodes:
+    #            self.slabgraph.remove_node(node)
+    #    
+    #    # Debug vis all saturated edges' nodes
+    #    tmp_nodes=[]
+    #    for (u,v) in self.sat_edges1:
+    #        # find common neighbor between u and v
+    #        this_intersect = set(self.refgraph.neighbors(u)).intersection(self.refgraph.neighbors(v))     
+    #        if(len(this_intersect) == 1):
+    #            n_to_add=next(iter(this_intersect))
+    #            this_data = self.refgraph.node[n_to_add]
+    #            self.slabgraph.add_node(n_to_add, this_data)
+    #            tmp_nodes.append(n_to_add)
+    #    self.write_slabgraph_cif(self.cell,bond_block=False,descriptor="satedges",relabel=False)
+    #    for node in tmp_nodes:
+    #        self.slabgraph.remove_node(node)
+    #        
 
-        # now reverse the tree and reverse the source and target nodes
-        # NOTE obsolete now that we have a directed graph and not a tree
-        self.slabgraphdirecREV=self.slabgraphdirec.reverse(copy=True)
-        #  create a barrier (aspect ratio of the slab is too large)
-        if(weight_barrier):
-            self.create_weighted_barrier_on_opposite_half(start='max')
-        self.cut_value2, self.partition2, self.cutset2 = nxmfc.minimum_cut(
-                self.slabgraphdirecREV,
-                self.super_surface_node_max,
-                self.super_surface_node_0,
-                flow_func=nx.algorithms.flow.shortest_augmenting_path)
+    #    # wichever partition is the biggest is the one we keep
+    #    # for now I am hoping that the algo always finds the symmetrically unique
+    #    # cut CLOSEST to either the sink or source node
+    #    if(len(self.partition1[0])>len(self.partition1[1])):
+    #        self.keep_partition_1=self.partition1[0].copy()
+    #        self.remove_partition_1=self.partition1[1].copy()
+    #    else:
+    #        self.keep_partition_1=self.partition1[1].copy()
+    #        self.remove_partition_1=self.partition1[0].copy()
 
-        # determine which are the removal/keep partitions
-        if(len(self.partition2[0])>len(self.partition2[1])):
-            self.keep_partition_2=self.partition2[0].copy()
-            self.remove_partition_2=self.partition2[1].copy()
-        else:
-            self.keep_partition_2=self.partition2[1].copy()
-            self.remove_partition_2=self.partition2[0].copy()
-
-        # useful to also have a copy of the  partition sets with ciflabels
-        self.partition2_labeled=[[],[]]
-        for node in self.partition2[0]:
-            self.partition2_labeled[0].append((node,self.refgraph.node[node]['ciflabel']))
-        for node in self.partition2[1]:
-            self.partition2_labeled[1].append((node,self.refgraph.node[node]['ciflabel']))
-
-
-        print("\nReverse s-t cut value:")
-        print(self.cut_value2)        
-        print("\nReverse s-t cut edges:")
-        print(self.get_edges_between_partitions(self.partition2))
-        #print("Partition 2, set 0:")
-        #print(self.partition2[0])
-        #print("Partition 2, set 1:")
-        #print(self.partition2[1])
-        print("Reverse cut (node, ciflabel) partition1:")
-        print(self.partition2_labeled[0])
-        print("Reverse cut (node, ciflabel) partition2:")
-        print(self.partition2_labeled[1])
-
-        # remove the midpoint barrier
-        if(weight_barrier):
-            self.create_weighted_barrier_on_opposite_half(start='neutral')
-
-
-    def nx_min_cut_digraph(self,weight_barrier=False,layer_props=None):
-        """
-        Use the Nx minimum cut of a directed graph (forward and reverse) edges
-        both exist with same weight, could equivalently be expressed as 
-        an undirected graph and the stoer-wagner algorithm be used
-
-        weight_barrier sets up a weight of inifinity for all edges whose nodes'
-        vacuum coordinates are both < 0.5 to constrain the solution to one half 
-        of the slab
-
-        then the weight barrier reverses (coordiantes > 0.5) to find the solution
-        on the other half of the slab
-        """
+    #    # useful to also have a copy of the  partition sets with ciflabels
+    #    self.partition1_labeled=[[],[]]
+    #    for node in self.partition1[0]:
+    #        self.partition1_labeled[0].append((node,self.refgraph.node[node]['ciflabel']))
+    #    for node in self.partition1[1]:
+    #        self.partition1_labeled[1].append((node,self.refgraph.node[node]['ciflabel']))
 
 
-        self.symmetric_cutsets=[]
+    #    print("\nForward s-t cut value:")
+    #    print(self.cut_value1)        
+    #    print("\nForward s-t cut edges:")
+    #    self.forward_edges=self.get_edges_between_partitions(self.partition1)
+    #    print(self.forward_edges)
+    #    print("\nForward s-t cut labeled:")
+    #    print([(self.slabgraph.node[n1]['ciflabel'],self.slabgraph.node[n2]['ciflabel']) for (n1, n2) in self.forward_edges])
 
-        print("\n\nNx minimum_cut function on directed slab graph...")
-        # Firt create a barrier (aspect ratio of the slab is too large)
-        if(weight_barrier):
-            self.create_weighted_barrier_on_opposite_half(start='min')
-        # uses stoer-wagner to do max flow (and indirectly min cut)
-        # given source and target node
-        self.cut_value1, self.partition1 = nx.minimum_cut(
-                self.slabgraphdirec,
-                self.super_surface_node_0,
-                self.super_surface_node_max,
-                flow_func=nx.algorithms.flow.shortest_augmenting_path)
+    #    
+    #    #print("Partition 1, set 0:")
+    #    #print(self.partition1[0])
+    #    #print("Partition 1, set 1:")
+    #    #print(self.partition1[1])
+    #    print("Forward cut (node, ciflabel) partition1:")
+    #    print(self.partition1_labeled[0])
+    #    print("Forward cut (node, ciflabel) partition2:")
+    #    print(self.partition1_labeled[1])
 
-        # wichever partition is the biggest is the one we keep
-        # for now I am hoping that the algo always finds the symmetrically unique
-        # cut CLOSEST to either the sink or source node
-        if(len(self.partition1[0])>len(self.partition1[1])):
-            self.keep_partition_1=self.partition1[0].copy()
-            self.remove_partition_1=self.partition1[1].copy()
-        else:
-            self.keep_partition_1=self.partition1[1].copy()
-            self.remove_partition_1=self.partition1[0].copy()
+    #    # remove the midpoint barrier
+    #    if(weight_barrier):
+    #        self.create_weighted_barrier_on_opposite_half(start='neutral')
 
-        # useful to also have a copy of the  partition sets with ciflabels
-        self.partition1_labeled=[[],[]]
-        for node in self.partition1[0]:
-            self.partition1_labeled[0].append((node,self.refgraph.node[node]['ciflabel']))
-        for node in self.partition1[1]:
-            self.partition1_labeled[1].append((node,self.refgraph.node[node]['ciflabel']))
+    #    # now reverse the tree and reverse the source and target nodes
+    #    # NOTE obsolete now that we have a directed graph and not a tree
+    #    self.slabgraphdirecREV=self.slabgraphdirec.reverse(copy=True)
+    #    #  create a barrier (aspect ratio of the slab is too large)
+    #    if(weight_barrier):
+    #        self.create_weighted_barrier_on_opposite_half(start='max')
+    #    self.cut_value2, self.partition2, self.cutset2 = nxmfc.minimum_cut(
+    #            self.slabgraphdirecREV,
+    #            self.super_surface_node_max,
+    #            self.super_surface_node_0,
+    #            flow_func=nx.algorithms.flow.shortest_augmenting_path)
 
+    #    # determine which are the removal/keep partitions
+    #    if(len(self.partition2[0])>len(self.partition2[1])):
+    #        self.keep_partition_2=self.partition2[0].copy()
+    #        self.remove_partition_2=self.partition2[1].copy()
+    #    else:
+    #        self.keep_partition_2=self.partition2[1].copy()
+    #        self.remove_partition_2=self.partition2[0].copy()
 
-        print("\nForward s-t cut value:")
-        print(self.cut_value1)        
-        #print("Partition 1, set 0:")
-        #print(self.partition1[0])
-        #print("Partition 1, set 1:")
-        #print(self.partition1[1])
-        #print("Forward cut (node, ciflabel) partition1:")
-        #print(self.partition1_labeled[0])
-        #print("Forward cut (node, ciflabel) partition2:")
-        #print(self.partition1_labeled[1])
-        print("\nForward s-t cut edges:")
-        forward_edges=self.get_edges_between_partitions(self.partition1)
-        print(forward_edges)
-        print("\nSymmetric forward s-t cut edges")
-        forward_edges_symm = self.id_symmetric_cut(forward_edges, layer_props)
-        print(forward_edges_symm)
-
-        self.symmetric_cutsets.append([forward_edges, forward_edges_symm])
-
-        # remove the midpoint barrier
-        if(weight_barrier):
-            self.create_weighted_barrier_on_opposite_half(start='neutral')
-
-        # now reverse the tree and reverse the source and target nodes
-        self.slabgraphdirecREV=self.slabgraphdirec.reverse(copy=True)
-        #  create a barrier (aspect ratio of the slab is too large)
-        if(weight_barrier):
-            self.create_weighted_barrier_on_opposite_half(start='max')
-        self.cut_value2, self.partition2 = nx.minimum_cut(
-                self.slabgraphdirecREV,
-                self.super_surface_node_max,
-                self.super_surface_node_0,
-                flow_func=nx.algorithms.flow.shortest_augmenting_path)
-
-        # determine which are the removal/keep partitions
-        if(len(self.partition2[0])>len(self.partition2[1])):
-            self.keep_partition_2=self.partition2[0].copy()
-            self.remove_partition_2=self.partition2[1].copy()
-        else:
-            self.keep_partition_2=self.partition2[1].copy()
-            self.remove_partition_2=self.partition2[0].copy()
-
-        # useful to also have a copy of the  partition sets with ciflabels
-        self.partition2_labeled=[[],[]]
-        for node in self.partition2[0]:
-            self.partition2_labeled[0].append((node,self.refgraph.node[node]['ciflabel']))
-        for node in self.partition2[1]:
-            self.partition2_labeled[1].append((node,self.refgraph.node[node]['ciflabel']))
+    #    # useful to also have a copy of the  partition sets with ciflabels
+    #    self.partition2_labeled=[[],[]]
+    #    for node in self.partition2[0]:
+    #        self.partition2_labeled[0].append((node,self.refgraph.node[node]['ciflabel']))
+    #    for node in self.partition2[1]:
+    #        self.partition2_labeled[1].append((node,self.refgraph.node[node]['ciflabel']))
 
 
-        print("\nReverse s-t cut value:")
-        print(self.cut_value2)        
-        #print("Partition 2, set 0:")
-        #print(self.partition2[0])
-        #print("Partition 2, set 1:")
-        #print(self.partition2[1])
-        #print("Reverse cut (node, ciflabel) partition1:")
-        #print(self.partition2_labeled[0])
-        #print("Reverse cut (node, ciflabel) partition2:")
-        #print(self.partition2_labeled[1])
-        print("\nReverse s-t cut edges:")
-        reverse_edges=self.get_edges_between_partitions(self.partition2)
-        print(reverse_edges)
-        print("\nSymmetric reverse s-t cut edges")
-        reverse_edges_symm = self.id_symmetric_cut(reverse_edges, layer_props) 
-        print(reverse_edges_symm)
+    #    print("\nReverse s-t cut value:")
+    #    print(self.cut_value2)        
+    #    print("\nReverse s-t cut edges:")
+    #    print(self.get_edges_between_partitions(self.partition2))
+    #    #print("Partition 2, set 0:")
+    #    #print(self.partition2[0])
+    #    #print("Partition 2, set 1:")
+    #    #print(self.partition2[1])
+    #    print("Reverse cut (node, ciflabel) partition1:")
+    #    print(self.partition2_labeled[0])
+    #    print("Reverse cut (node, ciflabel) partition2:")
+    #    print(self.partition2_labeled[1])
 
-        self.symmetric_cutsets.append([forward_edges, forward_edges_symm])
+    #    # remove the midpoint barrier
+    #    if(weight_barrier):
+    #        self.create_weighted_barrier_on_opposite_half(start='neutral')
 
-        # remove the midpoint barrier
-        if(weight_barrier):
-            self.create_weighted_barrier_on_opposite_half(start='neutral')
+
+    #def nx_min_cut_digraph(self,weight_barrier=False,layer_props=None):
+    #    """
+    #    Use the Nx minimum cut of a directed graph (forward and reverse) edges
+    #    both exist with same weight, could equivalently be expressed as 
+    #    an undirected graph and the stoer-wagner algorithm be used
+
+    #    weight_barrier sets up a weight of inifinity for all edges whose nodes'
+    #    vacuum coordinates are both < 0.5 to constrain the solution to one half 
+    #    of the slab
+
+    #    then the weight barrier reverses (coordiantes > 0.5) to find the solution
+    #    on the other half of the slab
+    #    """
+
+
+    #    self.symmetric_cutsets=[]
+
+    #    print("\n\nNx minimum_cut function on directed slab graph...")
+    #    # Firt create a barrier (aspect ratio of the slab is too large)
+    #    if(weight_barrier):
+    #        self.create_weighted_barrier_on_opposite_half(start='min')
+    #    # uses stoer-wagner to do max flow (and indirectly min cut)
+    #    # given source and target node
+    #    self.cut_value1, self.partition1 = nx.minimum_cut(
+    #            self.slabgraphdirec,
+    #            self.super_surface_node_0,
+    #            self.super_surface_node_max,
+    #            flow_func=nx.algorithms.flow.shortest_augmenting_path)
+
+    #    # wichever partition is the biggest is the one we keep
+    #    # for now I am hoping that the algo always finds the symmetrically unique
+    #    # cut CLOSEST to either the sink or source node
+    #    if(len(self.partition1[0])>len(self.partition1[1])):
+    #        self.keep_partition_1=self.partition1[0].copy()
+    #        self.remove_partition_1=self.partition1[1].copy()
+    #    else:
+    #        self.keep_partition_1=self.partition1[1].copy()
+    #        self.remove_partition_1=self.partition1[0].copy()
+
+    #    # useful to also have a copy of the  partition sets with ciflabels
+    #    self.partition1_labeled=[[],[]]
+    #    for node in self.partition1[0]:
+    #        self.partition1_labeled[0].append((node,self.refgraph.node[node]['ciflabel']))
+    #    for node in self.partition1[1]:
+    #        self.partition1_labeled[1].append((node,self.refgraph.node[node]['ciflabel']))
+
+
+    #    print("\nForward s-t cut value:")
+    #    print(self.cut_value1)        
+    #    #print("Partition 1, set 0:")
+    #    #print(self.partition1[0])
+    #    #print("Partition 1, set 1:")
+    #    #print(self.partition1[1])
+    #    #print("Forward cut (node, ciflabel) partition1:")
+    #    #print(self.partition1_labeled[0])
+    #    #print("Forward cut (node, ciflabel) partition2:")
+    #    #print(self.partition1_labeled[1])
+    #    print("\nForward s-t cut edges:")
+    #    forward_edges=self.get_edges_between_partitions(self.partition1)
+    #    print(forward_edges)
+    #    print("\nSymmetric forward s-t cut edges")
+    #    forward_edges_symm = self.id_symmetric_cut(forward_edges, layer_props)
+    #    print(forward_edges_symm)
+
+    #    self.symmetric_cutsets.append([forward_edges, forward_edges_symm])
+
+    #    # remove the midpoint barrier
+    #    if(weight_barrier):
+    #        self.create_weighted_barrier_on_opposite_half(start='neutral')
+
+    #    # now reverse the tree and reverse the source and target nodes
+    #    self.slabgraphdirecREV=self.slabgraphdirec.reverse(copy=True)
+    #    #  create a barrier (aspect ratio of the slab is too large)
+    #    if(weight_barrier):
+    #        self.create_weighted_barrier_on_opposite_half(start='max')
+    #    self.cut_value2, self.partition2 = nx.minimum_cut(
+    #            self.slabgraphdirecREV,
+    #            self.super_surface_node_max,
+    #            self.super_surface_node_0,
+    #            flow_func=nx.algorithms.flow.shortest_augmenting_path)
+
+    #    # determine which are the removal/keep partitions
+    #    if(len(self.partition2[0])>len(self.partition2[1])):
+    #        self.keep_partition_2=self.partition2[0].copy()
+    #        self.remove_partition_2=self.partition2[1].copy()
+    #    else:
+    #        self.keep_partition_2=self.partition2[1].copy()
+    #        self.remove_partition_2=self.partition2[0].copy()
+
+    #    # useful to also have a copy of the  partition sets with ciflabels
+    #    self.partition2_labeled=[[],[]]
+    #    for node in self.partition2[0]:
+    #        self.partition2_labeled[0].append((node,self.refgraph.node[node]['ciflabel']))
+    #    for node in self.partition2[1]:
+    #        self.partition2_labeled[1].append((node,self.refgraph.node[node]['ciflabel']))
+
+
+    #    print("\nReverse s-t cut value:")
+    #    print(self.cut_value2)        
+    #    #print("Partition 2, set 0:")
+    #    #print(self.partition2[0])
+    #    #print("Partition 2, set 1:")
+    #    #print(self.partition2[1])
+    #    #print("Reverse cut (node, ciflabel) partition1:")
+    #    #print(self.partition2_labeled[0])
+    #    #print("Reverse cut (node, ciflabel) partition2:")
+    #    #print(self.partition2_labeled[1])
+    #    print("\nReverse s-t cut edges:")
+    #    reverse_edges=self.get_edges_between_partitions(self.partition2)
+    #    print(reverse_edges)
+    #    print("\nSymmetric reverse s-t cut edges")
+    #    reverse_edges_symm = self.id_symmetric_cut(reverse_edges, layer_props) 
+    #    print(reverse_edges_symm)
+
+    #    self.symmetric_cutsets.append([forward_edges, forward_edges_symm])
+
+    #    # remove the midpoint barrier
+    #    if(weight_barrier):
+    #        self.create_weighted_barrier_on_opposite_half(start='neutral')
 
     ###########################################################################
     # START DEBUG visualization functions
@@ -3315,16 +3432,34 @@ class SlabGraph(MolecularGraph):
 
         print("Assigning each atoms in slab to the correct slab layer")
 
+        # NOTE important this is not rigorous since we are sorting possible identical c -values
+        # need to get the layer data directly from pymatgen
+        #tosort= [(n, data) for n, data in self.slabgraph.nodes_iter(data=True)]
+
+        #sort_on_c=sorted(tosort, key=lambda tup: tup[1]['_atom_site_fract_z'])
+   
+        # 
+        #for i in range(len(sort_on_c)):
+        #    node=sort_on_c[i][0]
+        #    slablayer=int(np.floor(i/layer_props['a_per_l']))
+        #    self.slabgraph.node[node]['slablayer']=slablayer
+        #    self.refgraph.node[node]['slablayer']=slablayer
+
+
+        # NOTE a better way is to just make sure that the ordering is not sorted by Pymatgen
+        # is every a_per_l atoms as we go from node 1 to N we know we have switched layers
         tosort= [(n, data) for n, data in self.slabgraph.nodes_iter(data=True)]
 
-        sort_on_c=sorted(tosort, key=lambda tup: tup[1]['_atom_site_fract_z'])
+        sort_on_n=sorted(tosort, key=lambda tup: tup[0])
    
          
-        for i in range(len(sort_on_c)):
-            node=sort_on_c[i][0]
+        for i in range(len(sort_on_n)):
+            node=sort_on_n[i][0]
             slablayer=int(np.floor(i/layer_props['a_per_l']))
             self.slabgraph.node[node]['slablayer']=slablayer
             self.refgraph.node[node]['slablayer']=slablayer
+
+
 
 
     def debug_slab_layers(self):
@@ -3357,6 +3492,14 @@ class SlabGraph(MolecularGraph):
 
         C_symm = [(layer_props['inversion_mapping'][u],layer_props['inversion_mapping'][v]) for (u,v) in C]
         return C_symm
+
+    def id_trans_layer_cut(self, C, layer_props):
+        """
+        Find the "opposite" cut based on the translational equivalent in the opposite layer
+        """
+
+        C_opp = [(layer_props['translation_mapping'][u],layer_props['translation_mapping'][v]) for (u,v) in C]
+        return C_opp
 
     ###########################################################################
     # START all functions for final manipulations to create valid slab
@@ -4089,7 +4232,7 @@ def write_CIF(G, cell, bond_block=True,descriptor="debug",relabel=True):
     for node, data in G.nodes_iter(data=True):
         # can override write to try to preserve the already assigned ciflabel
         if(relabel==True):
-            label = "%s%i"%(data['ciflabel'], node)
+            label = "%s%i"%(data['element'], node)
         else:
             try:
                 label = "%s"%(data['ciflabel'])
