@@ -2189,7 +2189,7 @@ def unique_typing(structure,dataset,debug=False):
     return unique_descr_to_sites
 
 
-def create_slab_pym(ifname,slab_face,slab_thickness,slab_vacuum):
+def create_slab_pym(ifname,slab_face,slab_thickness,slab_vacuum,verbose=True):
   
     print("\nCreatig Pymatgen initial slab:") 
 
@@ -2197,32 +2197,43 @@ def create_slab_pym(ifname,slab_face,slab_thickness,slab_vacuum):
     parser=pic.CifParser(ifname)
     structure=parser.get_structures()[0]                      
 
+    # First check the symmetrically distinct Miller indices
+    symm_distinct_hkl=pymatgen.core.surface.get_symmetrically_distinct_miller_indices(structure,2)
+    if(verbose):
+        print("Symmetrically distinct hkl Miller planes are:")
+        print(symm_distinct_hkl)
+
     # initial slabgen object
+    miller_list = tuple([int(elem) for elem in slab_face])
     slabgen=SlabGenerator(structure, 
-                 (int(slab_face[0]),int(slab_face[1]),int(slab_face[2])),
+                 miller_list,
                  min_slab_size=slab_thickness, 
                  min_vacuum_size=slab_vacuum,
                  primitive=True,
                  lll_reduce=True, center_slab=True
                          )
-    print("Projection height of slab for this face: %.3f"%(slabgen._proj_height))
+
 
     # recalculate the new min slab thickness to have two additional layers
     layers_list=get_nlayers(slabgen)
     new_min_slab_size=(layers_list[0]+4)*slabgen._proj_height-0.1
-    print("%d slab layers for MIN thickness of %.1f"%(layers_list[0],slab_thickness))
 
-    # create modified slabgen object
-    slabgen_no_lll=SlabGenerator(structure, 
-                 (int(slab_face[0]),int(slab_face[1]),int(slab_face[2])),
-                 min_slab_size=new_min_slab_size, 
-                 min_vacuum_size=slab_vacuum,
-                 primitive=True,
-                 lll_reduce=False, center_slab=True
-                         )
+    if(verbose):
+        print("Projection height of slab for this face: %.3f"%(slabgen._proj_height))
+        print("%d slab layers for MIN thickness of %.1f"%(layers_list[0],slab_thickness))
 
+    ## create modified slabgen object
+    #slabgen_no_lll=SlabGenerator(structure, 
+    #             (int(slab_face[0]),int(slab_face[1]),int(slab_face[2])),
+    #             min_slab_size=new_min_slab_size, 
+    #             min_vacuum_size=slab_vacuum,
+    #             primitive=True,
+    #             lll_reduce=False, center_slab=True
+    #                     )
+
+    # new SlabGenerator object with a min slab thickness that gives the min+4 # of layers
     slabgen=SlabGenerator(structure, 
-                 (int(slab_face[0]),int(slab_face[1]),int(slab_face[2])),
+                 miller_list,
                  min_slab_size=new_min_slab_size, 
                  min_vacuum_size=slab_vacuum,
                  primitive=True,
@@ -2231,6 +2242,15 @@ def create_slab_pym(ifname,slab_face,slab_thickness,slab_vacuum):
     layers_list=get_nlayers(slabgen)
     print("%d slab layers for thickness of %.1f"%(layers_list[0],new_min_slab_size))
 
+    slabs=slabgen.get_slabs()
+    for i in range(len(slabs)):
+        print("\nSlab: %d"%i)                                                  
+        print(slabs[i].lattice)                                                
+        print("Num sites: %d"%len(slabs[i].sites))                             
+                                                                               
+        # symmetric slab                                                       
+        outputter=pic.CifWriter(slabs[i])                                      
+        outputter.write_file("slab_id%05d.cif"%i) 
 
     frac_coords=slabgen.oriented_unit_cell.frac_coords
     #print("frac_coords in oriented unit cell")
@@ -2313,8 +2333,11 @@ def create_slab_pym(ifname,slab_face,slab_thickness,slab_vacuum):
     translation_dataset = translation_mapping(slab_L,a_per_l,slab)
 
     # re-write new slab to CIF so LAMMPS interface can re-interpret this new slab
+    miller_string=""
+    for elem in miller_list:
+        miller_string+=str(elem)
     ofname = str(ifname[:-4])+"_"+\
-             str(slab_face[0])+str(slab_face[1])+str(slab_face[2])+"_"+\
+             miller_string+"_"+\
              str(slab_L)+"_slab_pym"
     outputter = pic.CifWriter(slab)
     outputter.write_file(ofname+".cif")
@@ -2747,6 +2770,15 @@ def main():
         # min cut parameters
         sim.mincut_eps = options.mincut_eps
         sim.mincut_k   = options.mincut_k
+
+        print("Miller face: " + str(sim.slab_face         ))
+        print("Slab vacuum: " + str(sim.slab_vacuum       ))
+        print("Slab thick: " + str(sim.slab_target_thick  ))
+        print("Mincut eps: " + str(sim.mincut_eps         ))
+        print("Mincut k:   " + str(sim.mincut_k           ))
+
+
+
 
         # create pymatgen structure and get layer properties
         layer_props=create_slab_pym(options.cif_file,sim.slab_face,sim.slab_target_thick,sim.slab_vacuum)
