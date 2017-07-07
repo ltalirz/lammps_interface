@@ -2873,7 +2873,7 @@ class SlabGraph(MolecularGraph):
 
     def nx_near_min_cut_digraph_custom(self, eps=0, k=0, weight_barrier=False,
                                                          layer_props=None,
-                                                         max_num_cuts=1):
+                                                         max_num_cuts=5):
         """
         Find all near min cuts in a graph
 
@@ -3430,7 +3430,8 @@ class SlabGraph(MolecularGraph):
         (the layer it belongs to must be calculated w/pymatgen
         """ 
 
-        print("Assigning each atoms in slab to the correct slab layer")
+        print("\nAssigning each atoms in slab to the correct slab layer")
+
 
         # NOTE important this is not rigorous since we are sorting possible identical c -values
         # need to get the layer data directly from pymatgen
@@ -3456,10 +3457,13 @@ class SlabGraph(MolecularGraph):
         for i in range(len(sort_on_n)):
             node=sort_on_n[i][0]
             slablayer=int(np.floor(i/layer_props['a_per_l']))
+            #print(slablayer)
             self.slabgraph.node[node]['slablayer']=slablayer
             self.refgraph.node[node]['slablayer']=slablayer
 
 
+        print("%d atoms in the slab"%len(sort_on_n))
+        print("%d atoms per layer"%layer_props['a_per_l'])
 
 
     def debug_slab_layers(self):
@@ -3471,6 +3475,7 @@ class SlabGraph(MolecularGraph):
         # reassign element type based on its slablayer
         for n,data in self.slabgraph.nodes_iter(data=True):
             slablayer=data['slablayer']
+            #print(slablayer)
             # just to give it better coloring to start than an H atom in Mercury
             slablayer+=3
             data['element']=ATOMIC_NUMBER[slablayer]
@@ -3497,8 +3502,31 @@ class SlabGraph(MolecularGraph):
         """
         Find the "opposite" cut based on the translational equivalent in the opposite layer
         """
+        all_layers_in_cut = {}
+        
+        for (u,v) in C:
+            all_layers_in_cut[self.slabgraph.node[u]['slablayer']]=None
+            all_layers_in_cut[self.slabgraph.node[v]['slablayer']]=None
 
-        C_opp = [(layer_props['translation_mapping'][u],layer_props['translation_mapping'][v]) for (u,v) in C]
+        # get a list of all layers spanned by cut
+        all_layers_in_cut=sorted(all_layers_in_cut.keys())
+        #print(all_layers_in_cut)
+
+        # find the opposite layer for each layer of cut
+        opp_layers=[(layer_props['slab_L']-1)-all_layers_in_cut[i] for i in range(len(all_layers_in_cut))]
+        #print(opp_layers)        
+
+        # now reverse the list of the opposite layers
+        opp_layers=opp_layers[::-1]
+        #print(opp_layers)        
+        
+        # the translational offset is the difference between the opposite and original cut layers for any index
+        del_n = opp_layers[0]-all_layers_in_cut[0] 
+        #print(del_n)
+
+        # Tabulate the translational cut and return
+        C_opp = [(u+layer_props['a_per_l']*del_n, v+layer_props['a_per_l']*del_n) for (u,v) in C]
+        #C_opp = [(layer_props['translation_mapping'][u],layer_props['translation_mapping'][v]) for (u,v) in C]
         return C_opp
 
     ###########################################################################
@@ -3533,6 +3561,8 @@ class SlabGraph(MolecularGraph):
             # write this file
             thisid=self.all_cut_ids[it]
             self.write_slabgraph_cif(tmpG,self.cell,bond_block=False,descriptor="cut%s.addH"%thisid,relabel=False)
+            #self.write_labgraph_cif(tmpG,self.cell,bond_block=False,descriptor="cut%s.addH"%thisid,relabel=False)
+            self.write_silanol_surface_density(cutset,tmpG.name+".cut%s.addH"%thisid+".dat")
         
             it+=1
         
@@ -3993,11 +4023,16 @@ class SlabGraph(MolecularGraph):
         f = np.dot(self.cell.inverse, coord) 
         return f 
 
-    def write_silanol_surface_density(self):
+    def write_silanol_surface_density(self, C, ofname):
 
+        unit_area=self.cell.a*self.cell.b                                   
+        # correct if this face is not orthogonal                                
+        unit_area*=np.sin(np.deg2rad(self.cell.gamma))                          
+        per_surface_density=len(C[0])/(unit_area)
 
-        print("Surface silanol density: %.5f"%(self.cut_value1/(self.cell.a*self.cell.b)))
-        print("Surface silanol density: %.5f"%(self.cut_value2/(self.cell.a*self.cell.b)))   
+        f=open(ofname,"w")
+        f.write("%d %.5f %.5f"%(len(C[0]), unit_area, per_surface_density))
+        f.close()
 
 
     def write_slabgraph_cif(self, G, cell,bond_block=True,descriptor="debug",relabel=False):
