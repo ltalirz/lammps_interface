@@ -409,6 +409,14 @@ class Options(object):
             dest="mincut_k",
             help="Find cuts of weight min_cut_weight+mincut_k"+
                  "Default is 0")
+        parameter_group.add_argument(
+            "--max-num-cuts",
+            action="store",
+            type=int,
+            default=1,
+            dest="maxnumcuts",
+            help="Stop executing the search algorithm after finding maxnumcuts")
+
 
     
 

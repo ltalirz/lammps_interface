@@ -3003,10 +3003,11 @@ class SlabGraph(MolecularGraph):
                 elif(layer_props['translation_mapping'] is not None):
                     self.all_cut_C0=[(list(C),self.id_trans_layer_cut(list(C),layer_props)) for C in all_min_cuts]
                 else:
+                    pass
                     # TODO how to handle this case if no tranlation mapping
                     # i.e. slabs not made w/pymatgen
-                    print("For now, can't handle multiple cuts w/o inversion or translation mapping to find the opposite cut")
-                    sys.exit()
+                    #print("For now, can't handle multiple cuts w/o inversion or translation mapping to find the opposite cut")
+                    #sys.exit()
 
                 self.all_cut_ids=["%05d"%i for i in range(len(self.all_cut_C0))]
                 print("\nAll initial cutsets (%d):"%len(self.all_cut_C0))
