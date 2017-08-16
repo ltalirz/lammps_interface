@@ -2050,7 +2050,7 @@ def main():
 
     # Additional capability to write RASPA files if requested
     if options.output_raspa:
-        classifier=1
+        classifier=0
         print("Writing RASPA files to current WD")
         write_RASPA_CIF(graph, cell, classifier)
         write_RASPA_sim_files(sim, classifier)

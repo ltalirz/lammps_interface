@@ -26,12 +26,13 @@ import Molecules
 if sys.version_info < (3,0):
     input = raw_input
 
-try:
-    from ase.io import *
-    from ase.build import *
-except:
-    print("Error ASE not found! ASE import failed, cannot build initial slab guess with ASE!")
-    sys.exit()
+# NOTE removed ASE support 
+#try:
+#    from ase.io import *
+#    from ase.build import *
+#except:
+#    print("Error ASE not found! ASE import failed, cannot build initial slab guess with ASE!")
+#    sys.exit()
 
 try:
     import pymatgen
@@ -2844,6 +2845,9 @@ def produce_optimal_surface_slab(options, sim, face):
     sim.mincut_k   = options.mincut_k
     sim.maxnumcuts    = options.maxnumcuts 
 
+    # specialty parameters
+    sim.Ge_delam   = options.Ge_delam
+
     print("Input parameters:")
     print("Miller face: " + str(sim.slab_face         ))
     print("Slab vacuum: " + str(sim.slab_vacuum       ))
@@ -2889,8 +2893,14 @@ def produce_optimal_surface_slab(options, sim, face):
     sim.slabgraph.normalize_bulk_edge_weights()                                 
     sim.slabgraph.connect_super_surface_nodes_v2() 
 
+    # if targeting Ge delamination, reweight edges coming out of the D4R
+    # ring to a nominally small value
+    if(sim.Ge_delam):
+        sim.slabgraph.check_D4R()
+
     # Create a directed copy for max-flow/min-cut st problem
     sim.slabgraph.convert_to_digraph()                                            
+
 
     # DEBUG file writing before graph cutting 
     if(sim.slab_verbose):
@@ -3158,6 +3168,9 @@ def main():
         sim.mincut_eps = options.mincut_eps
         sim.mincut_k   = options.mincut_k
         sim.maxnumcuts = options.maxnumcuts
+
+        # specialty parameters 
+        sim.Ge_delam = options.Ge_delam
 
         print("Input parameters:")
         print("Miller face: " + str(sim.slab_face         ))

@@ -416,6 +416,16 @@ class Options(object):
             default=1,
             dest="maxnumcuts",
             help="Stop executing the search algorithm after finding maxnumcuts")
+        parameter_group.add_argument(
+            "--Ge-delam",
+            action="store",
+            type=bool,
+            default=False,
+            dest="Ge_delam",
+            help="Ge_delam option automatically reduces the weight of an edge"+
+                 "that leaves a D4R moiety since these are preferentially hydrolzyed"+
+                 "in Ge delamination")
+
 
 
     

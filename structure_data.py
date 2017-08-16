@@ -1935,6 +1935,96 @@ class SlabGraph(MolecularGraph):
               (len(self.slabgraph.neighbors(self.super_surface_node_max))))
         print("Total weight out: %d"%self.super_surface_node_max_weight)
 
+    def check_D4R(self):
+        """
+        Check for D4R rings (preferential Ge sites) that can react with water
+        to dislocate the structure
+        """
+
+        print("Checking for D4R rings:")
+       
+        tmpG=deepcopy(self.slabgraph)
+        #simple_cycles=list(nx.simple_cycles(tmpG))
+        #print(simple_cycles)
+
+        cycles = []
+        # not the most efficient, can def be improved
+        for node, data in tmpG.nodes_iter(data=True):
+            print("Node %d:"%(node))
+            #cycle = list(nx.all_shortest_paths(tmpG, node, node))
+            for n in tmpG.neighbors(node):
+                # fastest way I could think of..
+                edge = tmpG[node][n].copy()
+                tmpG.remove_edge(node, n)
+                cycle = []
+                try:
+                    cycle = list(nx.all_shortest_paths(tmpG, node, n))
+                except nx.exception.NetworkXNoPath:
+                    pass
+                tmpG.add_edge(node, n, **edge)
+                print(len(cycle))
+                print(cycle)
+                filter_cycles=[]
+                for ind in cycle:
+                    if(len(ind)==4):
+                        filter_cycles.append(ind)
+                cycles += filter_cycles
+
+        # now we have a list of all 4 cycles in the graph
+        #print("Cycles: %s"%(str(cycles)))
+
+        # group all four rings that share any nodes (could also just do in 
+        # NetworkX and use connected components) which are D4Rs or a collection
+        # of connected D4Rs
+        D4R = []
+        l=deepcopy(cycles)
+        while len(l)>0:
+            first, *rest = l
+            first = set(first)
+
+            lf = -1
+            while len(first)>lf:
+                lf = len(first)
+
+                rest2 = []
+                for r in rest:
+                    if len(first.intersection(set(r)))>0:
+                        first |= set(r)
+                    else:
+                        rest2.append(r)     
+                rest = rest2
+
+            D4R.append(first)
+            l = rest
+        # filter out anything not containing 8 nodes
+        final_D4R=[]
+        for struct in D4R:
+            if(len(struct) == 8):
+                final_D4R.append(struct)
+        # final subunits 
+        print("D4Rs: %s"%(str(final_D4R)))
+        if(len(final_D4R)==0):
+            print("Warning, structure passed in with no D4R units, but surface\
+                   was requested to be generated w/Ge delamination. Exiting...")
+            f=open('no_D4R.txt','w')
+            f.close()
+            
+
+
+        # finally, weight all edges that go from a node in a D4R to a node
+        # not in a D4R with a value of 0.1
+        all_D4R_nodes=set()
+        all_D4R_nodes=all_D4R_nodes.union(*final_D4R)
+        print(all_D4R_nodes)
+        for struct in final_D4R:
+            for n in struct:
+                for neigh in self.slabgraph.neighbors(n):
+                    if(neigh not in all_D4R_nodes):
+                        self.slabgraph.edge[n][neigh]['capacity']=0.1
+                        self.slabgraph.edge[n][neigh]['weight']=0.1
+
+        
+
 
                     
     def convert_to_digraph(self):
@@ -4029,7 +4119,12 @@ class SlabGraph(MolecularGraph):
         unit_area=self.cell.a*self.cell.b                                   
         # correct if this face is not orthogonal                                
         unit_area*=np.sin(np.deg2rad(self.cell.gamma))                          
-        per_surface_density=len(C[0])/(unit_area)
+
+        cut_weight=sum([self.slabgraph.edge[edg[0]][edg[1]]['weight'] for edg in C[0]])
+        
+        # NOTE changed to sum of edge weights instead of # of edges
+        #per_surface_density=sum(C[0])/(unit_area)
+        per_surface_density=cut_weight/(unit_area)
 
         f=open(ofname,"w")
         f.write("%d %.5f %.5f"%(len(C[0]), unit_area, per_surface_density))
