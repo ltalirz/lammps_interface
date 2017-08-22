@@ -1480,8 +1480,24 @@ class MolecularGraph(nx.Graph):
         cg = self.correspondence_graph(graph, 0.4)
         cliques = list(nx.find_cliques(cg))
         cliques.sort(key=len)
-        return cliques[-1] 
+        return cliques[-1]
 
+    def to_openbabel_structure(self):
+        try:
+            obstruct = ob.OBMol()
+        except NameError:
+            # openbabel could not be imported.
+            return
+        # add atoms and bonds one-by-one
+        for node in self.nodes_iter():
+            # shift by periodic boundaries??
+            a = obstruct.NewAtom()
+            a.SetAtomicNum(self.node[node]['atomic_number'])
+            a.SetVector(*self.node[node]['cartesian_coordinates'])
+        for (n1, n2, data) in self.edges_iter2(data=True):
+            obstruct.AddBond(n1, n2, data['order'])
+
+        return obstruct
 
 # END MolecularGraph class
 

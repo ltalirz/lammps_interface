@@ -24,6 +24,12 @@ from InputHandler import Options
 from copy import deepcopy
 from ForceFields import EVTOKCAL
 import Molecules
+try:
+    import openbabel as ob
+    obmodule=True
+except ImportError:
+    print("WARNING - openbabel library not found. Comparison of molecules will be conducted with clique detection")
+    obmodule=False
 if sys.version_info < (3,0):
     input = raw_input
 
@@ -467,17 +473,30 @@ class LammpsSimulation(object):
                 self.subgraphs.append(sg)
         type = 0
         temp_types = {}
+        if (obmodule):
+            conv = ob.OBConversion()
+            conv.SetOutFormat("INCHI")
+            conv.SetOptions("K", conv.OUTOPTIONS)
+
         for i, j in itertools.combinations(range(len(self.subgraphs)), 2):
             if self.subgraphs[i].number_of_nodes() != self.subgraphs[j].number_of_nodes():
                 continue
             
-            #TODO(pboyd): For complex 'floppy' molecules, a rigid 3D clique detection
-            # algorithm won't work very well. Inchi or smiles comparison may be better,
-            # but that would require using openbabel. I'm trying to keep this
-            # code as independent of non-standard python libraries as possible.
-            matched = self.subgraphs[i] | self.subgraphs[j]
-            condition = (len(matched) == self.subgraphs[i].number_of_nodes())
-
+            
+            if obmodule:
+                moli = self.subgraphs[i]
+                molj = self.subgraphs[j]
+                inchii = conv.WriteString(moli)
+                inchij = conv.WriteString(molj)
+                condition = (inchii == inchij)
+            else:
+                #TODO(pboyd): For complex 'floppy' molecules, a rigid 3D clique detection
+                # algorithm won't work very well. Inchi or smiles comparison may be better,
+                # but that would require using openbabel. I'm trying to keep this
+                # code as independent of non-standard python libraries as possible.
+                matched = self.subgraphs[i] | self.subgraphs[j]
+                condition = (len(matched) == self.subgraphs[i].number_of_nodes())
+            
             if condition:
                 if i not in list(temp_types.keys()) and j not in list(temp_types.keys()):
                     type += 1
