@@ -1979,7 +1979,9 @@ class SlabGraph(MolecularGraph):
         D4R = []
         l=deepcopy(cycles)
         while len(l)>0:
-            first, *rest = l
+            first=l[0]
+            rest=l[1:]
+            #first, *rest = l
             first = set(first)
 
             lf = -1

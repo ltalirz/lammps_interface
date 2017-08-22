@@ -476,7 +476,9 @@ class LammpsSimulation(object):
             # but that would require using openbabel. I'm trying to keep this
             # code as independent of non-standard python libraries as possible.
             matched = self.subgraphs[i] | self.subgraphs[j]
-            if (len(matched) == self.subgraphs[i].number_of_nodes()):
+            condition = (len(matched) == self.subgraphs[i].number_of_nodes())
+
+            if condition:
                 if i not in list(temp_types.keys()) and j not in list(temp_types.keys()):
                     type += 1
                     temp_types[i] = type
@@ -805,7 +807,7 @@ class LammpsSimulation(object):
             data=self.graph.node[node]
         if sorted(self.graph.nodes()) != [i+1 for i in range(len(self.graph.nodes()))]:
             print("Re-labelling atom indices.")
-            reorder_dic = {i:j+1 for i, j in zip(sorted(self.graph.nodes()), range(len(self.graph.nodes())))}
+            reorder_dic = {i:j+1 for (i,j) in zip(sorted(self.graph.nodes()), range(len(self.graph.nodes())))}
             self.graph.reorder_labels(reorder_dic)
             for mgraph in self.subgraphs:
                 mgraph.reorder_labels(reorder_dic)
