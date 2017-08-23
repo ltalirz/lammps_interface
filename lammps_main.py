@@ -484,8 +484,8 @@ class LammpsSimulation(object):
             
             
             if obmodule:
-                moli = self.subgraphs[i]
-                molj = self.subgraphs[j]
+                moli = self.subgraphs[i].to_openbabel_structure()
+                molj = self.subgraphs[j].to_openbabel_structure()
                 inchii = conv.WriteString(moli)
                 inchij = conv.WriteString(molj)
                 condition = (inchii == inchij)

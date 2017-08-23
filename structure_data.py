@@ -35,7 +35,7 @@ try:
     import networkx as nx
     from networkx.algorithms import approximation
 except ImportError:
-    print("Warning: could not load networkx module, this is needed to produce the lammps data file.")
+    print("WARNING: could not load networkx module, this is needed to produce the lammps data file.")
     sys.exit()
 
 import nxstoerwagnercustom as nxswc
@@ -43,7 +43,7 @@ try:
     import transforamtions as trans
     import nxmaxflowcustom as nxmfc
 except:
-    print("Not able to load custom nx algorithms (make sure at most recent git commit")
+    print("WARNING: Not able to load custom nx algorithms (make sure at most recent git commit)")
 
 
 class MolecularGraph(nx.Graph):

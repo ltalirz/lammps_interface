@@ -1,13 +1,14 @@
 from uff import UFF_DATA
 from uff4mof import UFF4MOF_DATA
 from dreiding import DREIDING_DATA
+from trappe import TraPPE_atoms, TraPPE_angles
 from uff_nonbonded import UFF_DATA_nonbonded
 from BTW import BTW_angles, BTW_dihedrals, BTW_opbends, BTW_atoms, BTW_bonds, BTW_charges
 from Dubbeldam import Dub_atoms, Dub_bonds, Dub_angles, Dub_dihedrals, Dub_impropers
 #from FMOFCu import FMOFCu_angles, FMOFCu_dihedrals, FMOFCu_opbends, FMOFCu_atoms, FMOFCu_bonds
 from MOFFF import MOFFF_angles, MOFFF_dihedrals, MOFFF_opbends, MOFFF_atoms, MOFFF_bonds
 from water_models import SPC_E_atoms, TIP3P_atoms, TIP4P_atoms, TIP5P_atoms
-from gas_models import EPM2_atoms, EPM2_angles, TraPPE_atoms, TraPPE_angles
+from gas_models import EPM2_atoms, EPM2_angles
 from lammps_potentials import BondPotential, AnglePotential, DihedralPotential, ImproperPotential, PairPotential
 from atomic import METALS
 from atomic import organic, non_metals, noble_gases, metalloids, lanthanides, actinides, transition_metals
@@ -3723,6 +3724,221 @@ class UFF4MOF(ForceField):
                         " with element: '%s'"%(data['element']))
                 sys.exit()
 
+class TraPPE(ForceField):
+    """ This is a challenging force field to implement because the computer can't tell
+    what level of saturation a particular carbon is. The user has to provide this
+    information at run-time.
+
+    NOTE: there is an enormous library of papers governing the TraPPE force field.
+    I will note here which ones have been implemented.
+
+    1. Martin & Siepmann JPCB 1998
+
+    """
+    def __init__(self, graph=None,  h_bonding=False, **kwargs):
+        self.pair_in_data = True
+        self.h_bonding = h_bonding
+        # override existing arguments with kwargs
+        for key, value in kwargs.items():
+            setattr(self, key, value)
+
+        if (graph is not None):
+            self.graph = graph
+            self.detect_ff_terms() 
+            self.compute_force_field_terms()
+
+    def bond_term(self, edge):
+        """
+        E = 0.5 * K * (R - Req)^2
+        This is a rigid bond in TraPPE. 
+        
+        """
+        n1, n2, data = edge
+
+        n1_data, n2_data = self.graph.node[n1], self.graph.node[n2]
+        fflabel1, fflabel2 = n1_data['force_field_type'], n2_data['force_field_type']
+       
+        K = 1000.
+        if (self.keep_metal_geometry) and (n1_data['atomic_number'] in METALS
+            or n2_data['atomic_number'] in METALS):
+            return None
+    
+        if (n1_data['force_field_type'][0] == "C") and (n2_data['force_field_type'][0] == "C"):
+            Re = 1.54
+        data['potential'] = BondPotential.Harmonic()
+        data['potential'].K = K/2.
+        data['potential'].R0 = Re
+        data['potential'].special = "rigid"
+
+        return 1
+
+    def angle_term(self, angle):
+        """
+        Harmonic cosine angle
+
+        E = 0.5*C*[cos(theta) - cos(theta0)]^2
+
+        This is available in LAMMPS as the cosine/squared angle style
+        (NB. the prefactor includes the usual 1/2 term.)
+
+        """
+        a, b, c, data = angle
+        a_data, b_data, c_data = self.graph.node[a], self.graph.node[b], self.graph.node[c] 
+        btype = b_data['force_field_type']
+        K = 62500 * KBTOKCAL
+        if (btype == "CH2"):
+            theta0 = 114.
+        elif (btype == "CH"):
+            theta0 = 112.
+        elif (btype == "C"):
+            theta0 = 109.47
+        
+        data['potential'] = AnglePotential.Harmonic()
+        data['potential'].K = K
+        data['potential'].theta0 = theta0
+
+        return 1
+
+    def dihedral_term(self, dihedral):
+        """
+        
+        The TraPPE dihedral is governed by the 3-term cosine function 
+
+        E = C1*[1 + cos(theta)] + C2*[1 - cos(2*theta)] + C3*[1 + cos(3*theta)]
+
+        LAMMPS has a similar potential 'opls' which is described as
+        
+        E = 0.5*K1*[1 + cos(theta)] + 0.5*K2*[1 - cos(2*theta)] + 0.5*K3*[1 + cos(3*theta)] + 0.5*K4[1 - cos(4*theta)]
+
+        NOTE: in some branched alkanes, there is a constant coefficient in front of K1, we'll call K0.
+        This will shift the energy of the dihedral torsion by a constant factor, but I can't see this doing
+        anything to the dynamic motion of the molecule, as dE/dtheta would be the same regardless.
+        In TraPPE 2 (doi: 10.1021/jp984742e) this value is roughly -0.5 kcal/mol for each dihedral (-251.06 Kb)
+
+        LAMMPS does not currently have a potential with a K0 coefficient, and considering it's null effect on dynamics,
+        I will not generate a table for this potential. (PB)
+
+        """
+        
+        a,b,c,d, data = dihedral
+        a_data = self.graph.node[a]
+        b_data = self.graph.node[b]
+        c_data = self.graph.node[c]
+        d_data = self.graph.node[d]
+
+        btype = b_data['force_field_type']
+        ctype = c_data['force_field_type']
+        
+        if (set([btype,ctype]) == set(["CH2"])):
+            K0 = 0.0
+            K1 = 335.03; K2 = -68.19; K3 = 791.32; K4=0.0
+        if (set([btype,ctype]) == set(["CH2", "CH"])):
+            K0 = -251.06 # just here for reference
+            K1 = 428.73; K2 = -111.85; K3 = 441.27; K4=0.0
+        if (set([btype,ctype]) == set(["CH2", "C"])):
+            K0 = 0.0
+            K1 = 0.0; K2 = 0.0; K3 = 461.29; K4=0.0
+        if (set([btype,ctype]) == set(["CH"])):
+            K0 = -251.06 # just here for reference
+            K1 = 428.73; K2 = -111.85; K3 = 441.27; K4=0.0
+
+        data['potential'] = DihedralPotential.Opls()
+        # NB: lammps divides the K values by 2 at runtime, which is unintended
+        # (I think) in TraPPE. Hence they are multiplied by 2 here.
+        data['potential'].K1 = 2*K1*KBTOKCAL
+        data['potential'].K2 = 2*K2*KBTOKCAL
+        data['potential'].K3 = 2*K3*KBTOKCAL
+        data['potential'].K4 = 2*K4*KBTOKCAL
+        return 1
+
+    def improper_term(self, improper):
+        """
+        No improper potentials that I've found for TraPPE (yet).
+
+
+        """
+        a, b, c, d, data = improper
+        
+        a_data = self.graph.node[a]
+        b_data = self.graph.node[b]
+        c_data = self.graph.node[c]
+        d_data = self.graph.node[d]
+
+        return None
+    
+    def pair_terms(self, node, data, cutoff, nbpot="LJ", hbpot='morse'):
+        """ 
+        TraPPE uses 
+        Lennard-Jones type interactions.
+        Elj = A*R^{-12} - B*R^{-6}
+
+        """
+        eps = TRAPPE_DATA[data['force_field_type']][3] * self.eps_scale_factor
+        R = TRAPPE_DATA[data['force_field_type']][2]
+        sig = R*(2**(-1./6.))
+        data['pair_potential'] = PairPotential.LjCutCoulLong()
+        data['pair_potential'].eps = eps 
+        data['pair_potential'].sig = sig 
+
+    def special_commands(self):
+        if self.pair_in_data: 
+            st = ["%-15s %s %s"%("pair_modify", "tail yes", "mix arithmetic")]
+        else:
+            st = ["%-15s %s"%("pair_modify", "tail yes")]
+        st += ["%-15s %.1f"%('dielectric', 1.0), 
+               "%-15s %s"%("special_bonds", "lj 0.0 0.0 0.5") 
+               ]
+        return st
+
+    def detect_ff_terms(self):
+        # for each atom determine the ff type if it is None
+        organics = ["C", "N", "O", "S"]
+        halides = ["F", "Cl", "Br", "I"]
+        electro_neg_atoms = ["N", "O", "F"]
+        for node, data in self.graph.nodes_iter(data=True):
+            # check if fftype exists:
+            try:
+                fftype = DREIDING_DATA[data['force_field_type']]
+            except KeyError:
+                fftype = None
+            if fftype is None or self.h_bonding:
+                if data['element'] in organics:
+                    if data['hybridization'] == "sp3":
+                        data['force_field_type'] = "%s_3"%data['element']
+                    elif data['hybridization'] == "aromatic":
+                        data['force_field_type'] = "%s_R"%data['element']
+                    elif data['hybridization'] == "sp2":
+                        data['force_field_type'] = "%s_2"%data['element']
+                    elif data['hybridization'] == "sp":
+                        data['force_field_type'] = "%s_1"%data['element']
+                    else:
+                        data['force_field_type'] = "%s_3"%data['element']
+
+                elif data['element'] == "H":
+                    data['force_field_type'] = "H_"
+                    if self.h_bonding:
+                        for n in self.graph.neighbors(node):
+                            if self.graph.node[n]['element'] in electro_neg_atoms:
+                                self.graph.node[n]['h_bond_donor'] = True
+                                data['force_field_type'] = "H__HB"
+
+                elif data['element'] in halides:
+                    data['force_field_type'] = data['element']
+                    if data['element'] == "F":
+                        data['force_field_type'] += "_"
+                else:
+                    ffs = list(DREIDING_DATA.keys())
+                    for j in ffs:
+                        if data['element'] == j[:2].strip("_"):
+                            data['force_field_type'] = j
+            elif data['force_field_type'] not in DREIDING_DATA.keys():
+                print('Error: %s is not a force field type in DREIDING.'%(data['force_field_type']))
+                sys.exit()
+
+            if data['force_field_type'] is None:
+                print("ERROR: could not find the proper force field type for atom %i"%(data['index'])+
+                        " with element: '%s'"%(data['element']))
+                sys.exit()
 
 class Dubbeldam(ForceField):
 
@@ -4771,9 +4987,9 @@ class CO2_TraPPE(ForceField):
         btype = b_data['force_field_type']
         ctype = c_data['force_field_type']
        
-        assert (b_data['element'] == "X")
-        assert (a_data['element'] == "N")
-        assert (c_data['element'] == "N")
+        assert (b_data['element'] == "C")
+        assert (a_data['element'] == "O")
+        assert (c_data['element'] == "O")
         data['potential'] = AnglePotential.Harmonic()
         data['potential'].theta0 = TraPPE_angles["_".join([atype,btype,ctype])][1]  
         data['potential'].K = TraPPE_angles["_".join([atype,btype,ctype])][0]/2. 
