@@ -1780,7 +1780,7 @@ class SlabGraph(MolecularGraph):
         print("\n\nIdentifying surface/bulk nodes\n")
         for node,data in self.slabgraph.nodes_iter(data=True):
             if(data['element']=="O"):
-                print("Error! O's have to be removed from graph first")
+                print("ERROR: O's have to be removed from graph first")
                 sys.exit()
 
             # Here need to be very careful
@@ -2221,7 +2221,7 @@ class SlabGraph(MolecularGraph):
             surface_0_weight=100000
             surface_max_weight=100000
         else:
-            print("Error, weight to super surface node can only be 'one','max', or 'inf'")
+            print("ERROR: weight to super surface node can only be 'one','max', or 'inf'")
             sys.exit()
 
         # now reweight each edge between the supersurface node and the bulk node neighbors
@@ -2280,7 +2280,7 @@ class SlabGraph(MolecularGraph):
             surface_0_weight=100000
             surface_max_weight=100000
         else:
-            print("Error, weight to super surface node can only be 'one','max', or 'inf'")
+            print("ERROR: weight to super surface node can only be 'one','max', or 'inf'")
             sys.exit()
 
         # already iterates over forward and reverse edges
@@ -2388,7 +2388,7 @@ class SlabGraph(MolecularGraph):
                     self.slabgraphdirec.edge[n1][n2]['weight'] = 1
 
                 else:
-                    print("Error! only three options for weighted barrier (min, max, neutral)")
+                    print("ERROR: only three options for weighted barrier (min, max, neutral)")
                     sys.exit()
                 
 
@@ -4624,7 +4624,7 @@ def write_RASPA_sim_files(lammps_sim, classifier=0):
             MOF_FF_MIXING.append([type_spec_, potential_, eps_, sig_])     
 
     if(len(MOF_PSEUDO_ATOMS) == 0):
-        print("Error! No MOF atoms found. Exiting...")
+        print("ERROR: No MOF atoms found. Exiting...")
         sys.exit()
 
     # Determine final column widths

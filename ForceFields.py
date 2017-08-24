@@ -8,7 +8,8 @@ from Dubbeldam import Dub_atoms, Dub_bonds, Dub_angles, Dub_dihedrals, Dub_impro
 #from FMOFCu import FMOFCu_angles, FMOFCu_dihedrals, FMOFCu_opbends, FMOFCu_atoms, FMOFCu_bonds
 from MOFFF import MOFFF_angles, MOFFF_dihedrals, MOFFF_opbends, MOFFF_atoms, MOFFF_bonds
 from water_models import SPC_E_atoms, TIP3P_atoms, TIP4P_atoms, TIP5P_atoms
-from gas_models import EPM2_atoms, EPM2_angles
+from gas_models import EPM2_atoms, EPM2_angle
+
 from lammps_potentials import BondPotential, AnglePotential, DihedralPotential, ImproperPotential, PairPotential
 from atomic import METALS
 from atomic import organic, non_metals, noble_gases, metalloids, lanthanides, actinides, transition_metals
@@ -418,7 +419,7 @@ class UserFF(ForceField):
             if descriptor == atom.force_field_type:
                 return atom.ff_type_index
         
-        raise ValueError('Error! An atom identifier ' + str(description) + 
+        raise ValueError('ERROR! An atom identifier ' + str(description) + 
                 ' in user_input.txt did not match any atom_site_description in your cif')
 
     def map_pair_unique_bond(self, pair, descriptor):
@@ -427,7 +428,7 @@ class UserFF(ForceField):
                 or pair == [bond.atoms[1].ff_type_index, bond.atoms[0].ff_type_index]):
                 return key
             
-        raise ValueError('Error! An bond identifier ' + str(descriptor) + 
+        raise ValueError('ERROR! An bond identifier ' + str(descriptor) + 
                 ' in user_input.txt did not match any bonds in your cif')
 
     def map_triplet_unique_angle(self, triplet, descriptor):
@@ -443,7 +444,7 @@ class UserFF(ForceField):
                             angle.atoms[0].ff_type_index]):
                 return key
             
-        raise ValueError('Error! An angle identifier ' + str(descriptor) + 
+        raise ValueError('ERROR! An angle identifier ' + str(descriptor) + 
                 ' in user_input.txt did not match any angles in your cif')
 
     def map_quadruplet_unique_dihedral(self, quadruplet, descriptor):
@@ -458,7 +459,7 @@ class UserFF(ForceField):
                                dihedral.atoms[0].ff_type_index]):
                 return key
             
-        raise ValueError('Error! A dihdral identifier ' + str(descriptor) + 
+        raise ValueError('ERROR! A dihdral identifier ' + str(descriptor) + 
                 ' in user_input.txt did not match any dihedrals in your cif')
 
     def map_quadruplet_unique_improper(self, quadruplet, descriptor):
@@ -473,7 +474,7 @@ class UserFF(ForceField):
                                improper.atoms[0].ff_type_index]):
                 return key
             
-        raise ValueError('Error! An improper identifier ' + str(descriptor) + 
+        raise ValueError('ERROR! An improper identifier ' + str(descriptor) + 
                 ' in user_input.txt did not match any improper in your cif')
     
     def overwrite_force_field_terms(self):
@@ -601,7 +602,7 @@ class OverwriteFF(ForceField):
             if descriptor == atom.force_field_type:
                 return atom.ff_type_index
         
-        raise ValueError('Error! An atom identifier ' + str(description) + 
+        raise ValueError('ERROR! An atom identifier ' + str(description) + 
                 ' in user_input.txt did not match any atom_site_description in your cif')
 
     def map_pair_unique_bond(self, pair, descriptor):
@@ -610,7 +611,7 @@ class OverwriteFF(ForceField):
                 or pair == [bond.atoms[1].ff_type_index, bond.atoms[0].ff_type_index]):
                 return key
             
-        raise ValueError('Error! A bond identifier ' + str(descriptor) + 
+        raise ValueError('ERROR! A bond identifier ' + str(descriptor) + 
                 ' in user_input.txt did not match any bonds in your cif')
 
     def map_triplet_unique_angle(self, triplet, descriptor):
@@ -626,7 +627,7 @@ class OverwriteFF(ForceField):
                             angle.atoms[0].ff_type_index]):
                 return key
             
-        raise ValueError('Error! An angle identifier ' + str(descriptor) + 
+        raise ValueError('ERROR! An angle identifier ' + str(descriptor) + 
                 ' in user_input.txt did not match any angles in your cif')
 
     def map_quadruplet_unique_dihedral(self, quadruplet, descriptor):
@@ -641,7 +642,7 @@ class OverwriteFF(ForceField):
                                dihedral.atoms[0].ff_type_index]):
                 return key
             
-        raise ValueError('Error! A dihdral identifier ' + str(descriptor) + 
+        raise ValueError('ERROR! A dihdral identifier ' + str(descriptor) + 
                 ' in user_input.txt did not match any dihedrals in your cif')
 
     def map_quadruplet_unique_improper(self, quadruplet, descriptor):
@@ -656,7 +657,7 @@ class OverwriteFF(ForceField):
                                improper.atoms[0].ff_type_index]):
                 return key
             
-        raise ValueError('Error! An improper identifier ' + str(descriptor) + 
+        raise ValueError('ERROR! An improper identifier ' + str(descriptor) + 
                 ' in user_input.txt did not match any improper in your cif')
 
 
@@ -3732,8 +3733,11 @@ class TraPPE(ForceField):
     NOTE: there is an enormous library of papers governing the TraPPE force field.
     I will note here which ones have been implemented.
 
-    1. Martin & Siepmann JPCB 1998
-
+    1. Martin & Siepmann JPCB 1998 - linear alkanes
+    2. Martin & Siepmann JPCB 1999 - branched alkanes
+    3. NOPE
+    4. Wick, Martin & Siepmann JPCB 2000 - linear, branched alkenes
+    5.
     """
     def __init__(self, graph=None,  h_bonding=False, **kwargs):
         self.pair_in_data = True
@@ -3762,13 +3766,27 @@ class TraPPE(ForceField):
         if (self.keep_metal_geometry) and (n1_data['atomic_number'] in METALS
             or n2_data['atomic_number'] in METALS):
             return None
-    
-        if (n1_data['force_field_type'][0] == "C") and (n2_data['force_field_type'][0] == "C"):
-            Re = 1.54
+        ffset = set([fflabel1, fflabel2])
+        Re = 0.
+        if data['order'] == 1:
+            if np.all([i[:2] == "CH" or i[:2] == "C_" for i in ffset]):
+                Re = 1.54
+        elif data['order'] == 2:
+            if np.all([i[:2] == "CH" or i[:2] == "C_" for i in ffset]):
+                Re = 1.33
+        elif data['order'] == 1.5:
+            if np.all([i[:2] == "CH" or i[:2] == "C_" for i in ffset]):
+                Re = 1.40
+
+        if (Re == 0.):
+            print("ERROR: Could not find the bond type in TraPPE for atoms %i and $i."%(n1, n2)
+                    "They have elements %s and %s."% (n1_data["element"], n2_data["element"]))
+            sys.exit()
+
         data['potential'] = BondPotential.Harmonic()
         data['potential'].K = K/2.
         data['potential'].R0 = Re
-        data['potential'].special = "rigid"
+        data['potential'].special = "shake" 
 
         return 1
 
@@ -3785,15 +3803,25 @@ class TraPPE(ForceField):
         a, b, c, data = angle
         a_data, b_data, c_data = self.graph.node[a], self.graph.node[b], self.graph.node[c] 
         btype = b_data['force_field_type']
-        K = 62500 * KBTOKCAL
-        if (btype == "CH2"):
-            theta0 = 114.
-        elif (btype == "CH"):
-            theta0 = 112.
-        elif (btype == "C"):
-            theta0 = 109.47
-        
         data['potential'] = AnglePotential.Harmonic()
+        if (btype == "CH2_sp3"):
+            K = 62500 * KBTOKCAL
+            theta0 = 114.
+        elif (btype == "CH_sp3"):
+            K = 62500 * KBTOKCAL
+            theta0 = 112.
+        elif (btype == "C_sp3"):
+            K = 62500 * KBTOKCAL
+            theta0 = 109.47
+        elif((btype == "CH2_sp2") or (btype == "CH_sp2") or 
+            (btype == "C_sp2")):
+            K = 70420 * KBTOKCAL
+            theta0 = 119.7
+        elif((btype == "CH_aro") or (btype == "C_aro")):
+            K = 70420 * KBTOKCAL
+            theta0 = 120
+            data['potential'].special_flag = "shake"
+            # rigid bond.
         data['potential'].K = K
         data['potential'].theta0 = theta0
 
@@ -3829,18 +3857,47 @@ class TraPPE(ForceField):
         btype = b_data['force_field_type']
         ctype = c_data['force_field_type']
         
-        if (set([btype,ctype]) == set(["CH2"])):
+
+        if (set([btype,ctype]) == set(["CH2_sp3"])):
             K0 = 0.0
             K1 = 335.03; K2 = -68.19; K3 = 791.32; K4=0.0
-        if (set([btype,ctype]) == set(["CH2", "CH"])):
+        elif (set([btype,ctype]) == set(["CH2_sp3", "CH_sp3"])):
             K0 = -251.06 # just here for reference
             K1 = 428.73; K2 = -111.85; K3 = 441.27; K4=0.0
-        if (set([btype,ctype]) == set(["CH2", "C"])):
+        elif (set([btype,ctype]) == set(["CH2_sp3", "C_sp3"])):
             K0 = 0.0
             K1 = 0.0; K2 = 0.0; K3 = 461.29; K4=0.0
-        if (set([btype,ctype]) == set(["CH"])):
+        elif (set([btype,ctype]) == set(["CH_sp3"])):
             K0 = -251.06 # just here for reference
             K1 = 428.73; K2 = -111.85; K3 = 441.27; K4=0.0
+        elif (set([btype,ctype]) == set(["CH2_sp3", "CH_sp2"])):
+            K0 = 688.5
+            K1 = 86.36; K2 = -109.77; K3 = -282.24; K4 = 0.0
+        elif (set([btype,ctype]) == set(["CH_sp2"])):
+            angle = self.graph.compute_dihedral_between(a,b,c,d)
+            # closer to a cis dihedral than trans.. 
+            cis = np.abs(angle) < 90.
+            if (cis) : 
+                phi0=np.pi
+                D0=12400
+            else:
+                phi0=0.0
+                D0=13400
+    
+        elif (set([btype,ctype]) == set(["CH2_sp3", "C_aro"])):
+            E0=131*KBTOKCAL
+            E1=180
+            data['potential'] = DihedralPotential.Quadratic()
+            data['potential'].K = E0
+            data['potential'].phi0 = E1
+            return 1
+        elif (set([btype,ctype]) == set(["CH_sp2", "C_aro"])):
+            # NB the Charmm dihedral_style is 180 deg out-of-phase,
+            # so adding this to the e1 value
+            data['potential'] = DihedralPotential.Charmm()
+            E0=167*KBTOKCAL
+            E1=5.0*180/3.0 + 180
+            return 1
 
         data['potential'] = DihedralPotential.Opls()
         # NB: lammps divides the K values by 2 at runtime, which is unintended
@@ -3932,7 +3989,7 @@ class TraPPE(ForceField):
                         if data['element'] == j[:2].strip("_"):
                             data['force_field_type'] = j
             elif data['force_field_type'] not in DREIDING_DATA.keys():
-                print('Error: %s is not a force field type in DREIDING.'%(data['force_field_type']))
+                print('ERROR: %s is not a force field type in DREIDING.'%(data['force_field_type']))
                 sys.exit()
 
             if data['force_field_type'] is None:

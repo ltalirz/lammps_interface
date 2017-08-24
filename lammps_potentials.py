@@ -881,10 +881,16 @@ class DihedralPotential(object):
             self.K = 0.
             self.phi0 = 0.
             self.redueced = False
-            
+            self.special_flag = ""
+
         def __str__(self):
-            return ""
-    
+            special_flag = self.special_flag
+            if special_flag:
+                special_flag = "# "+self.special_flag
+            if self.reduced:
+                return "%15.6f %15.6f %s"%(self.K, self.phi0, special_flag)
+            return "%28s %15.6f %15.6f %s"%(self.name, self.K, self.phi0, special_flag)
+            
     class Table(object):
         """Potential read from file."""
         def __init__(self):
