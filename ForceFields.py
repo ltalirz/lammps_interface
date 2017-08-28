@@ -8,7 +8,7 @@ from Dubbeldam import Dub_atoms, Dub_bonds, Dub_angles, Dub_dihedrals, Dub_impro
 #from FMOFCu import FMOFCu_angles, FMOFCu_dihedrals, FMOFCu_opbends, FMOFCu_atoms, FMOFCu_bonds
 from MOFFF import MOFFF_angles, MOFFF_dihedrals, MOFFF_opbends, MOFFF_atoms, MOFFF_bonds
 from water_models import SPC_E_atoms, TIP3P_atoms, TIP4P_atoms, TIP5P_atoms
-from gas_models import EPM2_atoms, EPM2_angle
+from gas_models import EPM2_atoms, EPM2_angles
 
 from lammps_potentials import BondPotential, AnglePotential, DihedralPotential, ImproperPotential, PairPotential
 from atomic import METALS
@@ -3779,8 +3779,8 @@ class TraPPE(ForceField):
                 Re = 1.40
 
         if (Re == 0.):
-            print("ERROR: Could not find the bond type in TraPPE for atoms %i and $i."%(n1, n2)
-                    "They have elements %s and %s."% (n1_data["element"], n2_data["element"]))
+            print("ERROR: Could not find the bond type in TraPPE for atoms %i and $i."%(n1, n2))
+            print("They have elements %s and %s."% (n1_data["element"], n2_data["element"]))
             sys.exit()
 
         data['potential'] = BondPotential.Harmonic()
