@@ -20,6 +20,7 @@ import networkx as nx
 import operator
 
 from collections import OrderedDict
+from collections import Counter
 from atomic import MASS, ATOMIC_NUMBER, COVALENT_RADII
 from atomic import organic, non_metals, noble_gases, metalloids, lanthanides, actinides, transition_metals
 from atomic import alkali, alkaline_earth, main_group, metals
@@ -1646,6 +1647,7 @@ class SlabGraph(MolecularGraph):
         self.removed_edges = []
         self.removed_edges_data = []
         self.added_edges = []
+        self.added_edges_data = []
 
         for node, data in self.slabgraph.nodes_iter(data=True):
             if(data['element']=="O"): 
@@ -1666,6 +1668,18 @@ class SlabGraph(MolecularGraph):
                 
                     # create an edge between the adjacent Si
                     self.added_edges.append((neighbors[0],neighbors[1]))
+
+                    # need to keep the periodicity information
+                    this_symflag=''
+                    if(self.slabgraph.edge[neighbors[0]][node]['symflag']!='.'):
+                        this_symflag=self.slabgraph.edge[neighbors[0]][node]['symflag']
+                    elif(self.slabgraph.edge[neighbors[1]][node]['symflag']!='.'):
+                        this_symflag=self.slabgraph.edge[neighbors[1]][node]['symflag']
+                    else:
+                        this_symflag=self.slabgraph.edge[neighbors[0]][node]['symflag']
+                    self.added_edges_data.append({ 'order':1, 'length': 4.0, 'symflag':this_symflag })
+                    
+
                 elif(len(neighbors)==1):
                     #print("Node %d is a surface O node"%node)
                     # the arbitrary initial slab config can have dangling O's
@@ -1707,14 +1721,12 @@ class SlabGraph(MolecularGraph):
                 del self.slabgraph.sorted_edge_dict[(edge[1],edge[0])]
             except:
                 pass
-            #if(edge[0]<edge[1]):
-            #    del self.slabgraph.sorted_edge_dict[(edge[0],edge[1])]
-            #else:
-            #    del self.slabgraph.sorted_edge_dict[(edge[1],edge[0])]
+
 
         # Add Si-Si/Si-Al/Al-Al,etc edges
-        edge_data={ 'order':1, 'length': 4.0, 'symflag':'--' } 
-        for edge in self.added_edges:
+        #edge_data={ 'order':1, 'length': 4.0, 'symflag':'--' } 
+        #for edge in self.added_edges:
+        for edge,edge_data in zip(self.added_edges,self.added_edges_data):
             self.slabgraph.add_edge(*edge,attr_dict=edge_data)
 
             # the sorted edge dict is used by write_CIF but IS NOT updated when modifying
@@ -1728,19 +1740,6 @@ class SlabGraph(MolecularGraph):
         for node in self.removed_nodes:
             self.slabgraph.remove_node(node)
 
-        #print((193,232) in self.removed_edges)
-        #print((232,193) in self.removed_edges)
-        #print((193,232) in self.added_edges)
-        #print((232,193) in self.added_edges)
-        #print((193,232) in self.slabgraph.sorted_edge_dict)
-        #print((232,193) in self.slabgraph.sorted_edge_dict)
-        #print(self.slabgraph.sorted_edge_dict[(232,193)])
-        #print((80,216) in self.slabgraph.sorted_edge_dict)
-        #print((216,80) in self.slabgraph.sorted_edge_dict)
-        # if necessary recompute cycle properties
-
-        # TODO if we want to take some cycle building based approach
-        #self.slabgraph.compute_init_typing()
       
         print(self.slabgraph.name)      
 
@@ -1982,49 +1981,98 @@ class SlabGraph(MolecularGraph):
                 print(cycle)
                 filter_cycles=[]
                 for ind in cycle:
+                    # make sure its a 4 ring
                     if(len(ind)==4):
-                        filter_cycles.append(ind)
+                        # make sure its periodic
+                        if(ind[3] in tmpG.neighbors(ind[0])):
+                            # make sure it doesn't contain the super surface nodes
+                            # because these edges don't have a symflag bc it 
+                            # carries no physical meaning for this edge
+                            if(self.super_surface_node_max not in ind and \
+                               self.super_surface_node_0 not in ind):
+                                filter_cycles.append(ind)
                 cycles += filter_cycles
 
         # now we have a list of all 4 cycles in the graph
         #print("Cycles: %s"%(str(cycles)))
 
+        nexttmpG=nx.Graph()
+        for four_ring in cycles:
+            # get the symflag (aka periodicity) of each bond in the identified 4 cycle
+            # -
+            # this is important because it's not a 4 ring in the edge case
+            # where a periodicity flag occurs exactly once when listing all the edges' periodicities
+            # -
+            # in such a case, making the supercell larger would find that this
+            # motif is NOT a 4R, so we must exclude it
+            periodicity=[]
+            periodicity.append(tmpG[four_ring[0]][four_ring[1]]['symflag'])
+            periodicity.append(tmpG[four_ring[1]][four_ring[2]]['symflag'])
+            periodicity.append(tmpG[four_ring[2]][four_ring[3]]['symflag'])
+            periodicity.append(tmpG[four_ring[3]][four_ring[0]]['symflag'])
+
+            # check if we have an even number of unique elements
+            counter=Counter(periodicity)
+            to_add=True
+            for key in counter:
+                if(counter[key]%2!=0):
+                    # found a periodicity flag that occurs an odd # of times
+                    to_add=False
+                    break 
+
+            if(to_add==True):
+                nexttmpG.add_edge(four_ring[0],four_ring[1])
+                nexttmpG.add_edge(four_ring[1],four_ring[2])
+                nexttmpG.add_edge(four_ring[2],four_ring[3])
+                nexttmpG.add_edge(four_ring[3],four_ring[0])
+
+        connected_comps=sorted(nx.connected_components(nexttmpG), key=len)
+        print("All connected comps")
+        print(connected_comps)
+
         # group all four rings that share any nodes (could also just do in 
         # NetworkX and use connected components) which are D4Rs or a collection
         # of connected D4Rs
-        D4R = []
-        l=deepcopy(cycles)
-        while len(l)>0:
-            first=l[0]
-            rest=l[1:]
-            #first, *rest = l
-            first = set(first)
+        #print("All 4 cycles:")
+        #print(cycles)
+        #D4R = []
+        #l=deepcopy(cycles)
+        #while len(l)>0:
+        #    first=l[0]
+        #    rest=l[1:]
+        #    #first, *rest = l
+        #    first = set(first)
 
-            lf = -1
-            while len(first)>lf:
-                lf = len(first)
+        #    lf = -1
+        #    while len(first)>lf:
+        #        lf = len(first)
 
-                rest2 = []
-                for r in rest:
-                    if len(first.intersection(set(r)))>0:
-                        first |= set(r)
-                    else:
-                        rest2.append(r)     
-                rest = rest2
+        #        rest2 = []
+        #        for r in rest:
+        #            if len(first.intersection(set(r)))>0:
+        #                first |= set(r)
+        #            else:
+        #                rest2.append(r)     
+        #        rest = rest2
 
-            D4R.append(first)
-            l = rest
+        #    D4R.append(first)
+        #    l = rest
         # filter out anything not containing 8 nodes
+
         final_D4R=[]
-        for struct in D4R:
-            if(len(struct) == 8):
+        for struct in connected_comps:
+            if(len(struct) >= 8):
                 final_D4R.append(struct)
+
         # final subunits 
         print("D4Rs: %s"%(str(final_D4R)))
         if(len(final_D4R)==0):
             print("Warning, structure passed in with no D4R units, but surface\
                    was requested to be generated w/Ge delamination. Exiting...")
-            f=open('no_D4R.txt','w')
+        else:
+            f=open('D4R.txt','w')
+            for struct in final_D4R:
+                f.write("%s\n"%str(struct))
             f.close()
             
 
