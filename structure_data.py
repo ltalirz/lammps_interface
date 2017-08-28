@@ -2030,7 +2030,7 @@ class SlabGraph(MolecularGraph):
 
 
         # finally, weight all edges that go from a node in a D4R to a node
-        # not in a D4R with a value of 0.1
+        # not in a D4R with a value of 0.0
         all_D4R_nodes=set()
         all_D4R_nodes=all_D4R_nodes.union(*final_D4R)
         print(all_D4R_nodes)
@@ -2038,8 +2038,8 @@ class SlabGraph(MolecularGraph):
             for n in struct:
                 for neigh in self.slabgraph.neighbors(n):
                     if(neigh not in all_D4R_nodes):
-                        self.slabgraph.edge[n][neigh]['capacity']=0.1
-                        self.slabgraph.edge[n][neigh]['weight']=0.1
+                        self.slabgraph.edge[n][neigh]['capacity']=0.0
+                        self.slabgraph.edge[n][neigh]['weight']=0.0
 
         
 
