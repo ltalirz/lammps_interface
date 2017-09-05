@@ -1964,27 +1964,44 @@ class SlabGraph(MolecularGraph):
         in a supercell
         """
 
-        perm=[i for i in itertools.product([0, -1], repeat = len(nlist))]
-        is_cycle=False
+        # Flag to see indicate we want to look at images of this node
+        perm=[i for i in itertools.product([0, 1], repeat = len(nlist))]
+        # Flag as to whether we want to look at images in this coordinate
+        abc_perm=[i for i in itertools.product([0, 1], repeat = 3)]
 
+        is_cycle=False
+        #print(nlist)
+        
+        # investigate each permutation for the image of the node
         for p in perm:
             # get the modified images of each node in the list
-            new_frac = [[self.refgraph[nlist[i]]['_atom_site_fract_x']+p[i],
-                         self.refgraph[nlist[i]]['_atom_site_fract_y']+p[i], 
-                         self.refgraph[nlist[i]]['_atom_site_fract_z']+p[i]] for i in range(len(nlist))]
+            old_frac = [[float(self.refgraph.node[nlist[i]]['_atom_site_fract_x']),
+                         float(self.refgraph.node[nlist[i]]['_atom_site_fract_y']), 
+                         float(self.refgraph.node[nlist[i]]['_atom_site_fract_z'])] for i in range(len(nlist))]
+            #print(old_frac)
 
-            # get the modified images in cart space for each node in the list
-            new_cartesian=[self.to_cartesian(frac) for frac in new_frac]
-
-            # get the distances between each point
-            all_distances=[np.norm(new_cartesian[i%len(nlist)],
-                                   new_cartesian[(i+1)%len(nlist)]) for i in range(len(nlist))]
-
+            # investigate each permutation of +a, +b, +c
+            for pp in abc_perm:
             
-            # if all Si-Si distances < ~3.5 A, then we have a true cycle
-            if(all(d < bdist for d in all_distances)):
-                is_cycle=True
-                break
+                #print(self.refgraph.node[nlist[0]].keys())
+                new_frac = [[float(self.refgraph.node[nlist[i]]['_atom_site_fract_x'])+p[i]*pp[0],
+                             float(self.refgraph.node[nlist[i]]['_atom_site_fract_y'])+p[i]*pp[1], 
+                             float(self.refgraph.node[nlist[i]]['_atom_site_fract_z'])+p[i]*pp[2]] for i in range(len(nlist))]
+                #print(new_frac)
+
+                # get the modified images in cart space for each node in the list
+                new_cartesian=[self.to_cartesian(frac) for frac in new_frac]
+                #print(new_cartesian)
+
+                # get the distances between each point
+                all_distances=[np.linalg.norm(new_cartesian[i%len(nlist)]-
+                                              new_cartesian[(i+1)%len(nlist)]) for i in range(len(nlist))]
+                #print(all_distances) 
+
+                # if all Si-Si distances < ~3.5 A, then we have a true cycle
+                if(all(d < bdist for d in all_distances)):
+                    is_cycle=True
+                    break
 
 
         return is_cycle
@@ -2048,47 +2065,53 @@ class SlabGraph(MolecularGraph):
             # in such a case, making the supercell larger would find that this
             # motif is NOT a 4R, so we must exclude it
             # TODO
-            #all_sym_flags = [tmpG[four_ring[0]][four_ring[1]]['symflag'],
-            #                 tmpG[four_ring[1]][four_ring[2]]['symflag'],
-            #                 tmpG[four_ring[2]][four_ring[3]]['symflag'],
-            #                 tmpG[four_ring[3]][four_ring[0]]['symflag']]
+            all_sym_flags = [tmpG[four_ring[0]][four_ring[1]]['symflag'],
+                             tmpG[four_ring[1]][four_ring[2]]['symflag'],
+                             tmpG[four_ring[2]][four_ring[3]]['symflag'],
+                             tmpG[four_ring[3]][four_ring[0]]['symflag']]
 
-            #if(f is not '.' for f in all_sym_flags):
-            #    to_add=self.check_cycle_across_PBC(four_ring)
-
-            periodicity=[]
-            periodicity2=[]
-            periodicity.append(self.equiv_symflag(tmpG[four_ring[0]][four_ring[1]]['symflag']))
-            periodicity.append(self.equiv_symflag(tmpG[four_ring[1]][four_ring[2]]['symflag']))
-            periodicity.append(self.equiv_symflag(tmpG[four_ring[2]][four_ring[3]]['symflag']))
-            periodicity.append(self.equiv_symflag(tmpG[four_ring[3]][four_ring[0]]['symflag']))
-
-            periodicity2.append(self.equiv_symflag(tmpG[four_ring[3]][four_ring[0]]['symflag']))
-            periodicity2.append(self.equiv_symflag(tmpG[four_ring[2]][four_ring[3]]['symflag']))
-            periodicity2.append(self.equiv_symflag(tmpG[four_ring[1]][four_ring[2]]['symflag']))
-            periodicity2.append(self.equiv_symflag(tmpG[four_ring[0]][four_ring[1]]['symflag']))
-            print(four_ring)
-            print(periodicity)
-            print(periodicity2)
-
-            # create a dict that tells how many times each sym flag occurs in periodicity
-            counter=Counter(periodicity)
-            # now we determine if a ring is actually a cycle or only appears that way bc of 
-            # crossing one periodic boundary
-            # NOTE this is def not rigorous just a simple quick hack for the case of 4
-            # membered rings
-
-            if(set(counter.keys()).union(set("."))==set(".")):
-                # All bonds are non PBC so must be a true cycle
+            if(all(f == '.' for f in all_sym_flags)):
                 to_add=True
             else:
-                for key in counter:
-                    if(key=="."):
-                        pass
-                    elif(counter[key]%2==0):
-                        # found a PBC direction that is crossed by 2 different edges
-                        to_add=True
-                        break 
+                print(all_sym_flags)
+                to_add=self.check_cycle_across_PBC(four_ring)
+                if(to_add):
+                    print('...has been added!')
+
+
+            #periodicity=[]
+            #periodicity2=[]
+            #periodicity.append(self.equiv_symflag(tmpG[four_ring[0]][four_ring[1]]['symflag']))
+            #periodicity.append(self.equiv_symflag(tmpG[four_ring[1]][four_ring[2]]['symflag']))
+            #periodicity.append(self.equiv_symflag(tmpG[four_ring[2]][four_ring[3]]['symflag']))
+            #periodicity.append(self.equiv_symflag(tmpG[four_ring[3]][four_ring[0]]['symflag']))
+
+            #periodicity2.append(self.equiv_symflag(tmpG[four_ring[3]][four_ring[0]]['symflag']))
+            #periodicity2.append(self.equiv_symflag(tmpG[four_ring[2]][four_ring[3]]['symflag']))
+            #periodicity2.append(self.equiv_symflag(tmpG[four_ring[1]][four_ring[2]]['symflag']))
+            #periodicity2.append(self.equiv_symflag(tmpG[four_ring[0]][four_ring[1]]['symflag']))
+            #print(four_ring)
+            #print(periodicity)
+            #print(periodicity2)
+
+            ## create a dict that tells how many times each sym flag occurs in periodicity
+            #counter=Counter(periodicity)
+            ## now we determine if a ring is actually a cycle or only appears that way bc of 
+            ## crossing one periodic boundary
+            ## NOTE this is def not rigorous just a simple quick hack for the case of 4
+            ## membered rings
+
+            #if(set(counter.keys()).union(set("."))==set(".")):
+            #    # All bonds are non PBC so must be a true cycle
+            #    to_add=True
+            #else:
+            #    for key in counter:
+            #        if(key=="."):
+            #            pass
+            #        elif(counter[key]%2==0):
+            #            # found a PBC direction that is crossed by 2 different edges
+            #            to_add=True
+            #            break 
 
             if(to_add==True):
                 nexttmpG.add_edge(four_ring[0],four_ring[1])
@@ -2133,15 +2156,21 @@ class SlabGraph(MolecularGraph):
         # finally we can check if a connected component is indeed a D4R
         final_D4R=[]
         for struct in connected_comps:
-            #if(len(struct)%4==0 and len(struct)/4>=2):
-            # each node in the component must have at least two neighbors
-            # that are also in the component
             still_a_D4R=True
-            for node in struct:
-                if(len(set(self.slabgraph.neighbors(node)).intersection(struct))<3):
-                    still_a_D4R=False
-                    print("Exculding component (not a true D4R): %s"%(str(struct)))
-                    break
+            
+            # only looking for D4R or pillared D4R unit
+            if(len(struct)==8 or len(struct)==12):
+
+                # each node in the component must have at least two neighbors
+                # that are also in the component
+                for node in struct:
+                    if(len(set(self.slabgraph.neighbors(node)).intersection(struct))<3):
+                        still_a_D4R=False
+                        print("Exculding component (not a true D4R): %s"%(str(struct)))
+                        break
+            else:
+                still_a_D4R=False
+
             if(still_a_D4R):        
                 final_D4R.append(struct)
 
