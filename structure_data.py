@@ -1958,6 +1958,37 @@ class SlabGraph(MolecularGraph):
         new_string=re.sub('4','6',string)
         return new_string
     
+    def check_cycle_across_PBC(self, nlist, bdist=3.5):
+        """
+        Checks if a cycle is still actually a cycle after it is embedded
+        in a supercell
+        """
+
+        perm=[i for i in itertools.product([0, -1], repeat = len(nlist))]
+        is_cycle=False
+
+        for p in perm:
+            # get the modified images of each node in the list
+            new_frac = [[self.refgraph[nlist[i]]['_atom_site_fract_x']+p[i],
+                         self.refgraph[nlist[i]]['_atom_site_fract_y']+p[i], 
+                         self.refgraph[nlist[i]]['_atom_site_fract_z']+p[i]] for i in range(len(nlist))]
+
+            # get the modified images in cart space for each node in the list
+            new_cartesian=[self.to_cartesian(frac) for frac in new_frac]
+
+            # get the distances between each point
+            all_distances=[np.norm(new_cartesian[i%len(nlist)],
+                                   new_cartesian[(i+1)%len(nlist)]) for i in range(len(nlist))]
+
+            
+            # if all Si-Si distances < ~3.5 A, then we have a true cycle
+            if(all(d < bdist for d in all_distances)):
+                is_cycle=True
+                break
+
+
+        return is_cycle
+    
     def check_D4R(self):
         """
         Check for D4R rings (preferential Ge sites) that can react with water
@@ -2006,6 +2037,9 @@ class SlabGraph(MolecularGraph):
 
         nexttmpG=nx.Graph()
         for four_ring in cycles:
+            # whether this four ring is a true cycle even when embedded in a super cell
+            to_add=False
+
             # get the symflag (aka periodicity) of each bond in the identified 4 cycle
             # -
             # this is important because it's not a 4 ring in the edge case
@@ -2013,6 +2047,14 @@ class SlabGraph(MolecularGraph):
             # -
             # in such a case, making the supercell larger would find that this
             # motif is NOT a 4R, so we must exclude it
+            # TODO
+            #all_sym_flags = [tmpG[four_ring[0]][four_ring[1]]['symflag'],
+            #                 tmpG[four_ring[1]][four_ring[2]]['symflag'],
+            #                 tmpG[four_ring[2]][four_ring[3]]['symflag'],
+            #                 tmpG[four_ring[3]][four_ring[0]]['symflag']]
+
+            #if(f is not '.' for f in all_sym_flags):
+            #    to_add=self.check_cycle_across_PBC(four_ring)
 
             periodicity=[]
             periodicity2=[]
@@ -2035,7 +2077,7 @@ class SlabGraph(MolecularGraph):
             # crossing one periodic boundary
             # NOTE this is def not rigorous just a simple quick hack for the case of 4
             # membered rings
-            to_add=False
+
             if(set(counter.keys()).union(set("."))==set(".")):
                 # All bonds are non PBC so must be a true cycle
                 to_add=True
