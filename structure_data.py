@@ -1518,10 +1518,14 @@ class SlabGraph(MolecularGraph):
 
     def check_if_zeolite(self):
 
-        zeo_types = set(["Si","O","Al"])
+        zeo_types = set(["Si","O"])
         for node, data in self.slabgraph.nodes_iter(data=True):
             if(set(data['element'])>zeo_types):
-                print("Warning! Structure determined not to be zeolite! Undefined behavior...")
+                print("Warning! Structure determined not to be all silica zeolite!...")
+                print("Warning! For now converting non-O type to an Si...")
+                if(data['element']!="O"):
+                    data['element']="Si"
+            
 
     def reset_node_edge_labelling(self,graph):
 
@@ -2180,6 +2184,7 @@ class SlabGraph(MolecularGraph):
         if(len(final_D4R)==0):
             print("Warning, structure passed in with no D4R units, but surface\
                    was requested to be generated w/Ge delamination. Exiting...")
+            sys.exit()
         else:
             f=open('D4R.txt','w')
             for struct in final_D4R:
