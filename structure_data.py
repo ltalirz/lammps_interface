@@ -20,6 +20,7 @@ import networkx as nx
 import operator
 
 from collections import OrderedDict
+from collections import Counter
 from atomic import MASS, ATOMIC_NUMBER, COVALENT_RADII
 from atomic import organic, non_metals, noble_gases, metalloids, lanthanides, actinides, transition_metals
 from atomic import alkali, alkaline_earth, main_group, metals
@@ -1517,10 +1518,14 @@ class SlabGraph(MolecularGraph):
 
     def check_if_zeolite(self):
 
-        zeo_types = set(["Si","O","Al"])
+        zeo_types = set(["Si","O"])
         for node, data in self.slabgraph.nodes_iter(data=True):
             if(set(data['element'])>zeo_types):
-                print("Warning! Structure determined not to be zeolite! Undefined behavior...")
+                print("Warning! Structure determined not to be all silica zeolite!...")
+                print("Warning! For now converting non-O type to an Si...")
+                if(data['element']!="O"):
+                    data['element']="Si"
+            
 
     def reset_node_edge_labelling(self,graph):
 
@@ -1646,6 +1651,7 @@ class SlabGraph(MolecularGraph):
         self.removed_edges = []
         self.removed_edges_data = []
         self.added_edges = []
+        self.added_edges_data = []
 
         for node, data in self.slabgraph.nodes_iter(data=True):
             if(data['element']=="O"): 
@@ -1666,6 +1672,18 @@ class SlabGraph(MolecularGraph):
                 
                     # create an edge between the adjacent Si
                     self.added_edges.append((neighbors[0],neighbors[1]))
+
+                    # need to keep the periodicity information
+                    this_symflag=''
+                    if(self.slabgraph.edge[neighbors[0]][node]['symflag']!='.'):
+                        this_symflag=self.slabgraph.edge[neighbors[0]][node]['symflag']
+                    elif(self.slabgraph.edge[neighbors[1]][node]['symflag']!='.'):
+                        this_symflag=self.slabgraph.edge[neighbors[1]][node]['symflag']
+                    else:
+                        this_symflag=self.slabgraph.edge[neighbors[0]][node]['symflag']
+                    self.added_edges_data.append({ 'order':1, 'length': 4.0, 'symflag':this_symflag })
+                    
+
                 elif(len(neighbors)==1):
                     #print("Node %d is a surface O node"%node)
                     # the arbitrary initial slab config can have dangling O's
@@ -1707,14 +1725,12 @@ class SlabGraph(MolecularGraph):
                 del self.slabgraph.sorted_edge_dict[(edge[1],edge[0])]
             except:
                 pass
-            #if(edge[0]<edge[1]):
-            #    del self.slabgraph.sorted_edge_dict[(edge[0],edge[1])]
-            #else:
-            #    del self.slabgraph.sorted_edge_dict[(edge[1],edge[0])]
+
 
         # Add Si-Si/Si-Al/Al-Al,etc edges
-        edge_data={ 'order':1, 'length': 4.0, 'symflag':'--' } 
-        for edge in self.added_edges:
+        #edge_data={ 'order':1, 'length': 4.0, 'symflag':'--' } 
+        #for edge in self.added_edges:
+        for edge,edge_data in zip(self.added_edges,self.added_edges_data):
             self.slabgraph.add_edge(*edge,attr_dict=edge_data)
 
             # the sorted edge dict is used by write_CIF but IS NOT updated when modifying
@@ -1728,19 +1744,6 @@ class SlabGraph(MolecularGraph):
         for node in self.removed_nodes:
             self.slabgraph.remove_node(node)
 
-        #print((193,232) in self.removed_edges)
-        #print((232,193) in self.removed_edges)
-        #print((193,232) in self.added_edges)
-        #print((232,193) in self.added_edges)
-        #print((193,232) in self.slabgraph.sorted_edge_dict)
-        #print((232,193) in self.slabgraph.sorted_edge_dict)
-        #print(self.slabgraph.sorted_edge_dict[(232,193)])
-        #print((80,216) in self.slabgraph.sorted_edge_dict)
-        #print((216,80) in self.slabgraph.sorted_edge_dict)
-        # if necessary recompute cycle properties
-
-        # TODO if we want to take some cycle building based approach
-        #self.slabgraph.compute_init_typing()
       
         print(self.slabgraph.name)      
 
@@ -1951,6 +1954,62 @@ class SlabGraph(MolecularGraph):
               (len(self.slabgraph.neighbors(self.super_surface_node_max))))
         print("Total weight out: %d"%self.super_surface_node_max_weight)
 
+    def equiv_symflag(self,string):
+        """
+        Helper function for comparing symflags under special circumstances
+        """
+        #return string
+        new_string=re.sub('4','6',string)
+        return new_string
+    
+    def check_cycle_across_PBC(self, nlist, bdist=3.5):
+        """
+        Checks if a cycle is still actually a cycle after it is embedded
+        in a supercell
+        """
+
+        # Flag to see indicate we want to look at images of this node
+        perm=[i for i in itertools.product([0, 1], repeat = len(nlist))]
+        # Flag as to whether we want to look at images in this coordinate
+        abc_perm=[i for i in itertools.product([0, 1], repeat = 3)]
+
+        is_cycle=False
+        #print(nlist)
+        
+        # investigate each permutation for the image of the node
+        for p in perm:
+            # get the modified images of each node in the list
+            old_frac = [[float(self.refgraph.node[nlist[i]]['_atom_site_fract_x']),
+                         float(self.refgraph.node[nlist[i]]['_atom_site_fract_y']), 
+                         float(self.refgraph.node[nlist[i]]['_atom_site_fract_z'])] for i in range(len(nlist))]
+            #print(old_frac)
+
+            # investigate each permutation of +a, +b, +c
+            for pp in abc_perm:
+            
+                #print(self.refgraph.node[nlist[0]].keys())
+                new_frac = [[float(self.refgraph.node[nlist[i]]['_atom_site_fract_x'])+p[i]*pp[0],
+                             float(self.refgraph.node[nlist[i]]['_atom_site_fract_y'])+p[i]*pp[1], 
+                             float(self.refgraph.node[nlist[i]]['_atom_site_fract_z'])+p[i]*pp[2]] for i in range(len(nlist))]
+                #print(new_frac)
+
+                # get the modified images in cart space for each node in the list
+                new_cartesian=[self.to_cartesian(frac) for frac in new_frac]
+                #print(new_cartesian)
+
+                # get the distances between each point
+                all_distances=[np.linalg.norm(new_cartesian[i%len(nlist)]-
+                                              new_cartesian[(i+1)%len(nlist)]) for i in range(len(nlist))]
+                #print(all_distances) 
+
+                # if all Si-Si distances < ~3.5 A, then we have a true cycle
+                if(all(d < bdist for d in all_distances)):
+                    is_cycle=True
+                    break
+
+
+        return is_cycle
+    
     def check_D4R(self):
         """
         Check for D4R rings (preferential Ge sites) that can react with water
@@ -1982,64 +2041,173 @@ class SlabGraph(MolecularGraph):
                 print(cycle)
                 filter_cycles=[]
                 for ind in cycle:
+                    # make sure its a 4 ring
                     if(len(ind)==4):
-                        filter_cycles.append(ind)
+                        # make sure its periodic
+                        if(ind[3] in tmpG.neighbors(ind[0])):
+                            # make sure it doesn't contain the super surface nodes
+                            # because these edges don't have a symflag bc it 
+                            # carries no physical meaning for this edge
+                            if(self.super_surface_node_max not in ind and \
+                               self.super_surface_node_0 not in ind):
+                                filter_cycles.append(ind)
                 cycles += filter_cycles
 
         # now we have a list of all 4 cycles in the graph
         #print("Cycles: %s"%(str(cycles)))
 
+        nexttmpG=nx.Graph()
+        for four_ring in cycles:
+            # whether this four ring is a true cycle even when embedded in a super cell
+            to_add=False
+
+            # get the symflag (aka periodicity) of each bond in the identified 4 cycle
+            # -
+            # this is important because it's not a 4 ring in the edge case
+            # where a periodicity flag occurs exactly once when listing all the edges' periodicities
+            # -
+            # in such a case, making the supercell larger would find that this
+            # motif is NOT a 4R, so we must exclude it
+            # TODO
+            all_sym_flags = [tmpG[four_ring[0]][four_ring[1]]['symflag'],
+                             tmpG[four_ring[1]][four_ring[2]]['symflag'],
+                             tmpG[four_ring[2]][four_ring[3]]['symflag'],
+                             tmpG[four_ring[3]][four_ring[0]]['symflag']]
+
+            if(all(f == '.' for f in all_sym_flags)):
+                to_add=True
+            else:
+                print(all_sym_flags)
+                to_add=self.check_cycle_across_PBC(four_ring)
+                if(to_add):
+                    print('...has been added!')
+
+
+            #periodicity=[]
+            #periodicity2=[]
+            #periodicity.append(self.equiv_symflag(tmpG[four_ring[0]][four_ring[1]]['symflag']))
+            #periodicity.append(self.equiv_symflag(tmpG[four_ring[1]][four_ring[2]]['symflag']))
+            #periodicity.append(self.equiv_symflag(tmpG[four_ring[2]][four_ring[3]]['symflag']))
+            #periodicity.append(self.equiv_symflag(tmpG[four_ring[3]][four_ring[0]]['symflag']))
+
+            #periodicity2.append(self.equiv_symflag(tmpG[four_ring[3]][four_ring[0]]['symflag']))
+            #periodicity2.append(self.equiv_symflag(tmpG[four_ring[2]][four_ring[3]]['symflag']))
+            #periodicity2.append(self.equiv_symflag(tmpG[four_ring[1]][four_ring[2]]['symflag']))
+            #periodicity2.append(self.equiv_symflag(tmpG[four_ring[0]][four_ring[1]]['symflag']))
+            #print(four_ring)
+            #print(periodicity)
+            #print(periodicity2)
+
+            ## create a dict that tells how many times each sym flag occurs in periodicity
+            #counter=Counter(periodicity)
+            ## now we determine if a ring is actually a cycle or only appears that way bc of 
+            ## crossing one periodic boundary
+            ## NOTE this is def not rigorous just a simple quick hack for the case of 4
+            ## membered rings
+
+            #if(set(counter.keys()).union(set("."))==set(".")):
+            #    # All bonds are non PBC so must be a true cycle
+            #    to_add=True
+            #else:
+            #    for key in counter:
+            #        if(key=="."):
+            #            pass
+            #        elif(counter[key]%2==0):
+            #            # found a PBC direction that is crossed by 2 different edges
+            #            to_add=True
+            #            break 
+
+            if(to_add==True):
+                nexttmpG.add_edge(four_ring[0],four_ring[1])
+                nexttmpG.add_edge(four_ring[1],four_ring[2])
+                nexttmpG.add_edge(four_ring[2],four_ring[3])
+                nexttmpG.add_edge(four_ring[3],four_ring[0])
+
+        connected_comps=sorted(nx.connected_components(nexttmpG), key=len)
+        print("All connected comps:")
+        print(connected_comps)
+
         # group all four rings that share any nodes (could also just do in 
         # NetworkX and use connected components) which are D4Rs or a collection
         # of connected D4Rs
-        D4R = []
-        l=deepcopy(cycles)
-        while len(l)>0:
-            first=l[0]
-            rest=l[1:]
-            #first, *rest = l
-            first = set(first)
+        #print("All 4 cycles:")
+        #print(cycles)
+        #D4R = []
+        #l=deepcopy(cycles)
+        #while len(l)>0:
+        #    first=l[0]
+        #    rest=l[1:]
+        #    #first, *rest = l
+        #    first = set(first)
 
-            lf = -1
-            while len(first)>lf:
-                lf = len(first)
+        #    lf = -1
+        #    while len(first)>lf:
+        #        lf = len(first)
 
-                rest2 = []
-                for r in rest:
-                    if len(first.intersection(set(r)))>0:
-                        first |= set(r)
-                    else:
-                        rest2.append(r)     
-                rest = rest2
+        #        rest2 = []
+        #        for r in rest:
+        #            if len(first.intersection(set(r)))>0:
+        #                first |= set(r)
+        #            else:
+        #                rest2.append(r)     
+        #        rest = rest2
 
-            D4R.append(first)
-            l = rest
+        #    D4R.append(first)
+        #    l = rest
         # filter out anything not containing 8 nodes
+
+
+        # finally we can check if a connected component is indeed a D4R
         final_D4R=[]
-        for struct in D4R:
-            if(len(struct) == 8):
+        for struct in connected_comps:
+            still_a_D4R=True
+            
+            # only looking for D4R or pillared D4R unit
+            if(len(struct)==8 or len(struct)==12):
+
+                # each node in the component must have at least two neighbors
+                # that are also in the component
+                for node in struct:
+                    if(len(set(self.slabgraph.neighbors(node)).intersection(struct))<3):
+                        still_a_D4R=False
+                        print("Exculding component (not a true D4R): %s"%(str(struct)))
+                        break
+            else:
+                still_a_D4R=False
+
+            if(still_a_D4R):        
                 final_D4R.append(struct)
+
         # final subunits 
-        print("D4Rs: %s"%(str(final_D4R)))
+        print("All D4Rs:")
+        print(str(final_D4R))
         if(len(final_D4R)==0):
             print("Warning, structure passed in with no D4R units, but surface\
                    was requested to be generated w/Ge delamination. Exiting...")
-            f=open('no_D4R.txt','w')
+            sys.exit()
+        else:
+            f=open('D4R.txt','w')
+            for struct in final_D4R:
+                f.write("%s\n"%str(struct))
             f.close()
             
 
 
         # finally, weight all edges that go from a node in a D4R to a node
-        # not in a D4R with a value of 0.1
-        all_D4R_nodes=set()
-        all_D4R_nodes=all_D4R_nodes.union(*final_D4R)
-        print(all_D4R_nodes)
+        # not in a D4R with a value of 0.0
+        self.all_D4R_nodes=set()
+        self.all_D4R_nodes=self.all_D4R_nodes.union(*final_D4R)
+        print("All nodes in D4Rs:")
+        print(self.all_D4R_nodes)
         for struct in final_D4R:
             for n in struct:
                 for neigh in self.slabgraph.neighbors(n):
-                    if(neigh not in all_D4R_nodes):
-                        self.slabgraph.edge[n][neigh]['capacity']=0.1
-                        self.slabgraph.edge[n][neigh]['weight']=0.1
+                    # if the edge goes from a node in the D4R to a node outside
+                    # the D4R, the weight is 0
+                    #if(neigh not in self.all_D4R_nodes):
+                    if(neigh not in struct):
+                        self.slabgraph.edge[n][neigh]['capacity']=0.0
+                        self.slabgraph.edge[n][neigh]['weight']=0.0
 
         
 
@@ -3507,6 +3675,15 @@ class SlabGraph(MolecularGraph):
             slablayer+=3
             data['element']=ATOMIC_NUMBER[slablayer]
 
+
+        # if we have some other specialty debug features, add here
+        # e.g. perhaps D4R units
+        if(hasattr(self, 'all_D4R_nodes')):
+            for n,data in self.slabgraph.nodes_iter(data=True):
+                if(n in self.all_D4R_nodes):
+                    data['element']=25
+
+
         tmp_nodes=[]
         for (u,v) in cutset:                                    
             # color nodes                                                   
@@ -3520,15 +3697,15 @@ class SlabGraph(MolecularGraph):
                 this_data = self.refgraph.node[n_to_add]                    
                 self.slabgraph.add_node(n_to_add, this_data)                
                 tmp_nodes.append(n_to_add)                                  
-                                                                            
-        self.write_slabgraph_cif(self.slabgraph,self.cell,bond_block=False,descriptor="cut%05d.debug"%step,relabel=False)
+
+        
+        # write a CIF file as an easy way to visualize the imoprtant info
+        self.write_slabgraph_cif(self.slabgraph,self.cell,bond_block=False,\
+                                 descriptor="cut%05d.debug"%step,relabel=False)
+
         # reset nodes                                                       
         for n,data in self.slabgraph.nodes_iter(data=True):
             data['element']=self.refgraph.node[n]['element']
-        #for (u,v) in cutset:                                    
-        #    self.slabgraph.node[u]['element']='Si'                          
-        #    self.slabgraph.node[v]['element']='Si'                          
-        # reset edges                                                       
         for node in tmp_nodes:                                              
             self.slabgraph.remove_node(node)
 
