@@ -3737,7 +3737,9 @@ class TraPPE(ForceField):
     2. Martin & Siepmann JPCB 1999 - branched alkanes
     3. NOPE
     4. Wick, Martin & Siepmann JPCB 2000 - linear, branched alkenes
-    5.
+    5. Chen, Potoff & Siepmann JPCB 2001 - primary, secondary, tertiary alcohols
+    6. Stubbs, Potoff & Siepmann JPCB 2004 - ethers, glycols, ketones, aldehydes
+    (NB: R^12 repulsive term between H-(O) and intramolecular O 5-atoms away is not included)
     """
     def __init__(self, graph=None,  h_bonding=False, **kwargs):
         self.pair_in_data = True
@@ -3770,14 +3772,40 @@ class TraPPE(ForceField):
         Re = 0.
         if data['order'] == 1:
             if np.all([i[:2] == "CH" or i[:2] == "C_" for i in ffset]):
-                Re = 1.54
+                # carbon single bonded to ketone/aldehyde carbon
+                if (np.any([i[-3:] == "_=O":
+                    Re = 1.52
+                else:
+                    Re = 1.54
+            elif set(["O_sp3","H"]) == ffset:
+                Re = 0.945
+
+            elif ("O_sp3" in ffset):
+                # C - O - (H) alcohol single bond
+                if((np.any(['C_' == i[:2] or "CH" == i[:2] for i in ffset])) and 
+                  (np.any(["_OH" == i[-3:] for i in ffset]))):
+                    Re = 1.43
+                # C - O - (CHx) ether single bond
+                elif (np.any(['C_' in i[:2] or "CH" in i[:2] for i in ffset])):
+                    Re = 1.41
+             
+            elif np.all([i[:2] == "O_" or i[:2] == "CH" or i[:2] == "C_" for i in ffset]):
+                Re = 1.43
         elif data['order'] == 2:
             if np.all([i[:2] == "CH" or i[:2] == "C_" for i in ffset]):
                 Re = 1.33
+            # ketone
+            elif (set(["C_sp2", "O_sp2"]) == ffset):
+                Re = 1.229
+            # aldehyde 
+            elif ((set(["CH_sp2","O_sp2"]) == ffset) or
+                (set(["CH2_sp2", "O_sp2"]) == ffset)):
+                Re = 1.217
+
         elif data['order'] == 1.5:
             if np.all([i[:2] == "CH" or i[:2] == "C_" for i in ffset]):
                 Re = 1.40
-
+        
         if (Re == 0.):
             print("ERROR: Could not find the bond type in TraPPE for atoms %i and $i."%(n1, n2)
                     "They have elements %s and %s."% (n1_data["element"], n2_data["element"]))
@@ -3803,33 +3831,49 @@ class TraPPE(ForceField):
         a, b, c, data = angle
         a_data, b_data, c_data = self.graph.node[a], self.graph.node[b], self.graph.node[c] 
         btype = b_data['force_field_type']
+        atype = a_data['force_field_type']
+        ctype = c_data['force_field_type']
         data['potential'] = AnglePotential.Harmonic()
         if (btype == "CH2_sp3"):
-            K = 62500 * KBTOKCAL
+            K = 62500.
             theta0 = 114.
+            if(atype == "O_sp3" or ctype == "O_sp3"):
+                K = 50300.
+                theta0 = 112.
         elif (btype == "CH_sp3"):
-            K = 62500 * KBTOKCAL
+            K = 62500.
             theta0 = 112.
+            if(atype == "O_sp3" or ctype == "O_sp3"):
+                K = 50300.
         elif (btype == "C_sp3"):
-            K = 62500 * KBTOKCAL
+            K = 62500.
             theta0 = 109.47
         elif((btype == "CH2_sp2") or (btype == "CH_sp2") or 
             (btype == "C_sp2")):
-            K = 70420 * KBTOKCAL
+            K = 70420.
             theta0 = 119.7
         elif((btype == "CH_aro") or (btype == "C_aro")):
-            K = 70420 * KBTOKCAL
-            theta0 = 120
+            K = 70420.
+            theta0 = 120.
             data['potential'].special_flag = "shake"
-            # rigid bond.
-        data['potential'].K = K
+            # rigid angle.
+        elif (btype == "O_sp3"):
+            K = 55400.
+            theta0 = 108.5
+        elif (btype == "C_sp2_=O"):
+            if(atype == "O_sp2" or ctype == "O_sp2"):
+                K = 62500.
+                theta0 = 117.2
+            elif(np.all([i[:2] == "CH" or i[:2] == "C_" for i in [atype,ctype]])):
+                K = 62500.
+                theta0 = 121.4
+        data['potential'].K = K*KBTOKCAL/2.
         data['potential'].theta0 = theta0
 
         return 1
 
     def dihedral_term(self, dihedral):
         """
-        
         The TraPPE dihedral is governed by the 3-term cosine function 
 
         E = C1*[1 + cos(theta)] + C2*[1 - cos(2*theta)] + C3*[1 + cos(3*theta)]
@@ -3854,13 +3898,46 @@ class TraPPE(ForceField):
         c_data = self.graph.node[c]
         d_data = self.graph.node[d]
 
+        atype = a_data['force_field_type']
         btype = b_data['force_field_type']
         ctype = c_data['force_field_type']
-        
+        dtype = d_data['force_field_type']
+
 
         if (set([btype,ctype]) == set(["CH2_sp3"])):
-            K0 = 0.0
-            K1 = 335.03; K2 = -68.19; K3 = 791.32; K4=0.0
+            # diol
+            if atype == "O_sp3" and dtype == "O_sp3":
+                K0 = 503.24
+                K1 = 0.0; K2 = -251.62; K3 = 1006.47; K4=0.0
+            # alcohol/ether
+            elif atype == "O_sp3" or dtype == "O_sp3":
+                K0 = 0.0
+                K1 = 176.62; K2 = -53.34; K3 = 769.93; K4=0.0
+            # carbon chain
+            else:
+                K0 = 0.0
+                K1 = 335.03; K2 = -68.19; K3 = 791.32; K4=0.0
+        # Carbon bonded to carbon of ketone/aldehyde
+        elif ("_=O" == btype[-3:] or "_=O" == ctype[-3:]):
+            K0 = 2035.58 # just here for reference
+            K1 = -736.90; K2 = 57.84; K3 = -293.23; K4 = 0.0
+        # alcohol
+        elif (set([btype,ctype]) == set(["CH2_sp3_OH", "O_sp3"])):
+            K0 = 0.0 
+            K1 = 209.82; K2 = -29.17; K3 = 187.93; K4 = 0.0
+        # alcohol
+        elif (set([btype,ctype]) == set(["CH_sp3_OH", "O_sp3"])):
+            K0 = 215.96 # just here for reference
+            K1 = 197.33; K2 = 31.46; K3 = -173.92; K4 = 0.0
+        # alcohol
+        elif (set([btype,ctype]) == set(["C_sp3_OH", "O_sp3"])):
+            K0 = 0.0 
+            K1 = 0.0; K2 = 0.0; K3 = 163.56; K4 = 0.0
+        # ether
+        elif (set([btype,ctype]) == set(["C_sp3", "O_sp3"])):
+            K0 = 0.0 
+            K1 = 725.35; K2 = -163.75; K3 = 558.20; K4 = 0.0
+
         elif (set([btype,ctype]) == set(["CH2_sp3", "CH_sp3"])):
             K0 = -251.06 # just here for reference
             K1 = 428.73; K2 = -111.85; K3 = 441.27; K4=0.0
@@ -3871,7 +3948,7 @@ class TraPPE(ForceField):
             K0 = -251.06 # just here for reference
             K1 = 428.73; K2 = -111.85; K3 = 441.27; K4=0.0
         elif (set([btype,ctype]) == set(["CH2_sp3", "CH_sp2"])):
-            K0 = 688.5
+            K0 = 688.5 # just here for reference
             K1 = 86.36; K2 = -109.77; K3 = -282.24; K4 = 0.0
         elif (set([btype,ctype]) == set(["CH_sp2"])):
             angle = self.graph.compute_dihedral_between(a,b,c,d)
