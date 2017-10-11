@@ -1338,7 +1338,7 @@ class LammpsSimulation(object):
                     print("WARNING: the force field defaults to a tail correction, but "+
                             "this is not properly treated with fluctuating molecule counts in LAMMPS "+
                             "so this is automatically changed to 'shift yes' for your convenience!")
-                    self.special_commands[ix] = string.replace(comm, "tail yes", "shift yes")
+                    self.special_commands[ix] = comm.replace("tail yes", "shift yes")
 
         # general catch-all for extra force field commands needed.
         inp_str += "\n".join(list(set(self.special_commands)))

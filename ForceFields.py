@@ -3773,7 +3773,7 @@ class TraPPE(ForceField):
         if data['order'] == 1:
             if np.all([i[:2] == "CH" or i[:2] == "C_" for i in ffset]):
                 # carbon single bonded to ketone/aldehyde carbon
-                if (np.any([i[-3:] == "_=O":
+                if (np.any([i[-3:] == "_=O"])):
                     Re = 1.52
                 else:
                     Re = 1.54
