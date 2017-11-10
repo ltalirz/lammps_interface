@@ -36,7 +36,7 @@ try:
     import networkx as nx
     from networkx.algorithms import approximation
 except ImportError:
-    print("WARNING: could not load networkx module, this is needed to produce the lammps data file.")
+    print("ERROR: could not load networkx module, this is needed to produce the lammps data file.")
     sys.exit()
 
 import nxstoerwagnercustom as nxswc
@@ -89,6 +89,17 @@ class MolecularGraph(nx.Graph):
         # are referenced properly (particularly across periodic images)
         self.sorted_edge_dict = {}
         self.molecule_images = []
+
+    def nodes_iter(self, data=True):
+        """Oh man, fixing to networkx 2.0
+
+        This probably breaks a lot of stuff in the code. THANKS NETWORKX!!!!!!!1
+
+        """
+        if (nx.version > 1.9):
+            return list(self.nodes())
+        else:
+            return self.nodes_iter(data=data)
         #FIXME(pboyd): latest version of NetworkX has removed nodes_iter...
 
     def edges_iter2(self, **kwargs):
