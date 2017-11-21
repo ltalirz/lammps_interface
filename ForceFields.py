@@ -53,7 +53,7 @@ class ForceField(object):
         self.compute_improper_terms()
 
     def compute_atomic_pair_terms(self):
-        for n, data in self.graph.nodes_iter(data=True):
+        for n, data in self.graph.nodes_iter2(data=True):
             self.pair_terms(n, data, self.cutoff)
 
     def compute_bond_terms(self):
@@ -66,7 +66,7 @@ class ForceField(object):
             self.graph.remove_edge(n1, n2)
     
     def compute_angle_terms(self):
-        for b, data in self.graph.nodes_iter(data=True):
+        for b, data in self.graph.nodes_iter2(data=True):
             # compute and store angle terms
             try:
                 rem_ang = []
@@ -96,7 +96,7 @@ class ForceField(object):
 
     def compute_improper_terms(self):
 
-        for b, data in self.graph.nodes_iter(data=True):
+        for b, data in self.graph.nodes_iter2(data=True):
             try:
                 rem_imp = []
                 imp_data = data['impropers']
@@ -711,7 +711,7 @@ class BTW_FF(ForceField):
             chrg_flag=sbu_type+"_"
 
         #Assigning force field type of atoms 
-        for node, atom in self.graph.nodes_iter(data=True):
+        for node, atom in self.graph.nodes_iter2(data=True):
             # check if element not in one of the SBUS
             if atom['element'] == "Cu":
                 try:
@@ -882,7 +882,7 @@ class BTW_FF(ForceField):
 
         #Assigning force field type of angles
         missing_labels=[]
-        for b , data in self.graph.nodes_iter(data=True):
+        for b , data in self.graph.nodes_iter2(data=True):
             try:
                 missing_angles=[]
                 ang_data = data['angles']
@@ -946,7 +946,7 @@ class BTW_FF(ForceField):
         
         #Assigning force field type of impropers 
         missing_labels=[]
-        for b, data in self.graph.nodes_iter(data=True):
+        for b, data in self.graph.nodes_iter2(data=True):
             try:
                 missing_improper=[]
                 imp_data = data['impropers']
@@ -1189,7 +1189,7 @@ class MOF_FF(ForceField):
             sys.exit()
             
         #Assigning force field type of atoms 
-        for node, atom in self.graph.nodes_iter(data=True):
+        for node, atom in self.graph.nodes_iter2(data=True):
             # check if element not in one of the SBUS
             if atom['element'] == "Cu":
                 try:
@@ -1343,7 +1343,7 @@ class MOF_FF(ForceField):
                 exit()
         #Assigning force field type of angles
         missing_labels=[]
-        for b , data in self.graph.nodes_iter(data=True):
+        for b , data in self.graph.nodes_iter2(data=True):
             try:
                 missing_angles=[]
                 ang_data = data['angles']
@@ -1410,7 +1410,7 @@ class MOF_FF(ForceField):
 
         #Assigning force field type of impropers 
         missing_labels=[]
-        for b, data in self.graph.nodes_iter(data=True):
+        for b, data in self.graph.nodes_iter2(data=True):
             try:
                 missing_improper=[]
                 imp_data = data['impropers']
@@ -1690,7 +1690,7 @@ class FMOFCu(ForceField):
         # for each atom determine the ff type if it is None
         FMOFCu_organics = [ "O", "C","H","F" ]
         FMOFCu_metals = ["Cu"]
-        for node, atom in self.graph.nodes_iter(data=True):
+        for node, atom in self.graph.nodes_iter2(data=True):
             flag_coordination=False
             if atom['force_field_type'] is None:                                
                 type_assigned=False
@@ -1805,7 +1805,7 @@ class FMOFCu(ForceField):
         Assigning force field type of angles
         """ """  """  """ """          
         missing_labels=[]
-        for b , data in self.graph.nodes_iter(data=True):
+        for b , data in self.graph.nodes_iter2(data=True):
             # compute and store angle terms
             try:
                 missing_angles=[]
@@ -1879,7 +1879,7 @@ class FMOFCu(ForceField):
         Assigning force field type of impropers 
         """ """  """  """ """          
         missing_labels=[]
-        for b, data in self.graph.nodes_iter(data=True):
+        for b, data in self.graph.nodes_iter2(data=True):
             try:
                 missing_improper=[]
                 imp_data = data['impropers']
@@ -2492,7 +2492,7 @@ class UFF(ForceField):
         halides = ["F", "Cl", "Br", "I"]
         sqpl = ["He", "Ne", "Ar", "Ni", "Kr", "Pd", "Xe", "Pt", "Au", "Rn"]
 
-        for node, data in self.graph.nodes_iter(data=True):
+        for node, data in self.graph.nodes_iter2(data=True):
             # check if fftype exists:
             try:
                 fftype = UFF_DATA[data['force_field_type']]
@@ -3103,7 +3103,7 @@ class Dreiding(ForceField):
         organics = ["C", "N", "O", "S"]
         halides = ["F", "Cl", "Br", "I"]
         electro_neg_atoms = ["N", "O", "F"]
-        for node, data in self.graph.nodes_iter(data=True):
+        for node, data in self.graph.nodes_iter2(data=True):
             # check if fftype exists:
             try:
                 fftype = DREIDING_DATA[data['force_field_type']]
@@ -3529,7 +3529,7 @@ class UFF4MOF(ForceField):
         # for each atom determine the ff type if it is None
         organics = ["C", "N", "O", "S"]
         halides = ["F", "Cl", "Br", "I"]
-        for node, data in self.graph.nodes_iter(data=True):
+        for node, data in self.graph.nodes_iter2(data=True):
             special = 'special_flag' in data
             # check if fftype exists:
             try:
@@ -4029,7 +4029,7 @@ class TraPPE(ForceField):
         organics = ["C", "N", "O", "S"]
         halides = ["F", "Cl", "Br", "I"]
         electro_neg_atoms = ["N", "O", "F"]
-        for node, data in self.graph.nodes_iter(data=True):
+        for node, data in self.graph.nodes_iter2(data=True):
             # check if fftype exists:
             try:
                 fftype = DREIDING_DATA[data['force_field_type']]
@@ -4258,7 +4258,7 @@ class Dubbeldam(ForceField):
         This means that failing to find the SBUs will result in a bad parameterization.
 
         """
-        for node, data in self.graph.nodes_iter(data=True):
+        for node, data in self.graph.nodes_iter2(data=True):
             special = 'special_flag' in data
             if not special:
                 print("ERROR: Some atoms were not detected as part of an SBU." + 
@@ -4439,7 +4439,7 @@ class BKS_SPC_SIOH(ForceField):
         Silica Os and Si
 
         """
-        for node, data in self.graph.nodes_iter(data=True):
+        for node, data in self.graph.nodes_iter2(data=True):
             elem = data['element']
             neighbours = [self.graph.node[j] for j in self.graph.neighbors(node)]
             neigh_elem = [i['element'] for i in neighbours]
@@ -4579,7 +4579,7 @@ class SPC_E(ForceField):
         """Water consists of O and H, not too difficult. 
 
         """
-        for node, data in self.graph.nodes_iter(data=True):
+        for node, data in self.graph.nodes_iter2(data=True):
             if data['element'] == "O":
                 fftype = "Ow"
             elif data['element'] == "H":
@@ -4692,7 +4692,7 @@ class TIP3P(ForceField):
         """Water consists of O and H, not too difficult. 
 
         """
-        for node, data in self.graph.nodes_iter(data=True):
+        for node, data in self.graph.nodes_iter2(data=True):
             if data['element'] == "O":
                 fftype = "OW"
             elif data['element'] == "H":
@@ -4825,7 +4825,7 @@ class TIP4P(ForceField, TIP4P_Water):
         """Water consists of O and H, not too difficult. 
 
         """
-        for node, data in self.graph.nodes_iter(data=True):
+        for node, data in self.graph.nodes_iter2(data=True):
             if data['element'] == "O":
                 fftype = "OW"
             elif data['element'] == "H":
@@ -4948,7 +4948,7 @@ class TIP5P(ForceField):
         """Water consists of O and H, not too difficult. 
 
         """
-        for node, data in self.graph.nodes_iter(data=True):
+        for node, data in self.graph.nodes_iter2(data=True):
             if data['element'] == "O":
                 fftype = "OW"
             elif data['element'] == "H":
@@ -5058,7 +5058,7 @@ class EPM2_CO2(ForceField):
         """CO2 consists of C and O, not too difficult. 
 
         """
-        for node, data in self.graph.nodes_iter(data=True):
+        for node, data in self.graph.nodes_iter2(data=True):
             if data['element'] == "O":
                 fftype = "Ox"
             elif data['element'] == "C":
@@ -5164,7 +5164,7 @@ class CO2_TraPPE(ForceField):
         """ Cx and Ox
 
         """
-        for node, data in self.graph.nodes_iter(data=True):
+        for node, data in self.graph.nodes_iter2(data=True):
             if data['element'] == "C":
                 fftype = "Cx"
             elif data['element'] == "O":
@@ -5270,7 +5270,7 @@ class N2_TraPPE(ForceField):
         """N2 consists of N, not too difficult. 
 
         """
-        for node, data in self.graph.nodes_iter(data=True):
+        for node, data in self.graph.nodes_iter2(data=True):
             if data['element'] == "N":
                 fftype = "Nx"
             elif data['element'] == "X":

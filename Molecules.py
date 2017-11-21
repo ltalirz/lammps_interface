@@ -69,15 +69,15 @@ class Molecule(MolecularGraph):
         #line += "%12.5f mass"%()
         #line += "%12.5f %12.5f %12.5f com"%()
         line += "\nCoords\n\n"
-        for node, data in self.nodes_iter(data=True):
+        for node, data in self.nodes_iter2(data=True):
             line += "%6i %12.5f %12.5f %12.5f\n"%(tuple ([node]+data['cartesian_coordinates'].tolist()))
 
         line += "\nTypes\n\n"
-        for node, data in self.nodes_iter(data=True):
+        for node, data in self.nodes_iter2(data=True):
             line += "%6i %6i  # %s\n"%(node, data['ff_type_index'], data['force_field_type'])
 
         line += "\nCharges\n\n"
-        for node, data in self.nodes_iter(data=True):
+        for node, data in self.nodes_iter2(data=True):
             line += "%6i %12.5f\n"%(node, data['charge']) 
         
         #TODO(pboyd): add bonding, angles, dihedrals, impropers, etc.
@@ -93,7 +93,7 @@ class Molecule(MolecularGraph):
         if self.count_angles():
             line += "\nAngles\n\n"
             count = 0
-            for b, data in self.nodes_iter(data=True):
+            for b, data in self.nodes_iter2(data=True):
                 try:
                     ang_data = data['angles']
                     for (a, c), val in ang_data.items(): 
@@ -126,7 +126,7 @@ class Molecule(MolecularGraph):
         if self.count_impropers():
             line += "\nImpropers\n\n"
             count = 0
-            for b, data in self.nodes_iter(data=True):
+            for b, data in self.nodes_iter2(data=True):
                 try:
                     imp_data = data['impropers']
                     for (a, c, d), val in imp_data.items(): 
@@ -188,7 +188,7 @@ class CO2(Molecule):
         R = self.rotation_from_vectors(v1, v2)
         self.C_coord = C_pos
         self._O_coord = np.dot(self._O_coord, R.T) + C_pos
-        for n in self.nodes_iter():
+        for n in self.nodes_iter2():
             if n == 1:
                 self.node[n]['cartesian_coordinates'] = self.C_coord
             elif n == 2:
@@ -236,7 +236,7 @@ class N2(Molecule):
         R = self.rotation_from_vectors(v1, v2)
         self.M_coord = M_pos
         self._N_coord = np.dot(self._N_coord, R.T) + M_pos
-        for n in self.nodes_iter():
+        for n in self.nodes_iter2():
             if n == 1:
                 self.node[n]['cartesian_coordinates'] = self.M_coord
             elif n == 2:
@@ -327,7 +327,7 @@ class Water(Molecule):
         except AttributeError:
             # no dummy atoms assigned to this water model
             pass
-        for n in self.nodes_iter():
+        for n in self.nodes_iter2():
             if n == 1:
                 self.node[n]['cartesian_coordinates'] = self.O_coord
             elif n == 2:

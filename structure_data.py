@@ -90,17 +90,19 @@ class MolecularGraph(nx.Graph):
         self.sorted_edge_dict = {}
         self.molecule_images = []
 
-    def nodes_iter(self, data=True):
+    def nodes_iter2(self, data=True):
         """Oh man, fixing to networkx 2.0
 
         This probably breaks a lot of stuff in the code. THANKS NETWORKX!!!!!!!1
 
         """
-        if (nx.version > 1.9):
-            return list(self.nodes())
-        else:
-            return self.nodes_iter(data=data)
-        #FIXME(pboyd): latest version of NetworkX has removed nodes_iter...
+        for node in self.nodes():
+            if(data):
+                data = self.node[node]
+                yield (node, data)
+            else:
+                yield node
+        #FIXME(pboyd): latest version of NetworkX has removed nodes_iter2...
 
     def edges_iter2(self, **kwargs):
         for n1, n2, d in self.edges_iter(**kwargs):
@@ -118,7 +120,7 @@ class MolecularGraph(nx.Graph):
 
     def count_angles(self):
         count = 0
-        for node, data in self.nodes_iter(data=True):
+        for node, data in self.nodes_iter2(data=True):
             try:
                 for angle in data['angles'].keys():
                     count += 1
@@ -128,7 +130,7 @@ class MolecularGraph(nx.Graph):
 
     def count_impropers(self):
         count = 0
-        for node, data in self.nodes_iter(data=True):
+        for node, data in self.nodes_iter2(data=True):
             try:
                 for angle in data['impropers'].keys():
                     count += 1
@@ -146,7 +148,7 @@ class MolecularGraph(nx.Graph):
         """
 
         old_nodes = sorted([(i,self.node[i]) for i in self.nodes()])
-        #old_nodes = list(self.nodes_iter(data=True))
+        #old_nodes = list(self.nodes_iter2(data=True))
         old_edges = list(self.edges_iter2(data=True))
         for node, data in old_nodes:
             
@@ -470,7 +472,7 @@ class MolecularGraph(nx.Graph):
         kwargs.update({'symflag': flag})
         kwargs.update({'potential': None})
         # get the node index to avoid headaches
-        for k,data in self.nodes_iter(data=True):
+        for k,data in self.nodes_iter2(data=True):
             if data['ciflabel'] == n1:
                 n1 = k
             elif data['ciflabel'] == n2:
@@ -484,7 +486,7 @@ class MolecularGraph(nx.Graph):
         coord_keys = ['_atom_site_x', '_atom_site_y', '_atom_site_z']
         fcoord_keys = ['_atom_site_fract_x', '_atom_site_fract_y', '_atom_site_fract_z']
         self.coordinates = np.empty((self.number_of_nodes(), 3))
-        for node, data in self.nodes_iter(data=True):
+        for node, data in self.nodes_iter2(data=True):
             #TODO(pboyd) probably need more error checking..
             try:
                 coordinates = np.array([float(del_parenth(data[i])) for i in coord_keys])
@@ -539,7 +541,7 @@ class MolecularGraph(nx.Graph):
         #TODO(pboyd) return if atoms already 'typed' in the .cif file
         # compute and store cycles
         cycles = []
-        for node, data in self.nodes_iter(data=True):
+        for node, data in self.nodes_iter2(data=True):
             for n in self.neighbors(node):
                 # fastest way I could think of..
                 edge = self[node][n].copy()
@@ -555,7 +557,7 @@ class MolecularGraph(nx.Graph):
                 if(len(cycle) <= 10):
                     cycles += cycle
 
-        for label, data in self.nodes_iter(data=True):
+        for label, data in self.nodes_iter2(data=True):
             # N O C S
             neighbours = self.neighbors(label)
             element = data['element']
@@ -908,7 +910,7 @@ class MolecularGraph(nx.Graph):
         periodic image.
         
         """
-        for b, data in self.nodes_iter(data=True):
+        for b, data in self.nodes_iter2(data=True):
             if self.degree(b) < 2:
                 continue
             angles = itertools.combinations(self.neighbors(b), 2)
@@ -947,7 +949,7 @@ class MolecularGraph(nx.Graph):
         angles between the neighbours of b 
 
         """
-        for b, data in self.nodes_iter(data=True):
+        for b, data in self.nodes_iter2(data=True):
             if self.degree(b) != 3:
                 continue
             # three improper torsion angles about each atom
@@ -971,7 +973,7 @@ class MolecularGraph(nx.Graph):
         self.compute_improper_dihedrals()
 
     def sorted_node_list(self):
-        return [n[1] for n in sorted([(data['index'], node) for node, data in self.nodes_iter(data=True)])]
+        return [n[1] for n in sorted([(data['index'], node) for node, data in self.nodes_iter2(data=True)])]
 
     def sorted_edge_list(self): 
         return [e[1] for e in sorted([(data['index'], (n1, n2)) for n1, n2, data in self.edges_iter2(data=True)])]
@@ -1089,7 +1091,7 @@ class MolecularGraph(nx.Graph):
             ref_sbus = OrganicCluster
             store_sbus = self.organic_sbus
 
-        for node, data in self.nodes_iter(data=True):
+        for node, data in self.nodes_iter2(data=True):
             if (type=='Inorganic') and (general_metal) and (data['atomic_number'] in METALS)\
                     and ('special' not in data.keys()): # special means that this atom has already been found in a previous clique detection
                 reference_nodes.append(node) 
@@ -1198,7 +1200,7 @@ class MolecularGraph(nx.Graph):
         old_cell = np.multiply(self.cell._cell.T, sc).T
         self.cell.set_cell(np.dot(redefinition, self.cell._cell))
         # the node cartesian_coordinates must be shifted by the periodic boundaries.
-        for node, data in self.nodes_iter(data=True):
+        for node, data in self.nodes_iter2(data=True):
             coord = data['cartesian_coordinates']
             data['cartesian_coordinates'] = self.in_cell(coord) 
 
@@ -1258,7 +1260,7 @@ class MolecularGraph(nx.Graph):
                 self.molecule_images.append(graph_image.nodes())
                 graph_image.molecule_id = orig_copy.molecule_id + mol_offset
             # update cartesian coordinates for each node in the image
-            for node, data in graph_image.nodes_iter(data=True):
+            for node, data in graph_image.nodes_iter2(data=True):
                 n_orig = data['image']
                 if track_molecule:
                     data['molid'] = graph_image.molecule_id
@@ -1421,7 +1423,7 @@ class MolecularGraph(nx.Graph):
             if (count > 0):
                 union_graphs.append(graph_image)
         for G in union_graphs:
-            for node, data in G.nodes_iter(data=True):
+            for node, data in G.nodes_iter2(data=True):
                 self.add_node(node, **data)
            #once nodes are added, add edges.
         for G in union_graphs:
@@ -1480,7 +1482,7 @@ class MolecularGraph(nx.Graph):
 
     def __iadd__(self, newgraph):
         self.sorted_edge_dict.update(newgraph.sorted_edge_dict)
-        for n, data in newgraph.nodes_iter(data=True):
+        for n, data in newgraph.nodes_iter2(data=True):
             self.add_node(n, **data)
         for n1,n2, data in newgraph.edges_iter2(data=True):
             self.add_edge(n1,n2, **data)
@@ -1501,7 +1503,7 @@ class MolecularGraph(nx.Graph):
             # openbabel could not be imported.
             return
         # add atoms and bonds one-by-one
-        for node in self.nodes_iter():
+        for node in self.nodes_iter2():
             # shift by periodic boundaries??
             a = obstruct.NewAtom()
             a.SetAtomicNum(self.node[node]['atomic_number'])
@@ -1530,7 +1532,7 @@ class SlabGraph(MolecularGraph):
     def check_if_zeolite(self):
 
         zeo_types = set(["Si","O"])
-        for node, data in self.slabgraph.nodes_iter(data=True):
+        for node, data in self.slabgraph.nodes_iter2(data=True):
             if(set(data['element'])>zeo_types):
                 print("Warning! Structure determined not to be all silica zeolite!...")
                 print("Warning! For now converting non-O type to an Si...")
@@ -1571,7 +1573,7 @@ class SlabGraph(MolecularGraph):
     #    node_convert_dict={}
     #    node_convert_dict_rev={}
     #    iterate=0
-    #    for node,data in self.slabgraph.nodes_iter(data=True):
+    #    for node,data in self.slabgraph.nodes_iter2(data=True):
     #        #xyz.append([np.float64(data['cartesian_coordinates'][0]),
     #        #            np.float64(data['cartesian_coordinates'][1]),
     #        #            np.float64(data['cartesian_coordinates'][2])])
@@ -1648,7 +1650,7 @@ class SlabGraph(MolecularGraph):
             self.refgraph=self.slabgraph.copy()
 
         #print("Reference graph:")
-        #for node, data in self.refgraph.nodes_iter(data=True):
+        #for node, data in self.refgraph.nodes_iter2(data=True):
         #    print(node, data['ciflabel'],data['element'])
 
     def condense_graph(self):
@@ -1664,7 +1666,7 @@ class SlabGraph(MolecularGraph):
         self.added_edges = []
         self.added_edges_data = []
 
-        for node, data in self.slabgraph.nodes_iter(data=True):
+        for node, data in self.slabgraph.nodes_iter2(data=True):
             if(data['element']=="O"): 
 
                 neighbors=self.slabgraph.neighbors(node)
@@ -1792,7 +1794,7 @@ class SlabGraph(MolecularGraph):
 
 
         print("\n\nIdentifying surface/bulk nodes\n")
-        for node,data in self.slabgraph.nodes_iter(data=True):
+        for node,data in self.slabgraph.nodes_iter2(data=True):
             if(data['element']=="O"):
                 print("ERROR: O's have to be removed from graph first")
                 sys.exit()
@@ -2035,7 +2037,7 @@ class SlabGraph(MolecularGraph):
 
         cycles = []
         # not the most efficient, can def be improved
-        for node, data in tmpG.nodes_iter(data=True):
+        for node, data in tmpG.nodes_iter2(data=True):
             print("Node %d:"%(node))
             #cycle = list(nx.all_shortest_paths(tmpG, node, node))
             for n in tmpG.neighbors(node):
@@ -2665,7 +2667,7 @@ class SlabGraph(MolecularGraph):
         # all nodes to remove
         remove_nodes=[]
 
-        for n1, data in Gp.nodes_iter(data=True):
+        for n1, data in Gp.nodes_iter2(data=True):
             #print(data['slablayer'])
             #print(max_layer)
             if(data['slablayer'] == max_layer+1):
@@ -3680,7 +3682,7 @@ class SlabGraph(MolecularGraph):
         """
 
         # reassign element type based on its slablayer
-        for n,data in self.slabgraph.nodes_iter(data=True):
+        for n,data in self.slabgraph.nodes_iter2(data=True):
             slablayer=data['slablayer']
             # just to give it better coloring to start than an H atom in Mercury
             slablayer+=3
@@ -3690,7 +3692,7 @@ class SlabGraph(MolecularGraph):
         # if we have some other specialty debug features, add here
         # e.g. perhaps D4R units
         if(hasattr(self, 'all_D4R_nodes')):
-            for n,data in self.slabgraph.nodes_iter(data=True):
+            for n,data in self.slabgraph.nodes_iter2(data=True):
                 if(n in self.all_D4R_nodes):
                     data['element']=25
 
@@ -3715,7 +3717,7 @@ class SlabGraph(MolecularGraph):
                                  descriptor="cut%05d.debug"%step,relabel=False)
 
         # reset nodes                                                       
-        for n,data in self.slabgraph.nodes_iter(data=True):
+        for n,data in self.slabgraph.nodes_iter2(data=True):
             data['element']=self.refgraph.node[n]['element']
         for node in tmp_nodes:                                              
             self.slabgraph.remove_node(node)
@@ -3732,7 +3734,7 @@ class SlabGraph(MolecularGraph):
 
         # NOTE important this is not rigorous since we are sorting possible identical c -values
         # need to get the layer data directly from pymatgen
-        #tosort= [(n, data) for n, data in self.slabgraph.nodes_iter(data=True)]
+        #tosort= [(n, data) for n, data in self.slabgraph.nodes_iter2(data=True)]
 
         #sort_on_c=sorted(tosort, key=lambda tup: tup[1]['_atom_site_fract_z'])
    
@@ -3746,7 +3748,7 @@ class SlabGraph(MolecularGraph):
 
         # NOTE a better way is to just make sure that the ordering is not sorted by Pymatgen
         # is every a_per_l atoms as we go from node 1 to N we know we have switched layers
-        tosort= [(n, data) for n, data in self.slabgraph.nodes_iter(data=True)]
+        tosort= [(n, data) for n, data in self.slabgraph.nodes_iter2(data=True)]
 
         sort_on_n=sorted(tosort, key=lambda tup: tup[0])
    
@@ -3770,7 +3772,7 @@ class SlabGraph(MolecularGraph):
         """
 
         # reassign element type based on its slablayer
-        for n,data in self.slabgraph.nodes_iter(data=True):
+        for n,data in self.slabgraph.nodes_iter2(data=True):
             slablayer=data['slablayer']
             #print(slablayer)
             # just to give it better coloring to start than an H atom in Mercury
@@ -3780,7 +3782,7 @@ class SlabGraph(MolecularGraph):
         self.write_slabgraph_cif(self.slabgraph,self.cell,bond_block=False,descriptor="layer.debug",relabel=False)
 
         # reset element
-        for n,data in self.slabgraph.nodes_iter(data=True):
+        for n,data in self.slabgraph.nodes_iter2(data=True):
             data['element']=self.refgraph.node[n]['element']
 
     ###########################################################################
@@ -3928,7 +3930,7 @@ class SlabGraph(MolecularGraph):
         all_nodes=G.nodes()
         nodes_to_add=set()
         edges_to_add=[]
-        for n1 in G.nodes_iter():
+        for n1 in G.nodes_iter2():
             for n2 in self.refgraph.neighbors(n1):
                 # duplicate integers not created in a set
                 nodes_to_add.add(n2)
@@ -4347,7 +4349,7 @@ class SlabGraph(MolecularGraph):
         min_coord=1.0
         max_coord=0.0
 
-        for node, data in self.slabgraph.nodes_iter(data=True):
+        for node, data in self.slabgraph.nodes_iter2(data=True):
             if(self.vacuum_direc==0):
                 if(float(data['_atom_site_fract_x'])>max_coord):
                     max_coord=float(data['_atom_site_fract_x'])
@@ -4462,7 +4464,7 @@ class SlabGraph(MolecularGraph):
         max_cycle_length=0
         min_cycle_length=1000000
         total_rings=0
-        for node, data in self.slabgraph.nodes_iter(data=True):
+        for node, data in self.slabgraph.nodes_iter2(data=True):
             print("Node %d is a part of all cycles:"%(node))
             for ring in data['rings']:
                 print(ring)
@@ -4566,7 +4568,7 @@ def write_CIF(G, cell, bond_block=True,descriptor="debug",relabel=True):
     # atom block
     element_counter = {}
     carts = []
-    for node, data in G.nodes_iter(data=True):
+    for node, data in G.nodes_iter2(data=True):
         # can override write to try to preserve the already assigned ciflabel
         if(relabel==True):
             label = "%s%i"%(data['element'], node)
@@ -4668,7 +4670,7 @@ def write_RASPA_CIF(graph, cell, classifier=0):
     carts = []
     
     # slight modification to make sure atoms printed out in same order as in data and original cif
-    for node, data in sorted(graph.nodes_iter(data=True)):
+    for node, data in sorted(graph.nodes_iter2(data=True)):
         label = "%s%i"%(data['element'], node)
 
         # sometimes we need to keep the original CIF label in the case          
@@ -4748,7 +4750,7 @@ def write_RASPA_sim_files(lammps_sim, classifier=0):
                 max_image = int(data[1]['image'])                                  
                                                                                 
     elif(classifier == 1):                                                      
-        for node, data in sorted(lammps_sim.graph.nodes_iter(data=True)):       
+        for node, data in sorted(lammps_sim.graph.nodes_iter2(data=True)):       
             data['node']=node                                                   
             #print(node)                                                         
             #print(data)                                                         

@@ -4,8 +4,10 @@ from scipy.spatial import distance
 
 def add_distance_matrix(graph):
     carts = []
-    if(nx.__version__ >= 2.0):
-        for j, data in sorted(list(graph.nodes(data=True))):
+    nxv = float('.'.join(nx.__version__.split('.')[:2]))
+    if(nxv >= 2.0):
+        for j in sorted(list(graph.nodes())):
+            data = graph.node[j]
             carts.append(data['cartesian_coordinates'])
     else:
         for j, data in sorted(graph.nodes_iter(data=True)):
