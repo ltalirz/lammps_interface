@@ -1099,11 +1099,11 @@ class MolecularGraph(nx.Graph):
             store_sbus = self.organic_sbus
 
         for node, d in self.nodes_iter2(data=True):
-            if (type=='Inorganic') and (general_metal) and (data['atomic_number'] in METALS)\
+            if (type=='Inorganic') and (general_metal) and (d['atomic_number'] in METALS)\
                     and ('special' not in d.keys()): # special means that this atom has already been found in a previous clique detection
                 reference_nodes.append(node) 
 
-            elif (data['element'] in types) and ('special' not in d.keys()): 
+            elif (d['element'] in types) and ('special' not in d.keys()): 
                 reference_nodes.append(node)
         
         no_cluster = []

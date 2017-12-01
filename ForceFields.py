@@ -53,58 +53,58 @@ class ForceField(object):
         self.compute_improper_terms()
 
     def compute_atomic_pair_terms(self):
-        for n, data in self.graph.nodes_iter2(data=True):
-            self.pair_terms(n, data, self.cutoff)
+        for n, d in self.graph.nodes_iter2(data=True):
+            self.pair_terms(n, d, self.cutoff)
 
     def compute_bond_terms(self):
         del_edges = []
-        for n1, n2, data in self.graph.edges_iter2(data=True):
+        for n1, n2, d in self.graph.edges_iter2(data=True):
 
-            if self.bond_term((n1, n2, data)) is None:
+            if self.bond_term((n1, n2, d)) is None:
                 del_edges.append((n1, n2))
         for (n1, n2) in del_edges:
             self.graph.remove_edge(n1, n2)
     
     def compute_angle_terms(self):
-        for b, data in self.graph.nodes_iter2(data=True):
+        for b, d in self.graph.nodes_iter2(data=True):
             # compute and store angle terms
             try:
                 rem_ang = []
-                ang_data = data['angles']
+                ang_data = d['angles']
                 for (a, c), val in ang_data.items():
                     if self.angle_term((a, b, c, val)) is None:
                         rem_ang.append((a,c))
                 for i in rem_ang:
-                    del(data['angles'][i])
+                    del(d['angles'][i])
 
             except KeyError:
                 pass
 
     def compute_dihedral_terms(self):
-        for b, c, data in self.graph.edges_iter2(data=True):
+        for b, c, d in self.graph.edges_iter2(data=True):
             try:
                 rem_dihed = []
-                dihed_data = data['dihedrals']
+                dihed_data = d['dihedrals']
                 for (a, d), val in dihed_data.items():
                     if self.dihedral_term((a,b,c,d, val)) is None:
                         rem_dihed.append((a,d))
                 for i in rem_dihed:
-                    del(data['dihedrals'][i])
+                    del(d['dihedrals'][i])
             
             except KeyError:
                 pass
 
     def compute_improper_terms(self):
 
-        for b, data in self.graph.nodes_iter2(data=True):
+        for b, d in self.graph.nodes_iter2(data=True):
             try:
                 rem_imp = []
-                imp_data = data['impropers']
+                imp_data = d['impropers']
                 for (a, c, d), val in imp_data.items():
                     if self.improper_term((a,b,c,d, val)) is None:
                         rem_imp.append((a,c,d))
                 for i in rem_imp:
-                    del(data['impropers'][i])
+                    del(d['impropers'][i])
 
             except KeyError:
                 pass
@@ -761,7 +761,7 @@ class BTW_FF(ForceField):
 
             try:
                 fftype = MOFFF_atoms[chrg_flag+atom['force_field_type']]
-            except KeyError:
+            except TypeError:
                 fftype = None
             if fftype is None:
                 type_assigned = False
@@ -882,13 +882,13 @@ class BTW_FF(ForceField):
 
         #Assigning force field type of angles
         missing_labels=[]
-        for b , data in self.graph.nodes_iter2(data=True):
+        for b, d in self.graph.nodes_iter2(data=True):
             try:
                 missing_angles=[]
-                ang_data = data['angles']
+                ang_data = d['angles']
                 for (a, c), val in ang_data.items():
                     a_atom = self.graph.node[a]
-                    b_atom = data 
+                    b_atom = d 
                     c_atom = self.graph.node[c]
                     atom_a_fflabel = a_atom['force_field_type']
                     atom_b_fflabel = b_atom['force_field_type']
@@ -914,10 +914,10 @@ class BTW_FF(ForceField):
 
         #Assigning force field type of dihedrals 
         missing_labels=[]
-        for b, c, data in self.graph.edges_iter2(data=True):
+        for b, c, dat in self.graph.edges_iter2(data=True):
             try:
                 missing_dihedral=[]
-                dihed_data = data['dihedrals']
+                dihed_data = dat['dihedrals']
                 for (a, d), val in dihed_data.items():
                     a_atom = self.graph.node[a]
                     b_atom = self.graph.node[b]
@@ -946,10 +946,10 @@ class BTW_FF(ForceField):
         
         #Assigning force field type of impropers 
         missing_labels=[]
-        for b, data in self.graph.nodes_iter2(data=True):
+        for b, dat in self.graph.nodes_iter2(data=True):
             try:
                 missing_improper=[]
-                imp_data = data['impropers']
+                imp_data = dat['impropers']
                 for (a, c, d), val in imp_data.items():
                     a_atom = self.graph.node[a]
                     b_atom = self.graph.node[b]
@@ -1232,7 +1232,7 @@ class MOF_FF(ForceField):
 
             # check if fftype exists:
             try:
-                fftype = MOFFF_atoms[data['force_field_type']]
+                fftype = MOFFF_atoms[atom['force_field_type']]
             except KeyError:
                 fftype = None
             if fftype is None:
@@ -1343,13 +1343,13 @@ class MOF_FF(ForceField):
                 exit()
         #Assigning force field type of angles
         missing_labels=[]
-        for b , data in self.graph.nodes_iter2(data=True):
+        for b, dat in self.graph.nodes_iter2(data=True):
             try:
                 missing_angles=[]
-                ang_data = data['angles']
+                ang_data = dat['angles']
                 for (a, c), val in ang_data.items():
                     a_atom = self.graph.node[a]
-                    b_atom = data 
+                    b_atom = dat 
                     c_atom = self.graph.node[c]
                     atom_a_fflabel = a_atom['force_field_type']
                     atom_b_fflabel = b_atom['force_field_type']
@@ -1378,10 +1378,10 @@ class MOF_FF(ForceField):
             print ("%s angle does not exist in FF!"%(ff_label))
         #Assigning force field type of dihedrals 
         missing_labels=[]
-        for b, c, data in self.graph.edges_iter2(data=True):
+        for b, c, dat in self.graph.edges_iter2(data=True):
             try:
                 missing_dihedral=[]
-                dihed_data = data['dihedrals']
+                dihed_data = dat['dihedrals']
                 for (a, d), val in dihed_data.items():
                     a_atom = self.graph.node[a]
                     b_atom = self.graph.node[b]
@@ -1410,10 +1410,10 @@ class MOF_FF(ForceField):
 
         #Assigning force field type of impropers 
         missing_labels=[]
-        for b, data in self.graph.nodes_iter2(data=True):
+        for b, dat in self.graph.nodes_iter2(data=True):
             try:
                 missing_improper=[]
-                imp_data = data['impropers']
+                imp_data = dat['impropers']
                 for (a, c, d), val in imp_data.items():
                     a_atom = self.graph.node[a]
                     b_atom = self.graph.node[b]
@@ -1805,14 +1805,14 @@ class FMOFCu(ForceField):
         Assigning force field type of angles
         """ """  """  """ """          
         missing_labels=[]
-        for b , data in self.graph.nodes_iter2(data=True):
+        for b, dat in self.graph.nodes_iter2(data=True):
             # compute and store angle terms
             try:
                 missing_angles=[]
-                ang_data = data['angles']
+                ang_data = dat['angles']
                 for (a, c), val in ang_data.items():
                     a_atom = self.graph.node[a]
-                    b_atom = data 
+                    b_atom = dat 
                     c_atom = self.graph.node[c]
                     atom_a_fflabel = a_atom['force_field_type']
                     atom_b_fflabel = b_atom['force_field_type']
@@ -1845,10 +1845,10 @@ class FMOFCu(ForceField):
         Assigning force field type of dihedrals 
         """ """  """  """ """          
         missing_labels=[]
-        for b, c, data in self.graph.edges_iter2(data=True):
+        for b, c, dat in self.graph.edges_iter2(data=True):
             try:
                 missing_dihedral=[]
-                dihed_data = data['dihedrals']
+                dihed_data = dat['dihedrals']
                 for (a, d), val in dihed_data.items():
                     a_atom = self.graph.node[a]
                     b_atom = self.graph.node[b]
@@ -1879,10 +1879,10 @@ class FMOFCu(ForceField):
         Assigning force field type of impropers 
         """ """  """  """ """          
         missing_labels=[]
-        for b, data in self.graph.nodes_iter2(data=True):
+        for b, dat in self.graph.nodes_iter2(data=True):
             try:
                 missing_improper=[]
-                imp_data = data['impropers']
+                imp_data = dat['impropers']
                 for (a, c, d), val in imp_data.items():
                     a_atom = self.graph.node[a]
                     b_atom = self.graph.node[b]
@@ -2492,76 +2492,76 @@ class UFF(ForceField):
         halides = ["F", "Cl", "Br", "I"]
         sqpl = ["He", "Ne", "Ar", "Ni", "Kr", "Pd", "Xe", "Pt", "Au", "Rn"]
 
-        for node, data in self.graph.nodes_iter2(data=True):
+        for node, dat in self.graph.nodes_iter2(data=True):
             # check if fftype exists:
             try:
-                fftype = UFF_DATA[data['force_field_type']]
+                fftype = UFF_DATA[dat['force_field_type']]
             except KeyError:
                 fftype = None
             if fftype is None:
-                if data['element'] in organics:
-                    if data['hybridization'] == "sp3":
-                        data['force_field_type'] = "%s_3"%data['element']
-                        if data['element'] == "O" and self.graph.degree(node) >= 2:
+                if dat['element'] in organics:
+                    if dat['hybridization'] == "sp3":
+                        dat['force_field_type'] = "%s_3"%dat['element']
+                        if dat['element'] == "O" and self.graph.degree(node) >= 2:
                             neigh_elem = set([self.graph.node[i]['element'] for i in self.graph.neighbors(node)])
                             if neigh_elem <= metals and self.graph.degree(node) == 2:
-                                data['force_field_type'] = "O_2"
+                                dat['force_field_type'] = "O_2"
                             elif neigh_elem <= metals and self.graph.degree(node) >= 3:
-                                data['force_field_type'] = "O_3"
+                                dat['force_field_type'] = "O_3"
                             # zeolites
                             if neigh_elem <= set(["Si", "Al"]):
-                                data['force_field_type'] = "O_3_z"
-                        elif data['element'] == "S":
+                                dat['force_field_type'] = "O_3_z"
+                        elif dat['element'] == "S":
                             # default sp3 hybridized sulphur set to S_3+6
-                            data['force_field_type'] = "S_3+6"
+                            dat['force_field_type'] = "S_3+6"
 
-                    elif data['hybridization'] == "aromatic":
-                        data['force_field_type'] = "%s_R"%data['element']
+                    elif dat['hybridization'] == "aromatic":
+                        dat['force_field_type'] = "%s_R"%dat['element']
                         # fix to make the angle 120
-                        #if data['element'] == "O":
-                        #    data['force_field_type'] = "O_2"
-                    elif data['hybridization'] == "sp2":
-                        data['force_field_type'] = "%s_2"%data['element']
-                    elif data['hybridization'] == "sp":
-                        data['force_field_type'] = "%s_1"%data['element']
-                elif data['element'] == "H":
-                    data['force_field_type'] = "H_"
-                elif data['element'] in halides:
-                    data['force_field_type'] = data['element']
-                    if data['element'] == "F":
-                        data['force_field_type'] += "_"
-                elif data['element'] == "Li":
-                    data['force_field_type'] = data['element']
+                        #if dat['element'] == "O":
+                        #    dat['force_field_type'] = "O_2"
+                    elif dat['hybridization'] == "sp2":
+                        dat['force_field_type'] = "%s_2"%dat['element']
+                    elif dat['hybridization'] == "sp":
+                        dat['force_field_type'] = "%s_1"%dat['element']
+                elif dat['element'] == "H":
+                    dat['force_field_type'] = "H_"
+                elif dat['element'] in halides:
+                    dat['force_field_type'] = dat['element']
+                    if dat['element'] == "F":
+                        dat['force_field_type'] += "_"
+                elif dat['element'] == "Li":
+                    dat['force_field_type'] = dat['element']
                 else:
                     ffs = list(UFF_DATA.keys())
                     valency = self.graph.degree(node)
                     # temp fix for some real geometrical analysis
-                    if (valency == 4) and (data['element'] not in sqpl):
+                    if (valency == 4) and (dat['element'] not in sqpl):
                         valency = 3
                     for j in ffs:
-                        if data['element'] == j[:2].strip("_"):
+                        if dat['element'] == j[:2].strip("_"):
                             try:
                                 if valency == int(j[2]):
-                                    data['force_field_type'] = j
+                                    dat['force_field_type'] = j
                             except IndexError:
                                 # no valency for this atom
-                                data['force_field_type'] = j
+                                dat['force_field_type'] = j
 
-            if data['force_field_type'] is None:
+            if dat['force_field_type'] is None:
                 assigned = False
                 # find the first entry that corresponds to this element and print a warning
                 for j in list(UFF_DATA.keys()):
-                    if data['element'] == j[:2].strip("_"):
-                        data['force_field_type'] = j
+                    if dat['element'] == j[:2].strip("_"):
+                        dat['force_field_type'] = j
                         neigh = self.graph.degree(node)
-                        print("WARNING: Atom %i element "%data['index'] + 
-                                "%s has %i neighbors, "%(data['element'], neigh)+
+                        print("WARNING: Atom %i element "%dat['index'] + 
+                                "%s has %i neighbors, "%(dat['element'], neigh)+
                                 "but was assigned %s as a force field type!"%(j))
                         assigned = True
 
                 if not assigned:
-                    print("ERROR: could not find the proper force field type for atom %i"%(data['index'])+
-                            " with element: '%s'"%(data['element']))
+                    print("ERROR: could not find the proper force field type for atom %i"%(dat['index'])+
+                            " with element: '%s'"%(dat['element']))
                     sys.exit()
 
 class Dreiding(ForceField):
@@ -3103,49 +3103,49 @@ class Dreiding(ForceField):
         organics = ["C", "N", "O", "S"]
         halides = ["F", "Cl", "Br", "I"]
         electro_neg_atoms = ["N", "O", "F"]
-        for node, data in self.graph.nodes_iter2(data=True):
+        for node, dat in self.graph.nodes_iter2(data=True):
             # check if fftype exists:
             try:
-                fftype = DREIDING_DATA[data['force_field_type']]
+                fftype = DREIDING_DATA[dat['force_field_type']]
             except KeyError:
                 fftype = None
             if fftype is None or self.h_bonding:
-                if data['element'] in organics:
-                    if data['hybridization'] == "sp3":
-                        data['force_field_type'] = "%s_3"%data['element']
-                    elif data['hybridization'] == "aromatic":
-                        data['force_field_type'] = "%s_R"%data['element']
-                    elif data['hybridization'] == "sp2":
-                        data['force_field_type'] = "%s_2"%data['element']
-                    elif data['hybridization'] == "sp":
-                        data['force_field_type'] = "%s_1"%data['element']
+                if dat['element'] in organics:
+                    if dat['hybridization'] == "sp3":
+                        dat['force_field_type'] = "%s_3"%dat['element']
+                    elif dat['hybridization'] == "aromatic":
+                        dat['force_field_type'] = "%s_R"%dat['element']
+                    elif dat['hybridization'] == "sp2":
+                        dat['force_field_type'] = "%s_2"%dat['element']
+                    elif dat['hybridization'] == "sp":
+                        dat['force_field_type'] = "%s_1"%dat['element']
                     else:
-                        data['force_field_type'] = "%s_3"%data['element']
+                        dat['force_field_type'] = "%s_3"%dat['element']
 
-                elif data['element'] == "H":
-                    data['force_field_type'] = "H_"
+                elif dat['element'] == "H":
+                    dat['force_field_type'] = "H_"
                     if self.h_bonding:
                         for n in self.graph.neighbors(node):
                             if self.graph.node[n]['element'] in electro_neg_atoms:
                                 self.graph.node[n]['h_bond_donor'] = True
-                                data['force_field_type'] = "H__HB"
+                                dat['force_field_type'] = "H__HB"
 
-                elif data['element'] in halides:
-                    data['force_field_type'] = data['element']
-                    if data['element'] == "F":
-                        data['force_field_type'] += "_"
+                elif dat['element'] in halides:
+                    dat['force_field_type'] = dat['element']
+                    if dat['element'] == "F":
+                        dat['force_field_type'] += "_"
                 else:
                     ffs = list(DREIDING_DATA.keys())
                     for j in ffs:
-                        if data['element'] == j[:2].strip("_"):
-                            data['force_field_type'] = j
-            elif data['force_field_type'] not in DREIDING_DATA.keys():
-                print('Error: %s is not a force field type in DREIDING.'%(data['force_field_type']))
+                        if dat['element'] == j[:2].strip("_"):
+                            dat['force_field_type'] = j
+            elif dat['force_field_type'] not in DREIDING_DATA.keys():
+                print('Error: %s is not a force field type in DREIDING.'%(dat['force_field_type']))
                 sys.exit()
 
-            if data['force_field_type'] is None:
-                print("ERROR: could not find the proper force field type for atom %i"%(data['index'])+
-                        " with element: '%s'"%(data['element']))
+            if dat['force_field_type'] is None:
+                print("ERROR: could not find the proper force field type for atom %i"%(dat['index'])+
+                        " with element: '%s'"%(dat['element']))
                 sys.exit()
 
 class UFF4MOF(ForceField):
@@ -3529,20 +3529,20 @@ class UFF4MOF(ForceField):
         # for each atom determine the ff type if it is None
         organics = ["C", "N", "O", "S"]
         halides = ["F", "Cl", "Br", "I"]
-        for node, data in self.graph.nodes_iter2(data=True):
-            special = 'special_flag' in data
+        for node, dat in self.graph.nodes_iter2(data=True):
+            special = 'special_flag' in dat
             # check if fftype exists:
             try:
-                fftype = UFF4MOF_DATA[data['force_field_type']]
+                fftype = UFF4MOF_DATA[dat['force_field_type']]
             except KeyError:
                 fftype = None
             if fftype is None:
                 if special:
                     # Zn4O case TODO(pboyd): generalize these cases...
-                    if data['special_flag'] == "O_z_Zn4O":
-                        data['force_field_type'] = "O_3_f"
-                    elif data['special_flag'] == "Zn4O":
-                        data['force_field_type'] = "Zn3f2"
+                    if dat['special_flag'] == "O_z_Zn4O":
+                        dat['force_field_type'] = "O_3_f"
+                    elif dat['special_flag'] == "Zn4O":
+                        dat['force_field_type'] = "Zn3f2"
                         # change the bond orders to 0.5 as per the paper
                         for n in self.graph.neighbors(node):
                             self.graph[node][n]['order'] = 0.5
@@ -3551,28 +3551,28 @@ class UFF4MOF(ForceField):
                             #    self.graph[node][n]['order'] = 1.0
                             #else:
                             #    self.graph[node][n]['order'] = 0.5
-                    elif data['special_flag'] == "C_Zn4O":
-                        data['force_field_type'] = "C_R"
+                    elif dat['special_flag'] == "C_Zn4O":
+                        dat['force_field_type'] = "C_R"
                         for n in self.graph.neighbors(node):
                             if self.graph.node[n]['element'] == "O":
                                 self.graph[node][n]['order'] = 1.5 
                             elif self.graph.node[n]['element'] == "C":
                                 self.graph[node][n]['order'] = 1
-                    elif data['special_flag'] == "O_c_Zn4O":
-                        data['force_field_type'] = 'O_2'
+                    elif dat['special_flag'] == "O_c_Zn4O":
+                        dat['force_field_type'] = 'O_2'
                     
                     # Copper Paddlewheel TODO(pboyd): generalize these cases...
-                    elif data['special_flag'] == "O1_Cu_pdw" or data['special_flag'] == "O2_Cu_pdw":
-                        data['force_field_type'] = 'O_2'
-                    elif data['special_flag'] == "Cu_pdw":
-                        data['force_field_type'] = 'Cu4+2'
+                    elif dat['special_flag'] == "O1_Cu_pdw" or dat['special_flag'] == "O2_Cu_pdw":
+                        dat['force_field_type'] = 'O_2'
+                    elif dat['special_flag'] == "Cu_pdw":
+                        dat['force_field_type'] = 'Cu4+2'
                         for n in self.graph.neighbors(node):
                             if self.graph.node[n]['element'] == "Cu":
                                 self.graph[node][n]['order'] = 0.25
                             else:
                                 self.graph[node][n]['order'] = 0.5
-                    elif data['special_flag'] == "C_Cu_pdw":
-                        data['force_field_type'] = 'C_R'
+                    elif dat['special_flag'] == "C_Cu_pdw":
+                        dat['force_field_type'] = 'C_R'
                         for n in self.graph.neighbors(node):
                             if self.graph.node[n]['element'] == "O":
                                 self.graph[node][n]['order'] = 1.5 
@@ -3580,17 +3580,17 @@ class UFF4MOF(ForceField):
                                 self.graph[node][n]['order'] = 1
 
                     # Zn Paddlewheel TODO(pboyd): generalize these cases...
-                    elif data['special_flag'] == "O1_Zn_pdw" or data['special_flag'] == "O2_Zn_pdw":
-                        data['force_field_type'] = 'O_2'
-                    elif data['special_flag'] == "Zn_pdw":
-                        data['force_field_type'] = 'Zn4+2'
+                    elif dat['special_flag'] == "O1_Zn_pdw" or dat['special_flag'] == "O2_Zn_pdw":
+                        dat['force_field_type'] = 'O_2'
+                    elif dat['special_flag'] == "Zn_pdw":
+                        dat['force_field_type'] = 'Zn4+2'
                         for n in self.graph.neighbors(node):
                             if self.graph.node[n]['element'] == "Zn":
                                 self.graph[node][n]['order'] = 0.25
                             else:
                                 self.graph[node][n]['order'] = 0.5
-                    elif data['special_flag'] == "C_Zn_pdw":
-                        data['force_field_type'] = 'C_R'
+                    elif dat['special_flag'] == "C_Zn_pdw":
+                        dat['force_field_type'] = 'C_R'
                         for n in self.graph.neighbors(node):
                             if self.graph.node[n]['element'] == "O":
                                 self.graph[node][n]['order'] = 1.5 
@@ -3598,16 +3598,16 @@ class UFF4MOF(ForceField):
                                 self.graph[node][n]['order'] = 1
                     
                     # Al Pillar TODO(pboyd): generalize these cases...
-                    elif data['special_flag'] == "O_c_Al_pillar":
-                        data['force_field_type'] = 'O_2'
-                    elif data['special_flag'] == "O_z_Al_pillar":
-                        data['force_field_type'] = 'O_2'
-                    elif data['special_flag'] == "H_Al_pillar":
-                        data['force_field_type'] = 'H_'
-                    elif data['special_flag'] == "Al_pillar":
-                        data['force_field_type'] = 'Al6+3'
-                    elif data['special_flag'] == "C_Al_pillar":
-                        data['force_field_type'] = 'C_R'
+                    elif dat['special_flag'] == "O_c_Al_pillar":
+                        dat['force_field_type'] = 'O_2'
+                    elif dat['special_flag'] == "O_z_Al_pillar":
+                        dat['force_field_type'] = 'O_2'
+                    elif dat['special_flag'] == "H_Al_pillar":
+                        dat['force_field_type'] = 'H_'
+                    elif dat['special_flag'] == "Al_pillar":
+                        dat['force_field_type'] = 'Al6+3'
+                    elif dat['special_flag'] == "C_Al_pillar":
+                        dat['force_field_type'] = 'C_R'
                         for n in self.graph.neighbors(node):
                             if self.graph.node[n]['element'] == "O":
                                 self.graph[node][n]['order'] = 1.5 
@@ -3615,64 +3615,64 @@ class UFF4MOF(ForceField):
                                 self.graph[node][n]['order'] = 1
 
                     # V Pillar TODO(pboyd): generalize these cases...
-                    elif data['special_flag'] == "O_c_V_pillar":
-                        data['force_field_type'] = 'O_2'
-                    elif data['special_flag'] == "O_z_V_pillar":
-                        data['force_field_type'] = 'O_2'
-                    elif data['special_flag'] == "V_pillar":
-                        data['force_field_type'] = 'V6+3'
-                    elif data['special_flag'] == "C_V_pillar":
-                        data['force_field_type'] = 'C_R'
+                    elif dat['special_flag'] == "O_c_V_pillar":
+                        dat['force_field_type'] = 'O_2'
+                    elif dat['special_flag'] == "O_z_V_pillar":
+                        dat['force_field_type'] = 'O_2'
+                    elif dat['special_flag'] == "V_pillar":
+                        dat['force_field_type'] = 'V6+3'
+                    elif dat['special_flag'] == "C_V_pillar":
+                        dat['force_field_type'] = 'C_R'
                         for n in self.graph.neighbors(node):
                             if self.graph.node[n]['element'] == "O":
                                 self.graph[node][n]['order'] = 1.5 
                             elif self.graph.node[n]['element'] == "C":
                                 self.graph[node][n]['order'] = 1
 
-                elif data['element'] in organics:
+                elif dat['element'] in organics:
                     neigh_elem = set([self.graph.node[i]['element'] for i in self.graph.neighbors(node)])
-                    if data['hybridization'] == "sp3":
-                        data['force_field_type'] = "%s_3"%data['element']
-                    elif data['hybridization'] == "aromatic":
-                        data['force_field_type'] = "%s_R"%data['element']
-                    elif data['hybridization'] == "sp2":
-                        data['force_field_type'] = "%s_2"%data['element']
-                    elif data['hybridization'] == "sp":
-                        data['force_field_type'] = "%s_1"%data['element']
+                    if dat['hybridization'] == "sp3":
+                        dat['force_field_type'] = "%s_3"%dat['element']
+                    elif dat['hybridization'] == "aromatic":
+                        dat['force_field_type'] = "%s_R"%dat['element']
+                    elif dat['hybridization'] == "sp2":
+                        dat['force_field_type'] = "%s_2"%dat['element']
+                    elif dat['hybridization'] == "sp":
+                        dat['force_field_type'] = "%s_1"%dat['element']
                     # special O cases
-                    if data['element'] == "O" and self.graph.degree(node) == 2:
+                    if dat['element'] == "O" and self.graph.degree(node) == 2:
                         if neigh_elem <= metals:
-                            data['force_field_type'] = "O_2"
+                            dat['force_field_type'] = "O_2"
                         # zeolites
                         if neigh_elem <= set(["Si", "Al"]):
-                            data['force_field_type'] = "O_3_z"
+                            dat['force_field_type'] = "O_3_z"
                         # override natural O_R assignment for carboxylates
                         if neigh_elem <= metals | set(["C"]):
-                            data['force_field_type'] = "O_2"
-                    elif data['element'] == "O" and self.graph.degree(node) == 3:
+                            dat['force_field_type'] = "O_2"
+                    elif dat['element'] == "O" and self.graph.degree(node) == 3:
                         if (neigh_elem <= metals): 
-                            data['force_field_type'] = "O_2_z"
+                            dat['force_field_type'] = "O_2_z"
                             # temp fix for UiO-series MOFs
                             if neigh_elem == set(["Zr"]):
-                                data['force_field_type'] = "O_3_f"
+                                dat['force_field_type'] = "O_3_f"
                         else:
-                            data['force_field_type'] = "O_2"
+                            dat['force_field_type'] = "O_2"
 
-                    elif data['element'] == "O" and self.graph.degree(node) == 4:
+                    elif dat['element'] == "O" and self.graph.degree(node) == 4:
                         if (neigh_elem <= set(metals) | set(["H"])): 
-                            data['force_field_type'] = "O_3_f"
+                            dat['force_field_type'] = "O_3_f"
 
-                elif data['element'] == "H":
-                    data['force_field_type'] = "H_"
-                elif data['element'] in halides:
-                    data['force_field_type'] = data['element']
-                    if data['element'] == "F":
-                        data['force_field_type'] += "_"
-                elif data['element'] in metals:
-                    if len(data['element']) == 1:
-                        fftype = data['element'] + "_"
+                elif dat['element'] == "H":
+                    dat['force_field_type'] = "H_"
+                elif dat['element'] in halides:
+                    dat['force_field_type'] = dat['element']
+                    if dat['element'] == "F":
+                        dat['force_field_type'] += "_"
+                elif dat['element'] in metals:
+                    if len(dat['element']) == 1:
+                        fftype = dat['element'] + "_"
                     else:
-                        fftype = data['element']
+                        fftype = dat['element']
 
                     # get coordination number and angles between atoms
                     if(self.graph.degree(node) == 2):
@@ -3696,7 +3696,7 @@ class UFF4MOF(ForceField):
 
                     try:
                         UFF4MOF_DATA[fftype]
-                        data['force_field_type'] = fftype
+                        dat['force_field_type'] = fftype
                     # couldn't find the force field type!
                     except KeyError:
                         try:
@@ -3713,16 +3713,16 @@ class UFF4MOF(ForceField):
                         # else: bond order stays = 1
 
                 # WARNING, the following else statement will do unknown things to the system.
-                if data['force_field_type'] is None:
+                if dat['force_field_type'] is None:
                     ffs = list(UFF4MOF_DATA.keys())
                     for j in ffs:
-                        if data['element'] == j[:2].strip("_"):
+                        if dat['element'] == j[:2].strip("_"):
                             print("WARNING: Could not find an appropriate UFF4MOF type for %s. Assigning %s"%(
-                                  data['element'], j))
-                            data['force_field_type'] = j
-            if data['force_field_type'] is None:
-                print("ERROR: could not find the proper force field type for atom %i"%(data['index'])+
-                        " with element: '%s'"%(data['element']))
+                                  dat['element'], j))
+                            dat['force_field_type'] = j
+            if dat['force_field_type'] is None:
+                print("ERROR: could not find the proper force field type for atom %i"%(dat['index'])+
+                        " with element: '%s'"%(dat['element']))
                 sys.exit()
 
 class TraPPE(ForceField):
@@ -4029,49 +4029,49 @@ class TraPPE(ForceField):
         organics = ["C", "N", "O", "S"]
         halides = ["F", "Cl", "Br", "I"]
         electro_neg_atoms = ["N", "O", "F"]
-        for node, data in self.graph.nodes_iter2(data=True):
+        for node, dat in self.graph.nodes_iter2(data=True):
             # check if fftype exists:
             try:
-                fftype = DREIDING_DATA[data['force_field_type']]
+                fftype = DREIDING_DATA[dat['force_field_type']]
             except KeyError:
                 fftype = None
             if fftype is None or self.h_bonding:
-                if data['element'] in organics:
-                    if data['hybridization'] == "sp3":
-                        data['force_field_type'] = "%s_3"%data['element']
-                    elif data['hybridization'] == "aromatic":
-                        data['force_field_type'] = "%s_R"%data['element']
-                    elif data['hybridization'] == "sp2":
-                        data['force_field_type'] = "%s_2"%data['element']
-                    elif data['hybridization'] == "sp":
-                        data['force_field_type'] = "%s_1"%data['element']
+                if dat['element'] in organics:
+                    if dat['hybridization'] == "sp3":
+                        dat['force_field_type'] = "%s_3"%dat['element']
+                    elif dat['hybridization'] == "aromatic":
+                        dat['force_field_type'] = "%s_R"%dat['element']
+                    elif dat['hybridization'] == "sp2":
+                        dat['force_field_type'] = "%s_2"%dat['element']
+                    elif dat['hybridization'] == "sp":
+                        dat['force_field_type'] = "%s_1"%dat['element']
                     else:
-                        data['force_field_type'] = "%s_3"%data['element']
+                        dat['force_field_type'] = "%s_3"%dat['element']
 
-                elif data['element'] == "H":
-                    data['force_field_type'] = "H_"
+                elif dat['element'] == "H":
+                    dat['force_field_type'] = "H_"
                     if self.h_bonding:
                         for n in self.graph.neighbors(node):
                             if self.graph.node[n]['element'] in electro_neg_atoms:
                                 self.graph.node[n]['h_bond_donor'] = True
-                                data['force_field_type'] = "H__HB"
+                                dat['force_field_type'] = "H__HB"
 
-                elif data['element'] in halides:
-                    data['force_field_type'] = data['element']
-                    if data['element'] == "F":
-                        data['force_field_type'] += "_"
+                elif dat['element'] in halides:
+                    dat['force_field_type'] = dat['element']
+                    if dat['element'] == "F":
+                        dat['force_field_type'] += "_"
                 else:
                     ffs = list(DREIDING_DATA.keys())
                     for j in ffs:
-                        if data['element'] == j[:2].strip("_"):
-                            data['force_field_type'] = j
-            elif data['force_field_type'] not in DREIDING_DATA.keys():
-                print('ERROR: %s is not a force field type in DREIDING.'%(data['force_field_type']))
+                        if dat['element'] == j[:2].strip("_"):
+                            dat['force_field_type'] = j
+            elif dat['force_field_type'] not in DREIDING_DATA.keys():
+                print('ERROR: %s is not a force field type in DREIDING.'%(dat['force_field_type']))
                 sys.exit()
 
-            if data['force_field_type'] is None:
-                print("ERROR: could not find the proper force field type for atom %i"%(data['index'])+
-                        " with element: '%s'"%(data['element']))
+            if dat['force_field_type'] is None:
+                print("ERROR: could not find the proper force field type for atom %i"%(dat['index'])+
+                        " with element: '%s'"%(dat['element']))
                 sys.exit()
 
 class Dubbeldam(ForceField):
@@ -4258,35 +4258,35 @@ class Dubbeldam(ForceField):
         This means that failing to find the SBUs will result in a bad parameterization.
 
         """
-        for node, data in self.graph.nodes_iter2(data=True):
-            special = 'special_flag' in data
+        for node, dat in self.graph.nodes_iter2(data=True):
+            special = 'special_flag' in dat
             if not special:
                 print("ERROR: Some atoms were not detected as part of an SBU." + 
                         " This is a requirement for successful parameterization of the "+
                         "Dubbeldam forcefield for the IRMOFs.")
                 sys.exit()
-            if data['special_flag'] == "O_z_Zn4O":
-                data['force_field_type'] = "Oa"
+            if dat['special_flag'] == "O_z_Zn4O":
+                dat['force_field_type'] = "Oa"
 
-            elif data['special_flag'] == "Zn4O":
-                data['force_field_type'] = "Zn"
+            elif dat['special_flag'] == "Zn4O":
+                dat['force_field_type'] = "Zn"
             
-            elif data['special_flag'] == "C_Zn4O":
-                data['force_field_type'] = "Ca"
+            elif dat['special_flag'] == "C_Zn4O":
+                dat['force_field_type'] = "Ca"
 
-            elif data['special_flag'] == "O_c_Zn4O":
-                data['force_field_type'] = "Ob"
+            elif dat['special_flag'] == "O_c_Zn4O":
+                dat['force_field_type'] = "Ob"
             
             else:
                 # NB this works only because the special flags for the organic
                 # SBUs are set to be the force field types assigned by Dubeldam!
                 # if the 'special_flags' are changed for the aromatic molecules in mof_sbus.py then this
                 # will break!!
-                data['force_field_type'] = data['special_flag']
+                dat['force_field_type'] = dat['special_flag']
 
-            if data['force_field_type'] is None:
-                print("ERROR: could not find the proper force field type for atom %i"%(data['index'])+
-                        " with element: '%s'"%(data['element']))
+            if dat['force_field_type'] is None:
+                print("ERROR: could not find the proper force field type for atom %i"%(dat['index'])+
+                        " with element: '%s'"%(dat['element']))
                 sys.exit()
 
 class BKS_SPC_SIOH(ForceField):
@@ -4439,20 +4439,20 @@ class BKS_SPC_SIOH(ForceField):
         Silica Os and Si
 
         """
-        for node, data in self.graph.nodes_iter2(data=True):
-            elem = data['element']
+        for node, dat in self.graph.nodes_iter2(data=True):
+            elem = dat['element']
             neighbours = [self.graph.node[j] for j in self.graph.neighbors(node)]
             neigh_elem = [i['element'] for i in neighbours]
             if elem == "O":
                 if set(neigh_elem) == set(["Si"]):
-                    data['force_field_type'] = "Os"
-                    data['charge'] = -1.2
+                    dat['force_field_type'] = "Os"
+                    dat['charge'] = -1.2
                 elif set(neigh_elem) == set(["Si", "H"]):
-                    data['force_field_type'] = "Oh"
-                    data['charge'] = -1.01
+                    dat['force_field_type'] = "Oh"
+                    dat['charge'] = -1.01
                 elif set(neigh_elem) == set(["H"]):
-                    data['force_field_type'] = "Ow"
-                    data['charge'] = -0.82
+                    dat['force_field_type'] = "Ow"
+                    dat['charge'] = -0.82
 
             elif elem == "H":
                 if self.graph.degree(node) == 1 and neigh_elem[0] == "O":
@@ -4461,19 +4461,19 @@ class BKS_SPC_SIOH(ForceField):
                                self.graph.neighbors(self.graph.neighbors(node)[0])]
                     o_neigh_elem = [i['element'] for i in o_neigh]
                     if set(o_neigh_elem) == set(["H"]):
-                        data['force_field_type'] = "Hw"
-                        data['charge'] = +0.41
+                        dat['force_field_type'] = "Hw"
+                        dat['charge'] = +0.41
                     elif set(o_neigh_elem) == set(["H", "Si"]):
-                        data['force_field_type'] = "Hh"
-                        data['charge'] = +0.41
+                        dat['force_field_type'] = "Hh"
+                        dat['charge'] = +0.41
 
             elif elem == "Si":
-                data['force_field_type'] = "Si"
-                data['charge'] = +2.4 
+                dat['force_field_type'] = "Si"
+                dat['charge'] = +2.4 
 
-            if data['force_field_type'] is None:
-                print("ERROR: could not find the proper force field type for atom %i"%(data['index'])+
-                        " with element: '%s'"%(data['element']))
+            if dat['force_field_type'] is None:
+                print("ERROR: could not find the proper force field type for atom %i"%(dat['index'])+
+                        " with element: '%s'"%(dat['element']))
                 sys.exit()
 
 class SPC_E(ForceField):
@@ -4579,18 +4579,18 @@ class SPC_E(ForceField):
         """Water consists of O and H, not too difficult. 
 
         """
-        for node, data in self.graph.nodes_iter2(data=True):
-            if data['element'] == "O":
+        for node, dat in self.graph.nodes_iter2(data=True):
+            if dat['element'] == "O":
                 fftype = "Ow"
-            elif data['element'] == "H":
+            elif dat['element'] == "H":
                 fftype = "Hw"
             else:
-                print("ERROR: could not find the proper force field type for atom %i"%(data['index'])+
-                        " with element: '%s'"%(data['element']))
+                print("ERROR: could not find the proper force field type for atom %i"%(dat['index'])+
+                        " with element: '%s'"%(dat['element']))
                 sys.exit()
-            data['force_field_type'] = fftype 
-            data['mass'] = SPC_E_atoms[fftype][0]
-            data['charge'] = SPC_E_atoms[fftype][3] 
+            dat['force_field_type'] = fftype 
+            dat['mass'] = SPC_E_atoms[fftype][0]
+            dat['charge'] = SPC_E_atoms[fftype][3] 
 
 class TIP3P(ForceField):
     def __init__(self, graph=None, **kwargs):
@@ -4692,18 +4692,18 @@ class TIP3P(ForceField):
         """Water consists of O and H, not too difficult. 
 
         """
-        for node, data in self.graph.nodes_iter2(data=True):
-            if data['element'] == "O":
+        for node, dat in self.graph.nodes_iter2(data=True):
+            if dat['element'] == "O":
                 fftype = "OW"
-            elif data['element'] == "H":
+            elif dat['element'] == "H":
                 fftype = "HW"
             else: 
-                print("ERROR: could not find the proper force field type for atom %i"%(data['index'])+
-                        " with element: '%s'"%(data['element']))
+                print("ERROR: could not find the proper force field type for atom %i"%(dat['index'])+
+                        " with element: '%s'"%(dat['element']))
                 sys.exit()
-            data['force_field_type'] = fftype 
-            data['mass'] = TIP3P_atoms[fftype][0] 
-            data['charge'] = TIP3P_atoms[fftype][3] 
+            dat['force_field_type'] = fftype 
+            dat['mass'] = TIP3P_atoms[fftype][0] 
+            dat['charge'] = TIP3P_atoms[fftype][3] 
 
 class TIP4P(ForceField, TIP4P_Water):
     def __init__(self, graph=None, **kwargs):
@@ -4825,20 +4825,20 @@ class TIP4P(ForceField, TIP4P_Water):
         """Water consists of O and H, not too difficult. 
 
         """
-        for node, data in self.graph.nodes_iter2(data=True):
-            if data['element'] == "O":
+        for node, dat in self.graph.nodes_iter2(data=True):
+            if dat['element'] == "O":
                 fftype = "OW"
-            elif data['element'] == "H":
+            elif dat['element'] == "H":
                 fftype = "HW"
-            elif data['element'] == "X":
+            elif dat['element'] == "X":
                 fftype = "X"
             else: 
-                print("ERROR: could not find the proper force field type for atom %i"%(data['index'])+
-                        " with element: '%s'"%(data['element']))
+                print("ERROR: could not find the proper force field type for atom %i"%(dat['index'])+
+                        " with element: '%s'"%(dat['element']))
                 sys.exit()
-            data['force_field_type'] = fftype 
-            data['mass'] = TIP4P_atoms[fftype][0] 
-            data['charge'] = TIP4P_atoms[fftype][3] 
+            dat['force_field_type'] = fftype 
+            dat['mass'] = TIP4P_atoms[fftype][0] 
+            dat['charge'] = TIP4P_atoms[fftype][3] 
 
 class TIP5P(ForceField):
     def __init__(self, graph=None, **kwargs):
@@ -4948,20 +4948,20 @@ class TIP5P(ForceField):
         """Water consists of O and H, not too difficult. 
 
         """
-        for node, data in self.graph.nodes_iter2(data=True):
-            if data['element'] == "O":
+        for node, dat in self.graph.nodes_iter2(data=True):
+            if dat['element'] == "O":
                 fftype = "OW"
-            elif data['element'] == "H":
+            elif dat['element'] == "H":
                 fftype = "HW"
-            elif data['element'] == "X":
+            elif dat['element'] == "X":
                 fftype = "X"
             else: 
-                print("ERROR: could not find the proper force field type for atom %i"%(data['index'])+
-                        " with element: '%s'"%(data['element']))
+                print("ERROR: could not find the proper force field type for atom %i"%(dat['index'])+
+                        " with element: '%s'"%(dat['element']))
                 sys.exit()
-            data['force_field_type'] = fftype 
-            data['mass'] = TIP5P_atoms[fftype][0] 
-            data['charge'] = TIP5P_atoms[fftype][3]
+            dat['force_field_type'] = fftype 
+            dat['mass'] = TIP5P_atoms[fftype][0] 
+            dat['charge'] = TIP5P_atoms[fftype][3]
 
 class EPM2_CO2(ForceField):
 
@@ -5058,18 +5058,18 @@ class EPM2_CO2(ForceField):
         """CO2 consists of C and O, not too difficult. 
 
         """
-        for node, data in self.graph.nodes_iter2(data=True):
-            if data['element'] == "O":
+        for node, dat in self.graph.nodes_iter2(data=True):
+            if dat['element'] == "O":
                 fftype = "Ox"
-            elif data['element'] == "C":
+            elif dat['element'] == "C":
                 fftype = "Cx"
             else: 
-                print("ERROR: could not find the proper force field type for atom %i"%(data['index'])+
-                        " with element: '%s'"%(data['element']))
+                print("ERROR: could not find the proper force field type for atom %i"%(dat['index'])+
+                        " with element: '%s'"%(dat['element']))
                 sys.exit()
-            data['force_field_type'] = fftype 
-            data['mass'] = EPM2_atoms[fftype][0] 
-            data['charge'] = EPM2_atoms[fftype][3]
+            dat['force_field_type'] = fftype 
+            dat['mass'] = EPM2_atoms[fftype][0] 
+            dat['charge'] = EPM2_atoms[fftype][3]
 
 class CO2_TraPPE(ForceField):
 
@@ -5164,18 +5164,18 @@ class CO2_TraPPE(ForceField):
         """ Cx and Ox
 
         """
-        for node, data in self.graph.nodes_iter2(data=True):
-            if data['element'] == "C":
+        for node, dat in self.graph.nodes_iter2(data=True):
+            if dat['element'] == "C":
                 fftype = "Cx"
-            elif data['element'] == "O":
+            elif dat['element'] == "O":
                 fftype = "Ox"
             else: 
-                print("ERROR: could not find the proper force field type for atom %i"%(data['index'])+
-                        " with element: '%s'"%(data['element']))
+                print("ERROR: could not find the proper force field type for atom %i"%(dat['index'])+
+                        " with element: '%s'"%(dat['element']))
                 sys.exit()
-            data['force_field_type'] = fftype 
-            data['mass'] = TraPPE_atoms[fftype][0] 
-            data['charge'] = TraPPE_atoms[fftype][3]
+            dat['force_field_type'] = fftype 
+            dat['mass'] = TraPPE_atoms[fftype][0] 
+            dat['charge'] = TraPPE_atoms[fftype][3]
 
 class N2_TraPPE(ForceField):
 
@@ -5270,15 +5270,15 @@ class N2_TraPPE(ForceField):
         """N2 consists of N, not too difficult. 
 
         """
-        for node, data in self.graph.nodes_iter2(data=True):
-            if data['element'] == "N":
+        for node, dat in self.graph.nodes_iter2(data=True):
+            if dat['element'] == "N":
                 fftype = "Nx"
-            elif data['element'] == "X":
+            elif dat['element'] == "X":
                 fftype = "X"
             else: 
-                print("ERROR: could not find the proper force field type for atom %i"%(data['index'])+
-                        " with element: '%s'"%(data['element']))
+                print("ERROR: could not find the proper force field type for atom %i"%(dat['index'])+
+                        " with element: '%s'"%(dat['element']))
                 sys.exit()
-            data['force_field_type'] = fftype 
-            data['mass'] = TraPPE_atoms[fftype][0] 
-            data['charge'] = TraPPE_atoms[fftype][3]
+            dat['force_field_type'] = fftype 
+            dat['mass'] = TraPPE_atoms[fftype][0] 
+            dat['charge'] = TraPPE_atoms[fftype][3]
