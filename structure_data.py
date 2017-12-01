@@ -1251,6 +1251,7 @@ class MolecularGraph(nx.Graph):
                 graph_image = self
             else:
                 # rename nodes
+                # returns a nx Graph, not a MolecularGraph!
                 graph_image = nx.relabel_nodes(deepcopy(orig_copy), {unit_node_ids[i-1]: offset+unit_node_ids[i-1] for i in range(1, totatomlen+1)})
                 graph_image.sorted_edge_dict = self.sorted_edge_dict.copy()
                 # rename the edges with the offset associated with this supercell.
@@ -1267,7 +1268,8 @@ class MolecularGraph(nx.Graph):
                 self.molecule_images.append(graph_image.nodes())
                 graph_image.molecule_id = orig_copy.molecule_id + mol_offset
             # update cartesian coordinates for each node in the image
-            for node, d in graph_image.nodes_iter2(data=True):
+            for node in graph_image.nodes():
+                d = graph_image.node[node]
                 n_orig = d['image']
                 if track_molecule:
                     d['molid'] = graph_image.molecule_id
@@ -1327,7 +1329,9 @@ class MolecularGraph(nx.Graph):
             
             # update nodes and edges to account for bonding to periodic images.
             #unique_translations = {}
-            for n1, n2, d in graph_image.edges_iter2(data=True):
+            for v1, v2 in graph_image.edges():
+                d = graph_image.edges[(v1,v2)]
+                n1, n2 = graph_image.sorted_edge_dict[(v1,v2)]
                 # flag boundary crossings, and determine updated nodes.
                 # check symmetry flags if they need to be updated,
                 n1_data = graph_image.node[n1]
@@ -1430,12 +1434,15 @@ class MolecularGraph(nx.Graph):
             if (count > 0):
                 union_graphs.append(graph_image)
         for G in union_graphs:
-            for node, d in G.nodes_iter2(data=True):
+            for node in G.nodes():
+                d = G.node[node]
                 self.add_node(node, **d)
            #once nodes are added, add edges.
         for G in union_graphs:
             self.sorted_edge_dict.update(G.sorted_edge_dict)
-            for (n1, n2, d) in G.edges_iter2(data=True):
+            for v1, v2 in G.edges():
+                d=G.edges[(v1,v2)]
+                n1,n2 = G.sorted_edge_dict[(v1,v2)]
                 self.add_edge(n1, n2, **d)
 
         for (n1, n2) in rem_edges:
