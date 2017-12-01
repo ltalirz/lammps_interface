@@ -2461,11 +2461,11 @@ class UFF(ForceField):
             koop = 6.0 
             if 'O_2' in (a_ff, c_ff, d_ff):
                 # check to make sure an aldehyde (i.e. not carboxylate bonded to metal)
-                if a_ff == "O_2" and len(self.graph.neighbors(a)) == 1:
+                if a_ff == "O_2" and self.graph.degree(a) == 1:
                     koop = 50.0 
-                elif c_ff == "O_2" and len(self.graph.neighbors(c)) == 1:
+                elif c_ff == "O_2" and self.graph.degree(c) == 1:
                     koop = 50.0 
-                elif d_ff == "O_2" and len(self.graph.neighbors(d)) == 1:
+                elif d_ff == "O_2" and self.graph.degree(d) == 1:
                     koop = 50.0 
         else:
             return None
@@ -2534,7 +2534,7 @@ class UFF(ForceField):
                     data['force_field_type'] = data['element']
                 else:
                     ffs = list(UFF_DATA.keys())
-                    valency = len(self.graph.neighbors(node))
+                    valency = self.graph.degree(node)
                     # temp fix for some real geometrical analysis
                     if (valency == 4) and (data['element'] not in sqpl):
                         valency = 3
@@ -2553,7 +2553,7 @@ class UFF(ForceField):
                 for j in list(UFF_DATA.keys()):
                     if data['element'] == j[:2].strip("_"):
                         data['force_field_type'] = j
-                        neigh = len(self.graph.neighbors(node))
+                        neigh = self.graph.degree(node)
                         print("WARNING: Atom %i element "%data['index'] + 
                                 "%s has %i neighbors, "%(data['element'], neigh)+
                                 "but was assigned %s as a force field type!"%(j))
@@ -3495,11 +3495,11 @@ class UFF4MOF(ForceField):
             koop = 6.0 
             if 'O_2' in (a_ff, c_ff, d_ff):
                 # check to make sure an aldehyde (i.e. not carboxylate bonded to metal)
-                if a_ff == "O_2" and len(self.graph.neighbors(a)) == 1:
+                if a_ff == "O_2" and self.graph.degree(a) == 1:
                     koop = 50.0 
-                elif c_ff == "O_2" and len(self.graph.neighbors(c)) == 1:
+                elif c_ff == "O_2" and self.graph.degree(c) == 1:
                     koop = 50.0 
-                elif d_ff == "O_2" and len(self.graph.neighbors(d)) == 1:
+                elif d_ff == "O_2" and self.graph.degree(d) == 1:
                     koop = 50.0 
         else:
             return None
@@ -4229,7 +4229,7 @@ class Dubbeldam(ForceField):
         data['potential'] = ImproperPotential.Cvff()
         
         # I have 3 impropers, he only has 1. Divide by 3 to get average?
-        data['potential'].K = Dub_impropers[string][0]*KBTOKCAL / len(self.graph.neighbors(b)) 
+        data['potential'].K = Dub_impropers[string][0]*KBTOKCAL / self.graph.degree(b)
         data['potential'].d = -1 
         data['potential'].n = Dub_impropers[string][2]
         return 1
@@ -4455,7 +4455,7 @@ class BKS_SPC_SIOH(ForceField):
                     data['charge'] = -0.82
 
             elif elem == "H":
-                if len(neighbours) == 1 and neigh_elem[0] == "O":
+                if self.graph.degree(node) == 1 and neigh_elem[0] == "O":
                     # get the neighbours of the H atoms neighbour (oxygen)
                     o_neigh = [self.graph.node[j] for j in 
                                self.graph.neighbors(self.graph.neighbors(node)[0])]
