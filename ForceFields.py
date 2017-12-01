@@ -760,8 +760,8 @@ class BTW_FF(ForceField):
 
 
             try:
-                fftype = MOFFF_atoms[chrg_flag+atom['force_field_type']]
-            except TypeError:
+                fftype = BTW_atoms[atom['force_field_type']]
+            except KeyError:
                 fftype = None
             if fftype is None:
                 type_assigned = False
