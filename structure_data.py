@@ -98,8 +98,8 @@ class MolecularGraph(nx.Graph):
         """
         for node in self.nodes():
             if(data):
-                data = self.node[node]
-                yield (node, data)
+                d = self.node[node]
+                yield (node, d)
             else:
                 yield node
         #FIXME(pboyd): latest version of NetworkX has removed nodes_iter2...
@@ -109,7 +109,7 @@ class MolecularGraph(nx.Graph):
             v1,v2=self.sorted_edge_dict[(n1,n2)]
             d=self.edges[(n1,n2)]
             if(data):
-                yield (v1,v2,data)
+                yield (v1,v2,d)
             else:
                 yield (v1,v2)
         #for n1, n2, d in self.edges_iter(**kwargs):
@@ -117,9 +117,9 @@ class MolecularGraph(nx.Graph):
     
     def count_dihedrals(self):
         count = 0
-        for n1, n2, data in self.edges_iter2(data=True):
+        for n1, n2, d in self.edges_iter2(data=True):
             try:
-                for dihed in data['dihedrals'].keys():
+                for dihed in d['dihedrals'].keys():
                     count += 1
             except KeyError:
                 pass
@@ -127,9 +127,9 @@ class MolecularGraph(nx.Graph):
 
     def count_angles(self):
         count = 0
-        for node, data in self.nodes_iter2(data=True):
+        for node, d in self.nodes_iter2(data=True):
             try:
-                for angle in data['angles'].keys():
+                for angle in d['angles'].keys():
                     count += 1
             except KeyError:
                 pass
@@ -137,9 +137,9 @@ class MolecularGraph(nx.Graph):
 
     def count_impropers(self):
         count = 0
-        for node, data in self.nodes_iter2(data=True):
+        for node, d in self.nodes_iter2(data=True):
             try:
-                for angle in data['impropers'].keys():
+                for angle in d['impropers'].keys():
                     count += 1
             except KeyError:
                 pass
@@ -157,35 +157,35 @@ class MolecularGraph(nx.Graph):
         old_nodes = sorted([(i,self.node[i]) for i in self.nodes()])
         #old_nodes = list(self.nodes_iter2(data=True))
         old_edges = list(self.edges_iter2(data=True))
-        for node, data in old_nodes:
+        for node, d in old_nodes:
             
-            if 'angles' in data:
-                ang_data = list(data['angles'].items())
+            if 'angles' in d:
+                ang_data = list(d['angles'].items())
                 for (a,c), val in ang_data:
-                    data['angles'].pop((a,c))
-                    data['angles'][(reorder_dic[a], reorder_dic[c])] = val
-            if 'impropers' in data:
-                imp_data = list(data['impropers'].items())
+                    d['angles'].pop((a,c))
+                    d['angles'][(reorder_dic[a], reorder_dic[c])] = val
+            if 'impropers' in d:
+                imp_data = list(d['impropers'].items())
                 for (a, c, d), val in imp_data:
-                    data['impropers'].pop((a,c,d))
-                    data['impropers'][(reorder_dic[a], reorder_dic[c], reorder_dic[d])] = val
+                    d['impropers'].pop((a,c,d))
+                    d['impropers'][(reorder_dic[a], reorder_dic[c], reorder_dic[d])] = val
 
             self.remove_node(node)
-            data['index'] = reorder_dic[node]
-            self.add_node(reorder_dic[node], **data)
+            d['index'] = reorder_dic[node]
+            self.add_node(reorder_dic[node], **d)
 
-        for b, c, data in old_edges:
-            if 'dihedrals' in data:
-                dihed_data = list(data['dihedrals'].items())
+        for b, c, d in old_edges:
+            if 'dihedrals' in d:
+                dihed_data = list(d['dihedrals'].items())
                 for (a, d), val in dihed_data:
-                    data['dihedrals'].pop((a,d))
-                    data['dihedrals'][(reorder_dic[a], reorder_dic[d])] = val
+                    d['dihedrals'].pop((a,d))
+                    d['dihedrals'][(reorder_dic[a], reorder_dic[d])] = val
             try:
                 self.remove_edge(b,c)
             except nx.exception.NetworkXError:
                 # edge already removed from 'remove_node' above
                 pass
-            self.add_edge(reorder_dic[b], reorder_dic[c], **data)
+            self.add_edge(reorder_dic[b], reorder_dic[c], **d)
         
         old_edge_dict = self.sorted_edge_dict.items()
         self.sorted_edge_dict = {}
@@ -267,7 +267,7 @@ class MolecularGraph(nx.Graph):
         if (self.number_of_edges() > 0):
             # bonding found in cif file
             sf = []
-            for n1, n2, data in self.edges_iter2(data=True):
+            for n1, n2, d in self.edges_iter2(data=True):
                 # get data['ciflabel'] for self.node[n1] and self.node[n2]
                 # update the sorted_edge_dict with the indices, not the 
                 # cif labels
@@ -294,18 +294,18 @@ class MolecularGraph(nx.Graph):
                 except KeyError:
                     pass
 
-                sf.append(data['symflag'])
-                bl = data['length']
+                sf.append(d['symflag'])
+                bl = d['length']
                 if bl <= 0.01:
                     id1, id2 = self.node[n1]['index']-1, self.node[n2]['index']-1
                     dist = self.distance_matrix[id1,id2]
-                    data['length'] = dist
+                    d['length'] = dist
 
             if (set(sf) == set(['.'])):
                 # compute sym flags
-                for n1, n2, data in self.edges_iter2(data=True):
+                for n1, n2, d in self.edges_iter2(data=True):
                     flag = self.compute_bond_image_flag(n1, n2, cell)
-                    data['symflag'] = flag
+                    d['symflag'] = flag
             return
 
         # Here we will determine bonding from all atom pairs using 
@@ -479,10 +479,10 @@ class MolecularGraph(nx.Graph):
         kwargs.update({'symflag': flag})
         kwargs.update({'potential': None})
         # get the node index to avoid headaches
-        for k,data in self.nodes_iter2(data=True):
-            if data['ciflabel'] == n1:
+        for k,d in self.nodes_iter2(data=True):
+            if d['ciflabel'] == n1:
                 n1 = k
-            elif data['ciflabel'] == n2:
+            elif d['ciflabel'] == n2:
                 n2 =k
 
         self.sorted_edge_dict.update({(n1,n2): (n1, n2), (n2, n1):(n1, n2)})
@@ -493,16 +493,16 @@ class MolecularGraph(nx.Graph):
         coord_keys = ['_atom_site_x', '_atom_site_y', '_atom_site_z']
         fcoord_keys = ['_atom_site_fract_x', '_atom_site_fract_y', '_atom_site_fract_z']
         self.coordinates = np.empty((self.number_of_nodes(), 3))
-        for node, data in self.nodes_iter2(data=True):
+        for node, d in self.nodes_iter2(data=True):
             #TODO(pboyd) probably need more error checking..
             try:
-                coordinates = np.array([float(del_parenth(data[i])) for i in coord_keys])
+                coordinates = np.array([float(del_parenth(d[i])) for i in coord_keys])
             except KeyError:
-                coordinates = np.array([float(del_parenth(data[i])) for i in fcoord_keys])
+                coordinates = np.array([float(del_parenth(d[i])) for i in fcoord_keys])
                 coordinates = np.dot(coordinates, cell.cell)
-            data.update({'cartesian_coordinates':coordinates})
+            d.update({'cartesian_coordinates':coordinates})
 
-            self.coordinates[data['index']-1] = coordinates
+            self.coordinates[d['index']-1] = coordinates
 
     def compute_min_img_distances(self, cell):
         self.distance_matrix = np.empty((self.number_of_nodes(), self.number_of_nodes()))
@@ -548,7 +548,7 @@ class MolecularGraph(nx.Graph):
         #TODO(pboyd) return if atoms already 'typed' in the .cif file
         # compute and store cycles
         cycles = []
-        for node, data in self.nodes_iter2(data=True):
+        for node, d in self.nodes_iter2(data=True):
             for n in self.neighbors(node):
                 # fastest way I could think of..
                 edge = self[node][n].copy()
@@ -564,10 +564,10 @@ class MolecularGraph(nx.Graph):
                 if(len(cycle) <= 10):
                     cycles += cycle
 
-        for label, data in self.nodes_iter2(data=True):
+        for label, d in self.nodes_iter2(data=True):
             # N O C S
             neighbours = self.neighbors(label)
-            element = data['element']
+            element = d['element']
             if element == "C":
                 if self.degree(label) >= 4:
                     self.node[label].update({'hybridization':'sp3'})
@@ -639,7 +639,7 @@ class MolecularGraph(nx.Graph):
         """ 
         #TODO(pboyd) return if bonds already 'typed' in the .cif file
         double_check = [] 
-        for n1, n2, data in self.edges_iter2(data=True):
+        for n1, n2, d in self.edges_iter2(data=True):
             elements = [self.node[a]['element'] for a in (n1,n2)]
             hybridization = [self.node[a]['hybridization'] for a in (n1, n2)]
             rings = [self.node[a]['rings'] for a in (n1, n2)]
@@ -650,7 +650,7 @@ class MolecularGraph(nx.Graph):
                     if n2 in r:
                         samering = True
                 if(samering):
-                    data.update({"order" : 1.5})
+                    d.update({"order" : 1.5})
 
             if set(elements) == set(["C", "O"]):
                 car = n1 if self.node[n1]['element'] == "C" else n2
@@ -677,18 +677,18 @@ class MolecularGraph(nx.Graph):
                             #CO2
                             car_data['hybridization'] = 'sp'
                             oxy_data['hybridization'] = 'sp2'
-                            data['order'] = 2.
+                            d['order'] = 2.
                         else:
                             # ester
                             if set(oxynelem) <= organic:
                                 car_data['hybridization'] = 'sp2'
                                 oxy_data['hybridization'] = 'sp2'
-                                data['order'] = 1 # this is the ether part of an ester... 
+                                d['order'] = 1 # this is the ether part of an ester... 
                             #carboxylate?
                             else:
                                 car_data['hybridization'] = 'aromatic'
                                 oxy_data['hybridization']= 'aromatic'
-                                data['order'] = 1.5
+                                d['order'] = 1.5
 
                     else:
                         atnelem = [self.node[k]['element'] for k in self.neighbors(at)]
@@ -697,22 +697,22 @@ class MolecularGraph(nx.Graph):
                             if len(oxynn) == 0:
                                 car_data['hybridization'] = 'sp2'
                                 oxy_data['hybridization'] = 'sp2'
-                                data['order'] = 2. # carbonyl part of ester
+                                d['order'] = 2. # carbonyl part of ester
                             # some kind of resonance structure?
                             else:
                                 car_data['hybridization'] = 'aromatic'
                                 oxy_data['hybridization'] = 'aromatic'
-                                data['order'] = 1.5
+                                d['order'] = 1.5
                         else:
                             car_data['hybridization'] = 'aromatic'
                             oxy_data['hybridization'] = 'aromatic'
-                            data['order'] = 1.5
+                            d['order'] = 1.5
 
                 if "N" in carnelem:
                     at = carnn[carnelem.index("N")]
                     # C=O of amide group
                     if self.degree(oxy) == 1:
-                        data['order'] = 1.5
+                        d['order'] = 1.5
                         car_data['hybridization'] = 'aromatic'
                         oxy_data['hybridization'] = 'aromatic'
                 # only one carbon oxygen connection.. could be C=O, R-C-O-R, R-C=O-R
@@ -720,15 +720,15 @@ class MolecularGraph(nx.Graph):
                     if len(oxynn) > 0:
                         # ether
                         oxy_data['hybridization'] = 'sp3'
-                        data['order'] = 1.0
+                        d['order'] = 1.0
                     else:
                         if car_data['cycle'] and car_data['hybridization'] == 'aromatic':
                             oxy_data['hybridization'] = 'aromatic'
-                            data['order'] = 1.5
+                            d['order'] = 1.5
                         # carbonyl
                         else:
                             oxy_data['hybridization'] = 'sp2'
-                            data['order'] = 2.0
+                            d['order'] = 2.0
             elif set(elements) == set(["C", "N"]) and not samering:
                 car = n1 if self.node[n1]['element'] == "C" else n2
                 car_data = self.node[car]
@@ -740,16 +740,16 @@ class MolecularGraph(nx.Graph):
                 nitnelem = [self.node[k]['element'] for k in nitnn]
                 # aromatic amine connected -- assume part of delocalized system
                 if car_data['hybridization'] == 'aromatic' and set(['H']) == set(nitnelem):
-                    data['order'] = 1.5
+                    d['order'] = 1.5
                     nit_data['hybridization'] = 'aromatic'
                 # amide?
                 elif len(self.neighbors(car)) == 3 and len(nitnn) >=2:
                     if "O" in carnelem:
-                        data['order'] = 1.5 # (amide)
+                        d['order'] = 1.5 # (amide)
                         nit_data['hybridization'] = 'aromatic'
                     # nitro
                     if set(nitnelem) == set(["O"]):
-                        data['order'] = 1. 
+                        d['order'] = 1. 
                         nit_data['hybridization'] = 'aromatic'
                         for oatom in nitnn:
                             nobond = self[nit][oatom]['order'] = 1.5
@@ -767,10 +767,10 @@ class MolecularGraph(nx.Graph):
                         cr2 = COVALENT_RADII[elements[1]]
                     covrad = cr1 + cr2
                     # first pass: assign all to 2.0 bond order
-                    data['order'] = 2.0
+                    d['order'] = 2.0
                     double_check += [n1, n2]
                     #if (data['length'] <= covrad*.95):
-                    #    data['order'] = 2.0
+                    #    d['order'] = 2.0
                 elif set(hybridization) == set(['sp']):
                     try:
                         cr1 = COVALENT_RADII['%s_1'%elements[0]]
@@ -782,10 +782,10 @@ class MolecularGraph(nx.Graph):
                         cr2 = COVALENT_RADII[elements[1]]
                     # first pass: assign all to 3.0 bond order
                     double_check += [n1, n2]
-                    data['order'] = 3.0
+                    d['order'] = 3.0
                     #covrad = cr1 + cr2 
                     #if (data['length'] <= covrad*.95):
-                    #    data['order'] = 3.0
+                    #    d['order'] = 3.0
         # second pass, check organic unsaturated bonds to make
         # sure alkyl chains are alternating etc.
         while double_check:
@@ -917,12 +917,12 @@ class MolecularGraph(nx.Graph):
         periodic image.
         
         """
-        for b, data in self.nodes_iter2(data=True):
+        for b, d in self.nodes_iter2(data=True):
             if self.degree(b) < 2:
                 continue
             angles = itertools.combinations(self.neighbors(b), 2)
             for (a, c) in angles:
-                data.setdefault('angles', {}).update({(a,c):{'potential':None}})
+                d.setdefault('angles', {}).update({(a,c):{'potential':None}})
     
     def compute_dihedrals(self):
         """Dihedrals are attached to specific edges in the graph.
@@ -937,12 +937,12 @@ class MolecularGraph(nx.Graph):
         and d and other possible bonded atoms)
 
         """
-        for b, c, data in self.edges_iter2(data=True):
+        for b, c, d in self.edges_iter2(data=True):
             b_neighbours = [k for k in self.neighbors(b) if k != c]
             c_neighbours = [k for k in self.neighbors(c) if k != b]
             for a in b_neighbours:
                 for d in c_neighbours:
-                    data.setdefault('dihedrals',{}).update({(a, d):{'potential':None}})
+                    d.setdefault('dihedrals',{}).update({(a, d):{'potential':None}})
     
     def compute_improper_dihedrals(self):
         """Improper Dihedrals are attached to specific nodes in the graph.
@@ -956,14 +956,14 @@ class MolecularGraph(nx.Graph):
         angles between the neighbours of b 
 
         """
-        for b, data in self.nodes_iter2(data=True):
+        for b, d in self.nodes_iter2(data=True):
             if self.degree(b) != 3:
                 continue
             # three improper torsion angles about each atom
             local_impropers = list(itertools.permutations(self.neighbors(b)))
             for idx in range(0, 6, 2):
                 (a, c, d) = local_impropers[idx]
-                data.setdefault('impropers',{}).update({(a,c,d):{'potential':None}})
+                d.setdefault('impropers',{}).update({(a,c,d):{'potential':None}})
 
     def compute_topology_information(self, cell, tol, num_neighbours):
         self.compute_cartesian_coordinates(cell)
@@ -980,10 +980,10 @@ class MolecularGraph(nx.Graph):
         self.compute_improper_dihedrals()
 
     def sorted_node_list(self):
-        return [n[1] for n in sorted([(data['index'], node) for node, data in self.nodes_iter2(data=True)])]
+        return [n[1] for n in sorted([(d['index'], node) for node, d in self.nodes_iter2(data=True)])]
 
     def sorted_edge_list(self): 
-        return [e[1] for e in sorted([(data['index'], (n1, n2)) for n1, n2, data in self.edges_iter2(data=True)])]
+        return [e[1] for e in sorted([(d['index'], (n1, n2)) for n1, n2, d in self.edges_iter2(data=True)])]
 
     def show(self):
         nx.draw(self)
@@ -1098,12 +1098,12 @@ class MolecularGraph(nx.Graph):
             ref_sbus = OrganicCluster
             store_sbus = self.organic_sbus
 
-        for node, data in self.nodes_iter2(data=True):
+        for node, d in self.nodes_iter2(data=True):
             if (type=='Inorganic') and (general_metal) and (data['atomic_number'] in METALS)\
-                    and ('special' not in data.keys()): # special means that this atom has already been found in a previous clique detection
+                    and ('special' not in d.keys()): # special means that this atom has already been found in a previous clique detection
                 reference_nodes.append(node) 
 
-            elif (data['element'] in types) and ('special' not in data.keys()): 
+            elif (data['element'] in types) and ('special' not in d.keys()): 
                 reference_nodes.append(node)
         
         no_cluster = []
@@ -1207,14 +1207,14 @@ class MolecularGraph(nx.Graph):
         old_cell = np.multiply(self.cell._cell.T, sc).T
         self.cell.set_cell(np.dot(redefinition, self.cell._cell))
         # the node cartesian_coordinates must be shifted by the periodic boundaries.
-        for node, data in self.nodes_iter2(data=True):
-            coord = data['cartesian_coordinates']
-            data['cartesian_coordinates'] = self.in_cell(coord) 
+        for node, d in self.nodes_iter2(data=True):
+            coord = d['cartesian_coordinates']
+            d['cartesian_coordinates'] = self.in_cell(coord) 
 
         # the bonds which span a periodic boundary will change
-        for n1, n2, data in self.edges_iter2(data=True):
+        for n1, n2, d in self.edges_iter2(data=True):
             flag = self.compute_bond_image_flag(n1, n2, self.cell)
-            data['symflag'] = flag #'.' 
+            d['symflag'] = flag #'.' 
 
         # not sure what this may break, but have to assume this new cell is the 'original'
         self.store_original_size()
@@ -1267,15 +1267,15 @@ class MolecularGraph(nx.Graph):
                 self.molecule_images.append(graph_image.nodes())
                 graph_image.molecule_id = orig_copy.molecule_id + mol_offset
             # update cartesian coordinates for each node in the image
-            for node, data in graph_image.nodes_iter2(data=True):
-                n_orig = data['image']
+            for node, d in graph_image.nodes_iter2(data=True):
+                n_orig = d['image']
                 if track_molecule:
-                    data['molid'] = graph_image.molecule_id
-                data['cartesian_coordinates'] = data['cartesian_coordinates'] + cartesian_offset
+                    d['molid'] = graph_image.molecule_id
+                d['cartesian_coordinates'] = d['cartesian_coordinates'] + cartesian_offset
                 # update all angle and improper terms to the curent image indices. Dihedrals will be done in the edge loop
                 # angle check
                 try:
-                    for (a, c), val in list(data['angles'].items()):
+                    for (a, c), val in list(d['angles'].items()):
                         aid, cid = offset + a, offset + c
                         e_ba = graph_image[node][aid]
                         e_bc = graph_image[node][cid]
@@ -1289,15 +1289,15 @@ class MolecularGraph(nx.Graph):
                             bc_symflag = "1_%i%i%i"%(tuple(np.array([10,10,10]) - np.array([int(j) for j in e_bc['symflag'][2:]]))) 
                         os_a = self.img_offset(cells, newcell, maxcell, ba_symflag, redefine) * unitatomlen
                         os_c = self.img_offset(cells, newcell, maxcell, bc_symflag, redefine) * unitatomlen
-                        data['angles'].pop((a,c))
-                        data['angles'][(a + os_a, c + os_c)] = val
+                        d['angles'].pop((a,c))
+                        d['angles'][(a + os_a, c + os_c)] = val
 
                 except KeyError:
                     # no angles for n1
                     pass
                 # improper check
                 try:
-                    for (a, c, d), val in list(data['impropers'].items()):
+                    for (a, c, d), val in list(d['impropers'].items()):
                         aid, cid, did = offset + a, offset + c, offset + d
                         e_ba = graph_image[node][aid]
                         order_ba = graph_image.sorted_edge_dict[(node, aid)]
@@ -1318,8 +1318,8 @@ class MolecularGraph(nx.Graph):
                         os_a = self.img_offset(cells, newcell, maxcell, ba_symflag, redefine) * unitatomlen
                         os_c = self.img_offset(cells, newcell, maxcell, bc_symflag, redefine) * unitatomlen
                         os_d = self.img_offset(cells, newcell, maxcell, bd_symflag, redefine) * unitatomlen
-                        data['impropers'].pop((a,c,d))
-                        data['impropers'][(a + os_a, c + os_c, d + os_d)] = val
+                        d['impropers'].pop((a,c,d))
+                        d['impropers'][(a + os_a, c + os_c, d + os_d)] = val
 
                 except KeyError:
                     # no impropers for n1
@@ -1327,7 +1327,7 @@ class MolecularGraph(nx.Graph):
             
             # update nodes and edges to account for bonding to periodic images.
             #unique_translations = {}
-            for n1, n2, data in graph_image.edges_iter2(data=True):
+            for n1, n2, d in graph_image.edges_iter2(data=True):
                 # flag boundary crossings, and determine updated nodes.
                 # check symmetry flags if they need to be updated,
                 n1_data = graph_image.node[n1]
@@ -1342,14 +1342,14 @@ class MolecularGraph(nx.Graph):
                 # update angle, dihedral, improper indices.
                 # dihedrals are difficult if the edge spans one of the terminal atoms..
 
-                if (data['symflag'] != '.'):
+                if (d['symflag'] != '.'):
                     # DEBUGGING
                     unit_repr = np.array([5, 5, 5], dtype=int)
-                    translation = tuple(np.array([int(j) for j in data['symflag'][2:]]) - unit_repr)
+                    translation = tuple(np.array([int(j) for j in d['symflag'][2:]]) - unit_repr)
                     #unique_translations.setdefault(translation,0)
                     #unique_translations[translation] += 1
                     # DEBUGGING
-                    os_id = self.img_offset(cells, newcell, maxcell, data['symflag'], redefine, n1) 
+                    os_id = self.img_offset(cells, newcell, maxcell, d['symflag'], redefine, n1) 
                     offset_c = os_id * unitatomlen
                     img_n2 = offset_c + n2_orig
                     #if (n1 == 1712):
@@ -1357,11 +1357,11 @@ class MolecularGraph(nx.Graph):
                     #    print(newcell)
                     #    print(redefine)
                     # pain...
-                    opposite_flag = "1_%i%i%i"%(tuple(np.array([10,10,10]) - np.array([int(j) for j in data['symflag'][2:]]))) 
+                    opposite_flag = "1_%i%i%i"%(tuple(np.array([10,10,10]) - np.array([int(j) for j in d['symflag'][2:]]))) 
                     rev_n1_img = self.img_offset(cells, newcell, maxcell, opposite_flag, redefine) * unitatomlen + n1_orig 
                     # dihedral check
                     try:
-                        for (a, d), val in list(data['dihedrals'].items()):
+                        for (a, d), val in list(d['dihedrals'].items()):
                             # check to make sure edge between a, n1 is not crossing an image
                             edge_n1_a = orig_copy[n1_orig][a]
                             order_n1_a = graph_image.sorted_edge_dict[(n1, a+offset)]
@@ -1385,20 +1385,20 @@ class MolecularGraph(nx.Graph):
                                 offset_d = self.img_offset(cells, np.array(cells[os_id]).flatten(), maxcell, n2d_symflag, redefine) * unitatomlen
 
                             aid, did = offset_a + a, offset_d + d
-                            copyover = data['dihedrals'].pop((a,d))
-                            data['dihedrals'][(aid, did)] = copyover
+                            copyover = d['dihedrals'].pop((a,d))
+                            d['dihedrals'][(aid, did)] = copyover
                     except KeyError:
                         # no dihedrals here.
                         pass
 
                     # Update symmetry flag of bond
-                    data['symflag'] = self.update_symflag(newcell, data['symflag'], origincell, maxcell)
-                    add_edges += [((n1, img_n2),data)]
+                    d['symflag'] = self.update_symflag(newcell, d['symflag'], origincell, maxcell)
+                    add_edges += [((n1, img_n2),d)]
                     rem_edges += [(n1, n2)]
                 else:
                     # dihedral check
                     try:
-                        for (a, d), val in list(data['dihedrals'].items()):
+                        for (a, d), val in list(d['dihedrals'].items()):
                             # check to make sure edge between a, n1 is not crossing an image
                             edge_n1_a = orig_copy[n1_orig][a] 
                             order_n1_a = graph_image.sorted_edge_dict[(n1, a+offset)]
@@ -1422,28 +1422,28 @@ class MolecularGraph(nx.Graph):
                                 offset_d = self.img_offset(cells, newcell, maxcell, n2d_symflag, redefine) * unitatomlen
 
                             aid, did = offset_a + a, offset_d + d
-                            copyover = data['dihedrals'].pop((a,d))
-                            data['dihedrals'][(aid, did)] = copyover
+                            copyover = d['dihedrals'].pop((a,d))
+                            d['dihedrals'][(aid, did)] = copyover
                     except KeyError:
                         # no dihedrals here.
                         pass
             if (count > 0):
                 union_graphs.append(graph_image)
         for G in union_graphs:
-            for node, data in G.nodes_iter2(data=True):
-                self.add_node(node, **data)
+            for node, d in G.nodes_iter2(data=True):
+                self.add_node(node, **d)
            #once nodes are added, add edges.
         for G in union_graphs:
             self.sorted_edge_dict.update(G.sorted_edge_dict)
-            for (n1, n2, data) in G.edges_iter2(data=True):
-                self.add_edge(n1, n2, **data)
+            for (n1, n2, d) in G.edges_iter2(data=True):
+                self.add_edge(n1, n2, **d)
 
         for (n1, n2) in rem_edges:
             self.remove_edge(n1, n2)
             self.sorted_edge_dict.pop((n1,n2))
             self.sorted_edge_dict.pop((n2,n1))
-        for (n1, n2), data in add_edges:
-            self.add_edge(n1, n2, **data)
+        for (n1, n2), d in add_edges:
+            self.add_edge(n1, n2, **d)
             self.sorted_edge_dict.update({(n1,n2):(n1,n2)})
             self.sorted_edge_dict.update({(n2,n1):(n1,n2)})
         #print(list(unique_translations.keys()))
@@ -1462,7 +1462,7 @@ class MolecularGraph(nx.Graph):
         n1 = nodelist[0] 
         queue = []
         while (nodelist or queue):
-            for n2, data in self[n1].items():
+            for n2, d in self[n1].items():
                 if n2 not in queue and n2 in nodelist:
                     queue.append(n2)
                     coord1 = self.node[n1]['cartesian_coordinates'] 
@@ -1475,7 +1475,7 @@ class MolecularGraph(nx.Graph):
                     dists = dists[0].tolist()
                     image = dists.index(min(dists))
                     self.node[n2]['cartesian_coordinates'] += np.dot(supercells[image], cell.cell)
-                    data['symflag'] = '.'
+                    d['symflag'] = '.'
             del nodelist[nodelist.index(n1)]
             try:
                 n1 = queue[0]
@@ -1489,10 +1489,10 @@ class MolecularGraph(nx.Graph):
 
     def __iadd__(self, newgraph):
         self.sorted_edge_dict.update(newgraph.sorted_edge_dict)
-        for n, data in newgraph.nodes_iter2(data=True):
-            self.add_node(n, **data)
-        for n1,n2, data in newgraph.edges_iter2(data=True):
-            self.add_edge(n1,n2, **data)
+        for n, d in newgraph.nodes_iter2(data=True):
+            self.add_node(n, **d)
+        for n1,n2, d in newgraph.edges_iter2(data=True):
+            self.add_edge(n1,n2, **d)
         return self
 
     def __or__(self, graph):
@@ -1515,8 +1515,8 @@ class MolecularGraph(nx.Graph):
             a = obstruct.NewAtom()
             a.SetAtomicNum(self.node[node]['atomic_number'])
             a.SetVector(*self.node[node]['cartesian_coordinates'])
-        for (n1, n2, data) in self.edges_iter2(data=True):
-            obstruct.AddBond(n1, n2, data['order'])
+        for (n1, n2, d) in self.edges_iter2(data=True):
+            obstruct.AddBond(n1, n2, d['order'])
 
         return obstruct
 
@@ -1539,12 +1539,12 @@ class SlabGraph(MolecularGraph):
     def check_if_zeolite(self):
 
         zeo_types = set(["Si","O"])
-        for node, data in self.slabgraph.nodes_iter2(data=True):
-            if(set(data['element'])>zeo_types):
+        for node, d in self.slabgraph.nodes_iter2(data=True):
+            if(set(d['element'])>zeo_types):
                 print("Warning! Structure determined not to be all silica zeolite!...")
                 print("Warning! For now converting non-O type to an Si...")
-                if(data['element']!="O"):
-                    data['element']="Si"
+                if(d['element']!="O"):
+                    d['element']="Si"
             
 
     def reset_node_edge_labelling(self,graph):
@@ -1580,16 +1580,16 @@ class SlabGraph(MolecularGraph):
     #    node_convert_dict={}
     #    node_convert_dict_rev={}
     #    iterate=0
-    #    for node,data in self.slabgraph.nodes_iter2(data=True):
-    #        #xyz.append([np.float64(data['cartesian_coordinates'][0]),
-    #        #            np.float64(data['cartesian_coordinates'][1]),
-    #        #            np.float64(data['cartesian_coordinates'][2])])
-    #        xyz.append([np.float64(data['_atom_site_fract_x']),
-    #                    np.float64(data['_atom_site_fract_y']),
-    #                    np.float64(data['_atom_site_fract_z'])])
-    #        if(data['element']=="Si"):
+    #    for node,d in self.slabgraph.nodes_iter2(data=True):
+    #        #xyz.append([np.float64(d['cartesian_coordinates'][0]),
+    #        #            np.float64(d['cartesian_coordinates'][1]),
+    #        #            np.float64(d['cartesian_coordinates'][2])])
+    #        xyz.append([np.float64(d['_atom_site_fract_x']),
+    #                    np.float64(d['_atom_site_fract_y']),
+    #                    np.float64(d['_atom_site_fract_z'])])
+    #        if(d['element']=="Si"):
     #            degree.append(5)
-    #        elif(data['element']=="X"):
+    #        elif(d['element']=="X"):
     #            degree.append(20)
     #        else:
     #            degree.append(1)
@@ -1657,8 +1657,8 @@ class SlabGraph(MolecularGraph):
             self.refgraph=self.slabgraph.copy()
 
         #print("Reference graph:")
-        #for node, data in self.refgraph.nodes_iter2(data=True):
-        #    print(node, data['ciflabel'],data['element'])
+        #for node, d in self.refgraph.nodes_iter2(data=True):
+        #    print(node, d['ciflabel'],d['element'])
 
     def condense_graph(self):
         """
@@ -1673,8 +1673,8 @@ class SlabGraph(MolecularGraph):
         self.added_edges = []
         self.added_edges_data = []
 
-        for node, data in self.slabgraph.nodes_iter2(data=True):
-            if(data['element']=="O"): 
+        for node, d in self.slabgraph.nodes_iter2(data=True):
+            if(d['element']=="O"): 
 
                 neighbors=self.slabgraph.neighbors(node)
 
@@ -1719,8 +1719,8 @@ class SlabGraph(MolecularGraph):
                     pass
                 
                 # remove the O node
-                self.removed_nodes.add_node(node,data)
-        #    elif(data['element']=='Si'):
+                self.removed_nodes.add_node(node,d)
+        #    elif(d['element']=='Si'):
         #        print("Si has %d neighbors"%len(self.slabgraph.neighbors(node)))
 
         #print("All nodes to remove:")
@@ -1772,7 +1772,7 @@ class SlabGraph(MolecularGraph):
         Make sure weight for all existing edges in graph is 1
         """
 
-        for n1,n2,data in self.slabgraph.edges_iter(data=True):
+        for n1,n2,d in self.slabgraph.edges_iter(data=True):
             self.slabgraph[n1][n2]['weight']=1
 
 
@@ -1801,8 +1801,8 @@ class SlabGraph(MolecularGraph):
 
 
         print("\n\nIdentifying surface/bulk nodes\n")
-        for node,data in self.slabgraph.nodes_iter2(data=True):
-            if(data['element']=="O"):
+        for node,d in self.slabgraph.nodes_iter2(data=True):
+            if(d['element']=="O"):
                 print("ERROR: O's have to be removed from graph first")
                 sys.exit()
 
@@ -1819,21 +1819,21 @@ class SlabGraph(MolecularGraph):
             if(temp_neigh_list[node]<4):
                 # if node is undercoordinated we identify it as a surface node
                 self.surface_nodes.append(node)
-                data['element']='X'
+                d['element']='X'
                 # For now rough approximation to distinguish nodes between the 2 surfaces
                 # TODO better
                 if(self.vacuum_direc==0):
-                    if(float(data['_atom_site_fract_x'])<0.5):
+                    if(float(d['_atom_site_fract_x'])<0.5):
                         self.surface_nodes_0.append(node)
                     else:
                         self.surface_nodes_max.append(node)
                 elif(self.vacuum_direc==1):
-                    if(float(data['_atom_site_fract_y'])<0.5):
+                    if(float(d['_atom_site_fract_y'])<0.5):
                         self.surface_nodes_0.append(node)
                     else:
                         self.surface_nodes_max.append(node)
                 elif(self.vacuum_direc==2):
-                    if(float(data['_atom_site_fract_z'])<0.5):
+                    if(float(d['_atom_site_fract_z'])<0.5):
                         self.surface_nodes_0.append(node)
                     else:
                         self.surface_nodes_max.append(node)
@@ -2044,7 +2044,7 @@ class SlabGraph(MolecularGraph):
 
         cycles = []
         # not the most efficient, can def be improved
-        for node, data in tmpG.nodes_iter2(data=True):
+        for node, d in tmpG.nodes_iter2(data=True):
             print("Node %d:"%(node))
             #cycle = list(nx.all_shortest_paths(tmpG, node, node))
             for n in tmpG.neighbors(node):
@@ -2375,15 +2375,15 @@ class SlabGraph(MolecularGraph):
                     to_reverse=True
     
             if(to_reverse):
-                data=self.slabgraphdirec[n1][n2].copy()
-                edges_to_reverse.append((n1,n2,data))
+                d=self.slabgraphdirec[n1][n2].copy()
+                edges_to_reverse.append((n1,n2,d))
 
 
 
-        for n1,n2,data in edges_to_reverse:
-            print("Reversing! ",n1,n2, data)
+        for n1,n2,d in edges_to_reverse:
+            print("Reversing! ",n1,n2, d)
             self.slabgraphdirec.remove_edge(n1,n2)
-            self.slabgraphdirec.add_edge(n2,n1,data)
+            self.slabgraphdirec.add_edge(n2,n1,d)
 
 
 
@@ -2674,10 +2674,10 @@ class SlabGraph(MolecularGraph):
         # all nodes to remove
         remove_nodes=[]
 
-        for n1, data in Gp.nodes_iter2(data=True):
-            #print(data['slablayer'])
+        for n1, d in Gp.nodes_iter2(data=True):
+            #print(d['slablayer'])
             #print(max_layer)
-            if(data['slablayer'] == max_layer+1):
+            if(d['slablayer'] == max_layer+1):
                 # check if that node is connected to the max layer
                 to_remove=True
                 for n2 in Gp.neighbors(n1):
@@ -2689,7 +2689,7 @@ class SlabGraph(MolecularGraph):
                 if(to_remove):
                     remove_nodes.append(n1)
 
-            elif(data['slablayer'] > max_layer+1):
+            elif(d['slablayer'] > max_layer+1):
                 # remove node 
                 remove_nodes.append(n1)
 
@@ -3689,19 +3689,19 @@ class SlabGraph(MolecularGraph):
         """
 
         # reassign element type based on its slablayer
-        for n,data in self.slabgraph.nodes_iter2(data=True):
-            slablayer=data['slablayer']
+        for n,d in self.slabgraph.nodes_iter2(data=True):
+            slablayer=d['slablayer']
             # just to give it better coloring to start than an H atom in Mercury
             slablayer+=3
-            data['element']=ATOMIC_NUMBER[slablayer]
+            d['element']=ATOMIC_NUMBER[slablayer]
 
 
         # if we have some other specialty debug features, add here
         # e.g. perhaps D4R units
         if(hasattr(self, 'all_D4R_nodes')):
-            for n,data in self.slabgraph.nodes_iter2(data=True):
+            for n,d in self.slabgraph.nodes_iter2(data=True):
                 if(n in self.all_D4R_nodes):
-                    data['element']=25
+                    d['element']=25
 
 
         tmp_nodes=[]
@@ -3724,8 +3724,8 @@ class SlabGraph(MolecularGraph):
                                  descriptor="cut%05d.debug"%step,relabel=False)
 
         # reset nodes                                                       
-        for n,data in self.slabgraph.nodes_iter2(data=True):
-            data['element']=self.refgraph.node[n]['element']
+        for n,d in self.slabgraph.nodes_iter2(data=True):
+            d['element']=self.refgraph.node[n]['element']
         for node in tmp_nodes:                                              
             self.slabgraph.remove_node(node)
 
@@ -3741,7 +3741,7 @@ class SlabGraph(MolecularGraph):
 
         # NOTE important this is not rigorous since we are sorting possible identical c -values
         # need to get the layer data directly from pymatgen
-        #tosort= [(n, data) for n, data in self.slabgraph.nodes_iter2(data=True)]
+        #tosort= [(n, d) for n, d in self.slabgraph.nodes_iter2(data=True)]
 
         #sort_on_c=sorted(tosort, key=lambda tup: tup[1]['_atom_site_fract_z'])
    
@@ -3755,7 +3755,7 @@ class SlabGraph(MolecularGraph):
 
         # NOTE a better way is to just make sure that the ordering is not sorted by Pymatgen
         # is every a_per_l atoms as we go from node 1 to N we know we have switched layers
-        tosort= [(n, data) for n, data in self.slabgraph.nodes_iter2(data=True)]
+        tosort= [(n, d) for n, d in self.slabgraph.nodes_iter2(data=True)]
 
         sort_on_n=sorted(tosort, key=lambda tup: tup[0])
    
@@ -3779,18 +3779,18 @@ class SlabGraph(MolecularGraph):
         """
 
         # reassign element type based on its slablayer
-        for n,data in self.slabgraph.nodes_iter2(data=True):
-            slablayer=data['slablayer']
+        for n,d in self.slabgraph.nodes_iter2(data=True):
+            slablayer=d['slablayer']
             #print(slablayer)
             # just to give it better coloring to start than an H atom in Mercury
             slablayer+=3
-            data['element']=ATOMIC_NUMBER[slablayer]
+            d['element']=ATOMIC_NUMBER[slablayer]
             
         self.write_slabgraph_cif(self.slabgraph,self.cell,bond_block=False,descriptor="layer.debug",relabel=False)
 
         # reset element
-        for n,data in self.slabgraph.nodes_iter2(data=True):
-            data['element']=self.refgraph.node[n]['element']
+        for n,d in self.slabgraph.nodes_iter2(data=True):
+            d['element']=self.refgraph.node[n]['element']
 
     ###########################################################################
     # END DEBUG visualization functions
@@ -3946,8 +3946,8 @@ class SlabGraph(MolecularGraph):
         for n1 in nodes_to_add:
             G.add_node(n1,self.refgraph.node[n1])
 
-        for n1, n2, data in edges_to_add:
-            G.add_edge(n1,n2,data)
+        for n1, n2, d in edges_to_add:
+            G.add_edge(n1,n2,d)
 
         print("Total nodes added: %d"%len(nodes_to_add))
         print("Total edges added: %d"%len(edges_to_add))
@@ -4356,22 +4356,22 @@ class SlabGraph(MolecularGraph):
         min_coord=1.0
         max_coord=0.0
 
-        for node, data in self.slabgraph.nodes_iter2(data=True):
+        for node, d in self.slabgraph.nodes_iter2(data=True):
             if(self.vacuum_direc==0):
-                if(float(data['_atom_site_fract_x'])>max_coord):
-                    max_coord=float(data['_atom_site_fract_x'])
-                if(float(data['_atom_site_fract_x'])<min_coord):
-                    min_coord=float(data['_atom_site_fract_x'])
+                if(float(d['_atom_site_fract_x'])>max_coord):
+                    max_coord=float(d['_atom_site_fract_x'])
+                if(float(d['_atom_site_fract_x'])<min_coord):
+                    min_coord=float(d['_atom_site_fract_x'])
             elif(self.vacuum_direc==1):
-                if(float(data['_atom_site_fract_y'])>max_coord):
-                    max_coord=float(data['_atom_site_fract_y'])
-                if(float(data['_atom_site_fract_y'])<min_coord):
-                    min_coord=float(data['_atom_site_fract_y'])
+                if(float(d['_atom_site_fract_y'])>max_coord):
+                    max_coord=float(d['_atom_site_fract_y'])
+                if(float(d['_atom_site_fract_y'])<min_coord):
+                    min_coord=float(d['_atom_site_fract_y'])
             elif(self.vacuum_direc==2):
-                if(float(data['_atom_site_fract_z'])>max_coord):
-                    max_coord=float(data['_atom_site_fract_z'])
-                if(float(data['_atom_site_fract_z'])<min_coord):
-                    min_coord=float(data['_atom_site_fract_z'])
+                if(float(d['_atom_site_fract_z'])>max_coord):
+                    max_coord=float(d['_atom_site_fract_z'])
+                if(float(d['_atom_site_fract_z'])<min_coord):
+                    min_coord=float(d['_atom_site_fract_z'])
 
         if(self.vacuum_direc==0):
             approximate=(max_coord-min_coord)*self.cell.a
@@ -4415,17 +4415,17 @@ class SlabGraph(MolecularGraph):
         periodic_c=False
         periodic_2D=False
 
-        for n1,n2,data in self.slabgraph.edges_iter(data=True):
+        for n1,n2,d in self.slabgraph.edges_iter(data=True):
             # having a O-H across a PBC doesn't count as being a periodic structure
             #print(n1,n2)
             if(self.slabgraph.node[n1]['element']!="H" and
                self.slabgraph.node[n2]['element']!="H"):
         
-                if(data['symflag']=='1_455' or data['symflag']=='1_655'):
+                if(d['symflag']=='1_455' or d['symflag']=='1_655'):
                     periodic_a=True
-                elif(data['symflag']=='1_545' or data['symflag']=='1_565'):
+                elif(d['symflag']=='1_545' or d['symflag']=='1_565'):
                     periodic_b=True
-                elif(data['symflag']=='1_554' or data['symflag']=='1_556'):
+                elif(d['symflag']=='1_554' or d['symflag']=='1_556'):
                     periodic_c=True
 
         if(self.vacuum_direc==0):
@@ -4471,9 +4471,9 @@ class SlabGraph(MolecularGraph):
         max_cycle_length=0
         min_cycle_length=1000000
         total_rings=0
-        for node, data in self.slabgraph.nodes_iter2(data=True):
+        for node, d in self.slabgraph.nodes_iter2(data=True):
             print("Node %d is a part of all cycles:"%(node))
-            for ring in data['rings']:
+            for ring in d['rings']:
                 print(ring)
                 if(len(ring) > max_cycle_length):
                     max_cycle_length=len(ring)
@@ -4575,29 +4575,29 @@ def write_CIF(G, cell, bond_block=True,descriptor="debug",relabel=True):
     # atom block
     element_counter = {}
     carts = []
-    for node, data in G.nodes_iter2(data=True):
+    for node, d in G.nodes_iter2(data=True):
         # can override write to try to preserve the already assigned ciflabel
         if(relabel==True):
-            label = "%s%i"%(data['element'], node)
+            label = "%s%i"%(d['element'], node)
         else:
             try:
-                label = "%s"%(data['ciflabel'])
+                label = "%s"%(d['ciflabel'])
             except:
-                label = "%s%i"%(data['ciflabel'], node)
+                label = "%s%i"%(d['ciflabel'], node)
 
 
         c.add_data("atoms", _atom_site_label=
                                 CIF.atom_site_label(label))
         c.add_data("atoms", _atom_site_type_symbol=
-                                CIF.atom_site_type_symbol(data['element']))
+                                CIF.atom_site_type_symbol(d['element']))
         try:
             c.add_data("atoms", _atom_site_description=
-                                CIF.atom_site_description(data['force_field_type']))
+                                CIF.atom_site_description(d['force_field_type']))
         except KeyError:
             c.add_data("atoms", _atom_site_description=
-                                CIF.atom_site_description(data['element']))
+                                CIF.atom_site_description(d['element']))
 
-        coords = data['cartesian_coordinates']
+        coords = d['cartesian_coordinates']
         carts.append(coords)
         fc = np.dot(cell.inverse, coords) 
         c.add_data("atoms", _atom_site_fract_x=
@@ -4608,17 +4608,17 @@ def write_CIF(G, cell, bond_block=True,descriptor="debug",relabel=True):
                                 CIF.atom_site_fract_z(fc[2]))
         try:
             c.add_data("atoms", _atom_type_partial_charge=
-                                CIF.atom_type_partial_charge(data['charge']))
+                                CIF.atom_type_partial_charge(d['charge']))
         except KeyError:
             c.add_data("atoms", _atom_type_partial_charge="0.0")
     # bond block
     # must re-sort them based on bond type (Mat Sudio)
     if(bond_block):
-        tosort = [(data['order'], (n1, n2, data)) for n1, n2, data in G.edges_iter2(data=True)]
-        for ord, (n1, n2, data) in sorted(tosort, key=lambda tup: tup[0]):
-            type = CCDC_BOND_ORDERS[data['order']]
-            dist = data['length'] 
-            sym = data['symflag']
+        tosort = [(d['order'], (n1, n2, d)) for n1, n2, d in G.edges_iter2(data=True)]
+        for ord, (n1, n2, d) in sorted(tosort, key=lambda tup: tup[0]):
+            type = CCDC_BOND_ORDERS[d['order']]
+            dist = d['length'] 
+            sym = d['symflag']
 
 
             label1 = "%s%i"%(G.node[n1]['element'], n1)
@@ -4677,23 +4677,23 @@ def write_RASPA_CIF(graph, cell, classifier=0):
     carts = []
     
     # slight modification to make sure atoms printed out in same order as in data and original cif
-    for node, data in sorted(graph.nodes_iter2(data=True)):
-        label = "%s%i"%(data['element'], node)
+    for node, d in sorted(graph.nodes_iter2(data=True)):
+        label = "%s%i"%(d['element'], node)
 
         # sometimes we need to keep the original CIF label in the case          
         # of slab geometries where charge symmetry is very reduced              
         if(classifier==0):                                                      
             c.add_data("atoms", _atom_site_label=                               
-                              CIF.atom_site_label(data['force_field_type']))    
+                              CIF.atom_site_label(d['force_field_type']))    
         elif(classifier==1):                                                    
             c.add_data("atoms", _atom_site_label=                               
-                              CIF.atom_site_label(data['ciflabel']))        
+                              CIF.atom_site_label(d['ciflabel']))        
 
         c.add_data("atoms", _atom_site_type_symbol=
-                                CIF.atom_site_type_symbol(data['element']))
+                                CIF.atom_site_type_symbol(d['element']))
         #c.add_data("atoms", _atom_site_description=
-        #                        CIF.atom_site_description(data['force_field_type']))
-        coords = data['cartesian_coordinates']
+        #                        CIF.atom_site_description(d['force_field_type']))
+        coords = d['cartesian_coordinates']
         carts.append(coords)
         fc = np.dot(cell.inverse, coords) 
         c.add_data("atoms", _atom_site_fract_x=
@@ -4703,14 +4703,14 @@ def write_RASPA_CIF(graph, cell, classifier=0):
         c.add_data("atoms", _atom_site_fract_z=
                                 CIF.atom_site_fract_z(fc[2]))
         c.add_data("atoms", _atom_site_charge=
-                                CIF.atom_type_partial_charge(data['charge']))
+                                CIF.atom_type_partial_charge(d['charge']))
     # bond block
     # must re-sort them based on bond type (Mat Sudio)
-    #tosort = [(data['order'], (n1, n2, data)) for n1, n2, data in graph.edges_iter2(data=True)]
-    #for ord, (n1, n2, data) in sorted(tosort, key=lambda tup: tup[0]):
-    #    type = CCDC_BOND_ORDERS[data['order']]
-    #    dist = data['length'] 
-    #    sym = data['symflag']
+    #tosort = [(d['order'], (n1, n2, d)) for n1, n2, d in graph.edges_iter2(data=True)]
+    #for ord, (n1, n2, d) in sorted(tosort, key=lambda tup: tup[0]):
+    #    type = CCDC_BOND_ORDERS[d['order']]
+    #    dist = d['length'] 
+    #    sym = d['symflag']
 
 
     #    label1 = "%s%i"%(graph.node[n1]['element'], n1)
@@ -4744,27 +4744,27 @@ def write_RASPA_sim_files(lammps_sim, classifier=0):
     data_list = []                                                              
     max_image = 0                                                               
     if(classifier == 0):                                                        
-        for node, data in sorted(lammps_sim.unique_atom_types.items()):         
+        for node, d in sorted(lammps_sim.unique_atom_types.items()):         
             #print(type(node))
-            #print(type(data))                                                         
+            #print(type(d))                                                         
             #print(node)                                                          
-            #print(data)                                                         
-            # Note here that data is a tuple of (node, data)
-            data[1]['node']=node                                                   
-            data_list.append(data[1])                                              
+            #print(d)                                                         
+            # Note here that data is a tuple of (node, d)
+            d[1]['node']=node                                                   
+            data_list.append(d[1])                                              
                                                                                 
-            if(int(data[1]['image']) > max_image):                                 
-                max_image = int(data[1]['image'])                                  
+            if(int(d[1]['image']) > max_image):                                 
+                max_image = int(d[1]['image'])                                  
                                                                                 
     elif(classifier == 1):                                                      
-        for node, data in sorted(lammps_sim.graph.nodes_iter2(data=True)):       
-            data['node']=node                                                   
+        for node, d in sorted(lammps_sim.graph.nodes_iter2(data=True)):       
+            d['node']=node                                                   
             #print(node)                                                         
-            #print(data)                                                         
-            data_list.append(data)                                              
+            #print(d)                                                         
+            data_list.append(d)                                              
                                                                                 
-            if(int(data['image']) > max_image):                                 
-                max_image = int(data['image'])                                  
+            if(int(d['image']) > max_image):                                 
+                max_image = int(d['image'])                                  
                                                                                 
     print(max_image)                                                            
     for i in range(len(data_list)):                                             
