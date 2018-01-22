@@ -2214,12 +2214,13 @@ class UFF(ForceField):
             # should put this angle in the general - non-linear case
             # unless the angle is 0 or 180 deg - then linear case.
             # here the K value will be scaled by the number of neighbors
-            angle_type = "None"
+            #angle_type = "None"
             # note, coefficient might be too strong here, if the metal
             # is octahedral, for example, kappa = ka/16
             if np.allclose(theta0, 180.0, atol=0.1):
                 angle_type = 'linear'
-
+            else:
+                angle_type = "Fix"
         cosT0 = np.cos(theta0*DEG2RAD)
         sinT0 = np.sin(theta0*DEG2RAD)
         c2 = 1.0 / (4.0*sinT0*sinT0)
@@ -2271,6 +2272,14 @@ class UFF(ForceField):
             #data['potential'].c = c0
             data['potential'].B = B 
             data['potential'].n = c1
+        # Fix metal. Was Fourier, but possibly too many nearby minima. Daniele was upset.
+        # NB. did not Taylor expand the Fourier function to obtain the proper force coefficient.
+        # so the curvature of the function may be too steep. 
+        elif angle_type == "Fix":
+            data['potential'] = AnglePotential.Harmonic()
+            data['potential'].K = ka
+            data['potential'].theta0 = theta0
+
         # general-nonlinear
         else:
 
