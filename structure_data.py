@@ -495,7 +495,7 @@ class MolecularGraph(nx.Graph):
         self.coordinates = np.empty((self.number_of_nodes(), 3))
         for node, d in self.nodes_iter2(data=True):
             #TODO(pboyd) probably need more error checking..
-            if ('cartesian_coordinates' in data):
+            if ('cartesian_coordinates' in d):
                 continue
             try:
                 coordinates = np.array([float(del_parenth(d[i])) for i in coord_keys])
