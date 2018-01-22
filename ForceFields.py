@@ -58,53 +58,53 @@ class ForceField(object):
 
     def compute_bond_terms(self):
         del_edges = []
-        for n1, n2, d in self.graph.edges_iter2(data=True):
+        for n1, n2, dat in self.graph.edges_iter2(data=True):
 
-            if self.bond_term((n1, n2, d)) is None:
+            if self.bond_term((n1, n2, dat)) is None:
                 del_edges.append((n1, n2))
         for (n1, n2) in del_edges:
             self.graph.remove_edge(n1, n2)
     
     def compute_angle_terms(self):
-        for b, d in self.graph.nodes_iter2(data=True):
+        for b, dat in self.graph.nodes_iter2(data=True):
             # compute and store angle terms
             try:
                 rem_ang = []
-                ang_data = d['angles']
+                ang_data = dat['angles']
                 for (a, c), val in ang_data.items():
                     if self.angle_term((a, b, c, val)) is None:
                         rem_ang.append((a,c))
                 for i in rem_ang:
-                    del(d['angles'][i])
+                    del(dat['angles'][i])
 
             except KeyError:
                 pass
 
     def compute_dihedral_terms(self):
-        for b, c, d in self.graph.edges_iter2(data=True):
+        for b, c, dat in self.graph.edges_iter2(data=True):
             try:
                 rem_dihed = []
-                dihed_data = d['dihedrals']
+                dihed_data = dat['dihedrals']
                 for (a, d), val in dihed_data.items():
                     if self.dihedral_term((a,b,c,d, val)) is None:
                         rem_dihed.append((a,d))
                 for i in rem_dihed:
-                    del(d['dihedrals'][i])
+                    del(dat['dihedrals'][i])
             
             except KeyError:
                 pass
 
     def compute_improper_terms(self):
 
-        for b, d in self.graph.nodes_iter2(data=True):
+        for b, dat in self.graph.nodes_iter2(data=True):
             try:
                 rem_imp = []
-                imp_data = d['impropers']
+                imp_data = dat['impropers']
                 for (a, c, d), val in imp_data.items():
                     if self.improper_term((a,b,c,d, val)) is None:
                         rem_imp.append((a,c,d))
                 for i in rem_imp:
-                    del(d['impropers'][i])
+                    del(dat['impropers'][i])
 
             except KeyError:
                 pass

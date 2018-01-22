@@ -14,7 +14,7 @@ import networkx as nx
 import ForceFields
 import itertools
 import operator
-from structure_data import from_CIF, write_CIF, clean
+from structure_data import from_CIF, write_CIF, clean, MolecularGraph
 from structure_data import write_RASPA_CIF, write_RASPA_sim_files, MDMC_config
 from lammps_potentials import PairPotential
 from CIFIO import CIF
@@ -1397,7 +1397,7 @@ class LammpsSimulation(object):
         if self.options.pxrd:
             cell_move="aniso"
 
-        framework_atoms = self.graph.nodes()
+        framework_atoms = list(self.graph.nodes())
         if(self.molecules)and(len(self.molecule_types.keys()) < 32):
             # lammps cannot handle more than 32 groups including 'all' 
             total_count = 0 
@@ -2029,7 +2029,7 @@ class LammpsSimulation(object):
                 self.molecules.append(j)
     
     def cut_molecule(self, nodes):
-        mgraph = self.graph.subgraph(nodes).copy()
+        mgraph = self.graph.subgraph(nodes)
         self.graph.remove_nodes_from(nodes)
         indices = np.array(list(nodes)) 
         indices -= 1
@@ -2037,7 +2037,7 @@ class LammpsSimulation(object):
         mgraph.sorted_edge_dict = self.graph.sorted_edge_dict.copy()
         mgraph.distance_matrix = self.graph.distance_matrix.copy()
         mgraph.original_size = self.graph.original_size
-        for n1, n2 in mgraph.edges_iter():
+        for n1, n2 in mgraph.edges():
             try:
                 val = self.graph.sorted_edge_dict.pop((n1, n2))
                 mgraph.sorted_edge_dict.update({(n1, n2):val})
