@@ -39,7 +39,7 @@ except ImportError:
     print("ERROR: could not load networkx module, this is needed to produce the lammps data file.")
     sys.exit()
 
-import nxstoerwagnercustom as nxswc
+#import nxstoerwagnercustom as nxswc
 try:
     import transforamtions as trans
     import nxmaxflowcustom as nxmfc
@@ -102,7 +102,6 @@ class MolecularGraph(nx.Graph):
                 yield (node, data)
             else:
                 yield node
-        #FIXME(pboyd): latest version of NetworkX has removed nodes_iter2...
 
     def edges_iter2(self, **kwargs):
         for n1, n2, d in self.edges_iter(**kwargs):
@@ -488,6 +487,8 @@ class MolecularGraph(nx.Graph):
         self.coordinates = np.empty((self.number_of_nodes(), 3))
         for node, data in self.nodes_iter2(data=True):
             #TODO(pboyd) probably need more error checking..
+            if ('cartesian_coordinates' in data):
+                continue
             try:
                 coordinates = np.array([float(del_parenth(data[i])) for i in coord_keys])
             except KeyError:
@@ -2590,15 +2591,15 @@ class SlabGraph(MolecularGraph):
 
 
 
-    def nx_stoer_wagner_cut_custom(self, weight_barrier=False):
-        print("\n\nNx stoer_wagner function on undirected slab graph...")
-        cut_value, partition = nxswc.stoer_wagner_custom(self.slabgraphundirected,
-                                                         s=self.super_surface_node_0,
-                                                         t=self.super_surface_node_max)
-        print(cut_value)        
-        print(partition)
-
-        sys.exit()
+#    def nx_stoer_wagner_cut_custom(self, weight_barrier=False):
+#        print("\n\nNx stoer_wagner function on undirected slab graph...")
+#        cut_value, partition = nxswc.stoer_wagner_custom(self.slabgraphundirected,
+#                                                         s=self.super_surface_node_0,
+#                                                         t=self.super_surface_node_max)
+#        print(cut_value)        
+#        print(partition)
+#
+#        sys.exit()
 
 
     def minimum_edge_slab_cut(self):
@@ -5113,7 +5114,6 @@ class Cell(object):
     @property
     def crystal_system(self):
         """Return the IUCr designation for the crystal system."""
-        #FIXME(tdaff): must be aligned with x to work
         if self.alpha == self.beta == self.gamma == 90:
             if self.a == self.b == self.c:
                 return 'cubic'
