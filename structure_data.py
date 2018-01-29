@@ -157,39 +157,39 @@ class MolecularGraph(nx.Graph):
         old_nodes = sorted([(i,self.node[i]) for i in self.nodes()])
         #old_nodes = list(self.nodes_iter2(data=True))
         old_edges = list(self.edges_iter2(data=True))
-        for node, d in old_nodes:
+        for node, dat in old_nodes:
             
-            if 'angles' in d:
-                ang_data = list(d['angles'].items())
+            if 'angles' in dat:
+                ang_data = list(dat['angles'].items())
                 for (a,c), val in ang_data:
-                    d['angles'].pop((a,c))
-                    d['angles'][(reorder_dic[a], reorder_dic[c])] = val
-            if 'impropers' in d:
-                imp_data = list(d['impropers'].items())
+                    dat['angles'].pop((a,c))
+                    dat['angles'][(reorder_dic[a], reorder_dic[c])] = val
+            if 'impropers' in dat:
+                imp_data = list(dat['impropers'].items())
                 for (a, c, d), val in imp_data:
-                    d['impropers'].pop((a,c,d))
-                    d['impropers'][(reorder_dic[a], reorder_dic[c], reorder_dic[d])] = val
+                    dat['impropers'].pop((a,c,d))
+                    dat['impropers'][(reorder_dic[a], reorder_dic[c], reorder_dic[d])] = val
 
             self.remove_node(node)
-            d['index'] = reorder_dic[node]
-            self.add_node(reorder_dic[node], **d)
+            dat['index'] = reorder_dic[node]
+            self.add_node(reorder_dic[node], **dat)
 
-        for b, c, d in old_edges:
-            if 'dihedrals' in d:
-                dihed_data = list(d['dihedrals'].items())
+        for b, c, dat in old_edges:
+            if 'dihedrals' in dat:
+                dihed_data = list(dat['dihedrals'].items())
                 for (a, d), val in dihed_data:
-                    d['dihedrals'].pop((a,d))
-                    d['dihedrals'][(reorder_dic[a], reorder_dic[d])] = val
+                    dat['dihedrals'].pop((a,d))
+                    dat['dihedrals'][(reorder_dic[a], reorder_dic[d])] = val
             try:
                 self.remove_edge(b,c)
             except nx.exception.NetworkXError:
                 # edge already removed from 'remove_node' above
                 pass
-            self.add_edge(reorder_dic[b], reorder_dic[c], **d)
-        
+            self.add_edge(reorder_dic[b], reorder_dic[c], **dat)
+       
         old_edge_dict = self.sorted_edge_dict.items()
         self.sorted_edge_dict = {}
-        for (a,b), val in old_edge_dict:
+        for (a, b), val in old_edge_dict:
             self.sorted_edge_dict[(reorder_dic[a], reorder_dic[b])] = (reorder_dic[val[0]], reorder_dic[val[1]])
 
         old_images = self.molecule_images[:]
