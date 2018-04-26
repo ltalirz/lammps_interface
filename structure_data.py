@@ -793,13 +793,17 @@ class MolecularGraph(nx.Graph):
         while double_check:
             n = double_check.pop()
             # rewind this atom to a 'terminal' connected atom
-            for i in self.recurse_bonds_to_end(n, pool=[], visited=[]):
-                start = i
-                try:
-                    idn = double_check.index(i)
-                    del double_check[idn]
-                except ValueError:
-                    pass
+            try:
+                for i in self.recurse_bonds_to_end(n, pool=[], visited=[]):
+                    start = i
+                    try:
+                        idn = double_check.index(i)
+                        del double_check[idn]
+                    except ValueError:
+                        pass
+            # really hacked fix for ZTC's
+            except RuntimeError:
+                start = 1
             # iterate over all linear chains
             # BE CAREFUL about overwriting bond orders here, the recursion
             # can have duplicate bonds for each 'k' iteration since it iterates over
