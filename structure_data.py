@@ -1569,6 +1569,7 @@ class SlabGraph(MolecularGraph):
         self.vacuum_direc=2
         # store original number of nodes so we know what index to use when we start adding H's
         self.num_nodes=self.slabgraph.number_of_nodes()
+        print(self.slabgraph.sorted_edge_dict)
     
     def __str__(self):
         pass
@@ -1710,17 +1711,37 @@ class SlabGraph(MolecularGraph):
             # get a list of unconnected networks
             sub_graphs = list(nx.connected_component_subgraphs(self.slabgraph))
 
-            main_graph = sub_graphs[0]
+            #main_graph = sub_graphs[0]
 
-            # find the largest network in that list
-            for sg in sub_graphs:
-                if len(sg.nodes()) > len(main_graph.nodes()):
-                    main_graph = sg
+            ## find the largest network in that list
+            #for sg in sub_graphs:
+            #    if len(sg.nodes()) > len(main_graph.nodes()):
+            #        main_graph = sg
 
-            self.slabgraph = main_graph
+            #self.slabgraph = main_graph
 
             print("WARNING! You passed in a graph with disconnected components...\
                   Assuming the largest component is the slab and continuing...")
+
+            # identify the main graph
+            ind_of_mainG=0
+            nodes_in_mainG=0
+            for subG_ind in range(len(sub_graphs)):
+                if(len(sub_graphs[subG_ind].nodes()) > nodes_in_mainG):
+                    ind_of_mainG=subG_ind
+                    nodes_in_mainG=len(sub_graphs[subG_ind].nodes())
+
+            print("Keeping connected component %d with size %d nodes"%
+                  (ind_of_mainG,nodes_in_mainG))
+
+            # delete the subgraph nodes and edges from main graph
+            for subG_ind in range(len(sub_graphs)):
+                if(subG_ind != ind_of_mainG):
+                    for edge in sub_graphs[subG_ind].edges():
+                        self.slabgraph.remove_edge(edge[0],edge[1])
+                    for n in sub_graphs[subG_ind].nodes():
+                        self.slabgraph.remove_node(n)
+                        
 
             # Important!! The reference graph must now be copied from 
             # our new slabgraph after the disconnected components have been removed
@@ -1743,7 +1764,8 @@ class SlabGraph(MolecularGraph):
         self.added_edges = []
         self.added_edges_data = []
 
-        for node, d in self.slabgraph.nodes_iter2(data=True):
+        #for node, d in self.slabgraph.nodes_iter2(data=True):
+        for node, d in self.slabgraph.nodes(data=True): # nx2.1
             if(d['element']=="O"): 
 
                 #neighbors=self.slabgraph.neighbors(node)
@@ -2753,10 +2775,6 @@ class SlabGraph(MolecularGraph):
         print("\nReducing graph to only contain nodes up to and including slablayer %d"%max_layer)
 
         Gp=deepcopy(G)
-        print(dir(Gp))
-        print(type(Gp))
-        print(type(super()))
-        print(dir(super()))
 
         # new super surface node
         self.new_super_surface_node_max=-3
