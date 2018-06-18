@@ -40,11 +40,16 @@ except ImportError:
     sys.exit()
 
 #import nxstoerwagnercustom as nxswc
-try:
-    import transforamtions as trans
-    import nxmaxflowcustom as nxmfc
-except:
-    print("WARNING: Not able to load custom nx algorithms (make sure at most recent git commit)")
+#try:
+#    import transforamtions as trans
+#    import nxmaxflowcustom as nxmfc
+#except:
+#    print("WARNING: Not able to load custom nx algorithms (make sure at most recent git commit)")
+
+if(nx.__version__ != '2.1'):
+    raise Warning("Using Nx version %s.\n\
+                  Code for min cut slab generation only validated on NetworkX v2.1"%
+                  nx.__version__)
 
 
 class MolecularGraph(nx.Graph):
@@ -1568,6 +1573,39 @@ class SlabGraph(MolecularGraph):
     def __str__(self):
         pass
 
+    def nodes_iter2(self, G, data=True):
+        """Oh man, fixing to networkx 2.0
+
+        This probably breaks a lot of stuff in the code. THANKS NETWORKX!!!!!!!1
+
+        Quick and dirty fix to create a differentversion from MolecularGraph
+        a graph as argument rather than operating on self
+
+        """
+        for node in G.nodes():
+            if(data):
+                d = G.node[node]
+                yield (node, d)
+            else:
+                yield node
+
+    def edges_iter2(self, G, data=True):
+        """
+        creating a different version from MolecularGraph
+        since I don't want to touch MolecularGraph at all
+        """
+
+        for (n1,n2) in self.edges():
+            v1,v2=G.sorted_edge_dict[(n1,n2)]
+            #d=self.edges[(n1,n2)]
+            d=G[n1][n2]
+            if(data):
+                yield (v1,v2,d)
+            else:
+                yield (v1,v2)
+        #for n1, n2, d in self.edges_iter(**kwargs):
+        #    yield (self.sorted_edge_dict[(n1, n2)][0], self.sorted_edge_dict[(n1,n2)][1], d)
+    
     def check_if_zeolite(self):
 
         zeo_types = set(["Si","O"])
@@ -1708,7 +1746,8 @@ class SlabGraph(MolecularGraph):
         for node, d in self.slabgraph.nodes_iter2(data=True):
             if(d['element']=="O"): 
 
-                neighbors=self.slabgraph.neighbors(node)
+                #neighbors=self.slabgraph.neighbors(node)
+                neighbors = [n for n in self.slabgraph.neighbors(node)] # nx2.1
 
 
                 if(len(neighbors)==2):
@@ -1717,22 +1756,29 @@ class SlabGraph(MolecularGraph):
 
                     # identify edges to remove AND the data associated with that node
                     self.removed_edges.append((neighbors[0],node))
-                    self.removed_edges_data.append(self.slabgraph.edge[neighbors[0]][node])
+                    #self.removed_edges_data.append(self.slabgraph.edge[neighbors[0]][node])
+                    self.removed_edges_data.append(self.slabgraph.edges[neighbors[0],node]) # nx2.1
 
                     self.removed_edges.append((neighbors[1],node))
-                    self.removed_edges_data.append(self.slabgraph.edge[neighbors[1]][node])
+                    #self.removed_edges_data.append(self.slabgraph.edge[neighbors[1]][node])
+                    self.removed_edges_data.append(self.slabgraph.edges[neighbors[1],node]) # nx2.1
                 
                     # create an edge between the adjacent Si
                     self.added_edges.append((neighbors[0],neighbors[1]))
 
                     # need to keep the periodicity information
                     this_symflag=''
-                    if(self.slabgraph.edge[neighbors[0]][node]['symflag']!='.'):
-                        this_symflag=self.slabgraph.edge[neighbors[0]][node]['symflag']
-                    elif(self.slabgraph.edge[neighbors[1]][node]['symflag']!='.'):
-                        this_symflag=self.slabgraph.edge[neighbors[1]][node]['symflag']
+                    #if(self.slabgraph.edge[neighbors[0]][node]['symflag']!='.'):
+                    if(self.slabgraph.edges[neighbors[0],node]['symflag']!='.'): # nx2.1
+                        #this_symflag=self.slabgraph.edge[neighbors[0]][node]['symflag']
+                        this_symflag=self.slabgraph.edges[neighbors[0],node]['symflag'] # nx2.1
+                    #elif(self.slabgraph.edge[neighbors[1]][node]['symflag']!='.'):
+                    elif(self.slabgraph.edges[neighbors[1],node]['symflag']!='.'): # nx2.1
+                        #this_symflag=self.slabgraph.edge[neighbors[1]][node]['symflag']
+                        this_symflag=self.slabgraph.edges[neighbors[1],node]['symflag'] # nx2.1
                     else:
-                        this_symflag=self.slabgraph.edge[neighbors[0]][node]['symflag']
+                        #this_symflag=self.slabgraph.edge[neighbors[0]][node]['symflag']
+                        this_symflag=self.slabgraph.edges[neighbors[0],node]['symflag'] # nx2.1
                     self.added_edges_data.append({ 'order':1, 'length': 4.0, 'symflag':this_symflag })
                     
 
@@ -1741,7 +1787,8 @@ class SlabGraph(MolecularGraph):
                     # the arbitrary initial slab config can have dangling O's
                     # remove both edges to Si
                     self.removed_edges.append((neighbors[0],node))
-                    self.removed_edges_data.append(self.slabgraph.edge[neighbors[0]][node])
+                    #self.removed_edges_data.append(self.slabgraph.edge[neighbors[0]][node])
+                    self.removed_edges_data.append(self.slabgraph.edges[neighbors[0],node]) # nx2.1
 
                     # no edge to add to the all Si graph
                 else:
@@ -1751,7 +1798,8 @@ class SlabGraph(MolecularGraph):
                     pass
                 
                 # remove the O node
-                self.removed_nodes.add_node(node,d)
+                #self.removed_nodes.add_node(node,d)
+                self.removed_nodes.add_node(node,**d) # nx2.1
         #    elif(d['element']=='Si'):
         #        print("Si has %d neighbors"%len(self.slabgraph.neighbors(node)))
 
@@ -1804,7 +1852,7 @@ class SlabGraph(MolecularGraph):
         Make sure weight for all existing edges in graph is 1
         """
 
-        for n1,n2,d in self.slabgraph.edges_iter(data=True):
+        for n1,n2,d in self.slabgraph.edges_iter2(data=True):
             self.slabgraph[n1][n2]['weight']=1
 
 
@@ -1908,12 +1956,16 @@ class SlabGraph(MolecularGraph):
                }
     
         # add to our undirected slab graph
-        self.slabgraph.add_node(self.super_surface_node_0,data_0)
-        self.slabgraph.add_node(self.super_surface_node_max,data_max)
+        #self.slabgraph.add_node(self.super_surface_node_0,data_0)
+        #self.slabgraph.add_node(self.super_surface_node_max,data_max)
+        self.slabgraph.add_node(self.super_surface_node_0,**data_0) # nx2.1
+        self.slabgraph.add_node(self.super_surface_node_max,**data_max) # nx2.1
 
         # for now add the super surface nodes to the refgraph for technicality reasons
-        self.refgraph.add_node(self.super_surface_node_0,data_0)
-        self.refgraph.add_node(self.super_surface_node_max,data_max)
+        #self.refgraph.add_node(self.super_surface_node_0,data_0)
+        #self.refgraph.add_node(self.super_surface_node_max,data_max)
+        self.refgraph.add_node(self.super_surface_node_0,**data_0) # nx2.1
+        self.refgraph.add_node(self.super_surface_node_max,**data_max) #nx2.1
 
         # add weights of 100000 from super surface nodes to surface nodes
         for i in range(0, len(self.surface_nodes_0)):
@@ -2354,68 +2406,68 @@ class SlabGraph(MolecularGraph):
         self.slabgraphdirec=self.slabgraph.to_directed()
         self.create_weighted_barrier_on_super_surface_edges(super_surface_weight='max')
 
-    def redirect_slab_tree_by_coordinate_directionality(self,start="min"):
-        """
-        Redirect the edges in the directed version of the slab graph
-        solely based on the fractional coordinate that represents the
-        crystallographic position perpendicular to the surface (parallel to the
-        vacuum)
+    #def redirect_slab_tree_by_coordinate_directionality(self,start="min"):
+    #    """
+    #    Redirect the edges in the directed version of the slab graph
+    #    solely based on the fractional coordinate that represents the
+    #    crystallographic position perpendicular to the surface (parallel to the
+    #    vacuum)
 
-        if start=='min', the parent node must have a vacuum_coord < child node
-        if start=='max', the parent node must have a vacuum_coord > child node
-        """
+    #    if start=='min', the parent node must have a vacuum_coord < child node
+    #    if start=='max', the parent node must have a vacuum_coord > child node
+    #    """
 
-        edges_to_reverse=[]
-        for edge in self.slabgraphdirec.edges_iter():
-            n1=edge[0]
-            n2=edge[1]
+    #    edges_to_reverse=[]
+    #    for edge in self.slabgraphdirec.edges_iter():
+    #        n1=edge[0]
+    #        n2=edge[1]
 
-            to_reverse=False
-            
-            if(self.vacuum_direc==0):
-                if(self.slabgraph.node[n1]['_atom_site_fract_x']<
-                   self.slabgraph.node[n2]['_atom_site_fract_x']):
-                    if(start=="max"):
-                        to_reverse=True
-                else:
-                    if(start=="min"):
-                        to_reverse=True
-            elif(self.vacuum_direc==1):
-                if(self.slabgraph.node[n1]['_atom_site_fract_y']<
-                   self.slabgraph.node[n2]['_atom_site_fract_y']):
-                    if(start=="max"):
-                        to_reverse=True
-                else:
-                    if(start=="min"):
-                        to_reverse=True
-            elif(self.vacuum_direc==2):
-                if(self.slabgraph.node[n1]['_atom_site_fract_z']<
-                   self.slabgraph.node[n2]['_atom_site_fract_z']):
-                    if(start=="max"):
-                        to_reverse=True
-                else:
-                    if(start=="min"):
-                        to_reverse=True
-                        
-            # Take special care to ensure the correct directionality each edge 
-            # betweeen the super surface node and the first bulk node
-            if(start=="min"):
-                if(n2 == self.super_surface_node_0):
-                    to_reverse=True
-            elif(start=="max"):
-                if(n1 == self.super_surface_node_max):
-                    to_reverse=True
-    
-            if(to_reverse):
-                d=self.slabgraphdirec[n1][n2].copy()
-                edges_to_reverse.append((n1,n2,d))
+    #        to_reverse=False
+    #        
+    #        if(self.vacuum_direc==0):
+    #            if(self.slabgraph.node[n1]['_atom_site_fract_x']<
+    #               self.slabgraph.node[n2]['_atom_site_fract_x']):
+    #                if(start=="max"):
+    #                    to_reverse=True
+    #            else:
+    #                if(start=="min"):
+    #                    to_reverse=True
+    #        elif(self.vacuum_direc==1):
+    #            if(self.slabgraph.node[n1]['_atom_site_fract_y']<
+    #               self.slabgraph.node[n2]['_atom_site_fract_y']):
+    #                if(start=="max"):
+    #                    to_reverse=True
+    #            else:
+    #                if(start=="min"):
+    #                    to_reverse=True
+    #        elif(self.vacuum_direc==2):
+    #            if(self.slabgraph.node[n1]['_atom_site_fract_z']<
+    #               self.slabgraph.node[n2]['_atom_site_fract_z']):
+    #                if(start=="max"):
+    #                    to_reverse=True
+    #            else:
+    #                if(start=="min"):
+    #                    to_reverse=True
+    #                    
+    #        # Take special care to ensure the correct directionality each edge 
+    #        # betweeen the super surface node and the first bulk node
+    #        if(start=="min"):
+    #            if(n2 == self.super_surface_node_0):
+    #                to_reverse=True
+    #        elif(start=="max"):
+    #            if(n1 == self.super_surface_node_max):
+    #                to_reverse=True
+    #
+    #        if(to_reverse):
+    #            d=self.slabgraphdirec[n1][n2].copy()
+    #            edges_to_reverse.append((n1,n2,d))
 
 
 
-        for n1,n2,d in edges_to_reverse:
-            print("Reversing! ",n1,n2, d)
-            self.slabgraphdirec.remove_edge(n1,n2)
-            self.slabgraphdirec.add_edge(n2,n1,d)
+    #    for n1,n2,d in edges_to_reverse:
+    #        print("Reversing! ",n1,n2, d)
+    #        self.slabgraphdirec.remove_edge(n1,n2)
+    #        self.slabgraphdirec.add_edge(n2,n1,d)
 
 
 
@@ -2445,40 +2497,43 @@ class SlabGraph(MolecularGraph):
             sys.exit()
 
         # now reweight each edge between the supersurface node and the bulk node neighbors
-        for edge in self.slabgraphdirec.edges_iter():
-            self.slabgraphdirec.edge[edge[0]][edge[1]]['capacity']=\
-                float(self.slabgraph.edge[edge[0]][edge[1]]['weight'])
-            self.slabgraphdirec.edge[edge[0]][edge[1]]['weight']=\
-                float(self.slabgraph.edge[edge[0]][edge[1]]['weight'])
+        #for edge in self.slabgraphdirec.edges_iter():
+        for edge in self.slabgraphdirec.edges(): # nx2.1
+            #self.slabgraphdirec.edge[edge[0]][edge[1]]['capacity']=\
+            # NOTE all xxxxx.edges[] assignemtns modified to nx2.1 compatible
+            self.slabgraphdirec.edges[edge[0],edge[1]]['capacity']=\
+                float(self.slabgraph.edges[edge[0],edge[1]]['weight'])
+            self.slabgraphdirec.edges[edge[0],edge[1]]['weight']=\
+                float(self.slabgraph.edges[edge[0],edge[1]]['weight'])
 
             # However, if one node in the edge is the super surface node,
             # reset the capacity to the max weight of the supernode
             if(edge[0] == self.super_surface_node_0 or \
                edge[1] == self.super_surface_node_0):
                 # adjust directed graph edge properties
-                self.slabgraphdirec.edge[edge[0]][edge[1]]['capacity'] = \
+                self.slabgraphdirec.edges[edge[0],edge[1]]['capacity'] = \
                     surface_0_weight 
-                self.slabgraphdirec.edge[edge[0]][edge[1]]['weight'] = \
+                self.slabgraphdirec.edges[edge[0],edge[1]]['weight'] = \
                     surface_0_weight 
 
                 # adjust undirected graph edge properties
-                self.slabgraphundirected.edge[edge[0]][edge[1]]['capacity'] = \
+                self.slabgraphundirected.edges[edge[0],edge[1]]['capacity'] = \
                     surface_0_weight 
-                self.slabgraphundirected.edge[edge[0]][edge[1]]['weight'] = \
+                self.slabgraphundirected.edges[edge[0],edge[1]]['weight'] = \
                     surface_0_weight 
 
             elif(edge[0] == self.super_surface_node_max or \
                  edge[1] == self.super_surface_node_max):
                 # adjust directed graph edge properties
-                self.slabgraphdirec.edge[edge[0]][edge[1]]['capacity'] = \
+                self.slabgraphdirec.edges[edge[0],edge[1]]['capacity'] = \
                     surface_max_weight
-                self.slabgraphdirec.edge[edge[0]][edge[1]]['weight'] = \
+                self.slabgraphdirec.edges[edge[0],edge[1]]['weight'] = \
                     surface_max_weight
 
                 # adjust undirected graph edge properties
-                self.slabgraphundirected.edge[edge[0]][edge[1]]['capacity'] = \
+                self.slabgraphundirected.edges[edge[0],edge[1]]['capacity'] = \
                     surface_max_weight
-                self.slabgraphundirected.edge[edge[0]][edge[1]]['weight'] = \
+                self.slabgraphundirected.edges[edge[0],edge[1]]['weight'] = \
                     surface_max_weight
 
 
@@ -2687,6 +2742,8 @@ class SlabGraph(MolecularGraph):
 
         return edges_that_were_cut
 
+
+
     def keep_N_layers(self, G, max_layer):
         """
         For an input graph G, return a copy that has only nodes w/attribute 
@@ -2696,6 +2753,10 @@ class SlabGraph(MolecularGraph):
         print("\nReducing graph to only contain nodes up to and including slablayer %d"%max_layer)
 
         Gp=deepcopy(G)
+        print(dir(Gp))
+        print(type(Gp))
+        print(type(super()))
+        print(dir(super()))
 
         # new super surface node
         self.new_super_surface_node_max=-3
@@ -2706,7 +2767,8 @@ class SlabGraph(MolecularGraph):
         # all nodes to remove
         remove_nodes=[]
 
-        for n1, d in Gp.nodes_iter2(data=True):
+        #for n1, d in Gp.nodes_iter2(data=True):
+        for n1, d in self.nodes_iter2(Gp,data=True):
             #print(d['slablayer'])
             #print(max_layer)
             if(d['slablayer'] == max_layer+1):
@@ -2744,7 +2806,8 @@ class SlabGraph(MolecularGraph):
             Gp.remove_node(n)
     
         # add to our DIRECTED slab graph
-        Gp.add_node(self.new_super_surface_node_max,new_data_max)
+        #Gp.add_node(self.new_super_surface_node_max,new_data_max)
+        Gp.add_node(self.new_super_surface_node_max,**new_data_max) # nx2.1
 
         # add forward and reverse edges to new supersurface node
         for i in range(0, len(self.new_surface_nodes_max)):
@@ -3747,7 +3810,8 @@ class SlabGraph(MolecularGraph):
             if(len(this_intersect) == 1):                                   
                 n_to_add=next(iter(this_intersect))                         
                 this_data = self.refgraph.node[n_to_add]                    
-                self.slabgraph.add_node(n_to_add, this_data)                
+                #self.slabgraph.add_node(n_to_add, this_data)                
+                self.slabgraph.add_node(n_to_add, **this_data) # nx2.1
                 tmp_nodes.append(n_to_add)                                  
 
         
@@ -3968,17 +4032,23 @@ class SlabGraph(MolecularGraph):
         all_nodes=G.nodes()
         nodes_to_add=set()
         edges_to_add=[]
-        for n1 in G.nodes_iter2():
-            for n2 in self.refgraph.neighbors(n1):
+        #for n1 in G.nodes_iter2():
+        for n1, data in self.nodes_iter2(G,data=True):
+            neighbors = [n for n in self.refgraph.neighbors(n1)] # nx2.1
+            #for n2 in self.refgraph.neighbors(n1):
+            for n2 in neighbors:
                 # duplicate integers not created in a set
                 nodes_to_add.add(n2)
-                edges_to_add.append((n1,n2,self.refgraph.edge[n1][n2]))
+                #edges_to_add.append((n1,n2,self.refgraph.edge[n1][n2]))
+                edges_to_add.append((n1,n2,self.refgraph.get_edge_data(n1,n2))) # nx2.1
 
         for n1 in nodes_to_add:
-            G.add_node(n1,self.refgraph.node[n1])
+            #G.add_node(n1,self.refgraph.node[n1])
+            G.add_node(n1,**self.refgraph.nodes[n1]) # nx2.1
 
         for n1, n2, d in edges_to_add:
-            G.add_edge(n1,n2,d)
+            #G.add_edge(n1,n2,d)
+            G.add_edge(n1,n2,**d) # nx2.1
 
         print("Total nodes added: %d"%len(nodes_to_add))
         print("Total edges added: %d"%len(edges_to_add))
@@ -4115,7 +4185,8 @@ class SlabGraph(MolecularGraph):
             new_child_node_data['ciflabel']="H"+str(new_child_node_index)
    
             # get original edge data to check for periodicity
-            old_edge_data=self.refgraph.edge[edge[0]][edge[1]]
+            #old_edge_data=self.refgraph.edge[edge[0]][edge[1]]
+            old_edge_data=self.refgraph.edges[edge[0],edge[1]] # nx2.1
             symflag=old_edge_data['symflag']
 
             # New/old coordinates of child node to write in file
@@ -4211,7 +4282,8 @@ class SlabGraph(MolecularGraph):
             new_child_node_data['_atom_site_fract_y'] = str(new_child_abc[1])
             new_child_node_data['_atom_site_fract_z'] = str(new_child_abc[2])
             new_child_node_data['cartesian_coordinates']=new_child_xyz
-            G.add_node(new_child_node_index, new_child_node_data)
+            #G.add_node(new_child_node_index, new_child_node_data)
+            G.add_node(new_child_node_index, **new_child_node_data)
             if(debug):
                 print("Adding child H node w/index %d"%new_child_node_index)
 
@@ -4366,7 +4438,8 @@ class SlabGraph(MolecularGraph):
         # correct if this face is not orthogonal                                
         unit_area*=np.sin(np.deg2rad(self.cell.gamma))                          
 
-        cut_weight=sum([self.slabgraph.edge[edg[0]][edg[1]]['weight'] for edg in C[0]])
+        #cut_weight=sum([self.slabgraph.edge[edg[0]][edg[1]]['weight'] for edg in C[0]])
+        cut_weight=sum([self.slabgraph.edges[edg[0],edg[1]]['weight'] for edg in C[0]]) # nx2.1
         
         # NOTE changed to sum of edge weights instead of # of edges
         #per_surface_density=sum(C[0])/(unit_area)
@@ -4606,7 +4679,8 @@ def write_CIF(G, cell, bond_block=True,descriptor="debug",relabel=True):
     # atom block
     element_counter = {}
     carts = []
-    for node, d in G.nodes_iter2(data=True):
+    #for node, d in G.nodes_iter2(data=True):
+    for node, d in G.nodes(data=True):  # nx2.1
         # can override write to try to preserve the already assigned ciflabel
         if(relabel==True):
             label = "%s%i"%(d['element'], node)
