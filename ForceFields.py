@@ -2208,19 +2208,6 @@ class UFF(ForceField):
             metal_check = True
         elif b_data['atomic_number'] in METALS:
             metal_check = True
-        if (self.keep_metal_geometry) and (metal_check):
-
-            theta0 = self.graph.compute_angle_between(a, b, c)
-            # should put this angle in the general - non-linear case
-            # unless the angle is 0 or 180 deg - then linear case.
-            # here the K value will be scaled by the number of neighbors
-            #angle_type = "None"
-            # note, coefficient might be too strong here, if the metal
-            # is octahedral, for example, kappa = ka/16
-            if np.allclose(theta0, 180.0, atol=0.1):
-                angle_type = 'linear'
-            else:
-                angle_type = "Fix"
         cosT0 = np.cos(theta0*DEG2RAD)
         sinT0 = np.sin(theta0*DEG2RAD)
         c2 = 1.0 / (4.0*sinT0*sinT0)
@@ -2237,41 +2224,52 @@ class UFF(ForceField):
         beta = 664.12/r_ab/r_bc
         ka = beta*(za*zc /(r_ac**5.))
         ka *= (3.*r_ab*r_bc*(1. - cosT0*cosT0) - r_ac*r_ac*cosT0)
+        if (self.keep_metal_geometry) and (metal_check):
+
+            theta0 = self.graph.compute_angle_between(a, b, c)
+            # should put this angle in the general - non-linear case
+            # unless the angle is 0 or 180 deg - then linear case.
+            # here the K value will be scaled by the number of neighbors
+            #angle_type = "None"
+            # note, coefficient might be too strong here, if the metal
+            # is octahedral, for example, kappa = ka/16
+            if np.allclose(theta0, 180.0, atol=0.1):
+                angle_type = 'linear'
+            else:
+                angle_type = "Fix"
 
         if angle_type in sf or (angle_type == 'tetrahedral' and int(theta0) == 90):
             if angle_type == 'linear':
                 kappa = ka
-                c0 = -1.
-                B  = 1
-                c1 = 1.
+                B  = -1
+                n = 1.
             # the description of the actual parameters for 'n' are not obvious
             # for the tetrahedral special case from the UFF paper or the write up in TOWHEE.
             # The values were found in the TOWHEE source code (eg. Bi3+3).
             if angle_type == 'tetrahedral': 
                 kappa = ka/4.
-                c0 = 1.
-                B  = -1
-                c1 = 2.
+                B  = 1
+                n = 2.
 
             if angle_type == 'trigonal-planar':
                 kappa = ka/9.
-                c0 = -1.
                 B  = -1
-                c1 = 3.
+                n = 3.
 
             if angle_type == 'square-planar' or angle_type == 'octahedral':
                 kappa = ka/16.
-                c0 = -1.
-                B  = 1
-                c1 = 4.
+                B  = -1
+                n = 4.
 
-            #data['potential'] = AnglePotential.FourierSimple()
             data['potential'] = AnglePotential.CosinePeriodic()
             #data['potential'].K = kappa
-            data['potential'].C = kappa*(c1**2)
-            #data['potential'].c = c0
+            # PB 23/08/2018 - lammps gives a functional form of E = C*[1-B(-1)^n*cos(n*theta)
+            # and states that the force constant K = C/n**2
+            # the UFF paper gives a form E = K/n**2 [1 - cos(n*theta)]
+            
+            data['potential'].C = kappa*(n**2) 
             data['potential'].B = B 
-            data['potential'].n = c1
+            data['potential'].n = n 
         # Fix metal. Was Fourier, but possibly too many nearby minima. Daniele was upset.
         # NB. did not Taylor expand the Fourier function to obtain the proper force coefficient.
         # so the curvature of the function may be too steep.
@@ -2282,7 +2280,9 @@ class UFF(ForceField):
             # F = -K(4*C2*cos(2*x) + C1*cos(x))
             # d^2 F / dx^2 = -K*(b*cos(x) + 4*c*cos(2*x))
             # set K to when this function is at x=theta0
-            K = -ka*(c1*cosT0 + 4*c2*np.cos(2*theta0*DEG2RAD))
+            # NB: I think this just works out to be ka in the end.. Shhh don't tell Daniele!
+            K=ka
+            #K = -ka*(c1*cosT0 + 4*c2*np.cos(2*theta0*DEG2RAD))
             data['potential'] = AnglePotential.Harmonic()
             data['potential'].K = K 
             data['potential'].theta0 = theta0
