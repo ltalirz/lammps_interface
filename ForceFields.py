@@ -2274,10 +2274,17 @@ class UFF(ForceField):
             data['potential'].n = c1
         # Fix metal. Was Fourier, but possibly too many nearby minima. Daniele was upset.
         # NB. did not Taylor expand the Fourier function to obtain the proper force coefficient.
-        # so the curvature of the function may be too steep. 
+        # so the curvature of the function may be too steep.
+        # PB (23/08/2018) now K is the result of taking second derivative of fourier function at
+        # theta0. Because Daniele was upset.
         elif angle_type == "Fix":
+            # get the coefficient from the second derivative of the fourier term
+            # F = -K(4*C2*cos(2*x) + C1*cos(x))
+            # d^2 F / dx^2 = -K*(b*cos(x) + 4*c*cos(2*x))
+            # set K to when this function is at x=theta0
+            K = -ka*(c1*cosT0 + 4*c2*np.cos(2*theta0*DEG2RAD))
             data['potential'] = AnglePotential.Harmonic()
-            data['potential'].K = ka
+            data['potential'].K = K 
             data['potential'].theta0 = theta0
 
         # general-nonlinear
