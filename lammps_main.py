@@ -812,8 +812,10 @@ class LammpsSimulation(object):
             for mtype in list(self.molecule_types.keys()):
                 # prompt for replication of this molecule in the supercell.
                 rep = self.subgraphs[self.molecule_types[mtype][0]]
-                response = input("Would you like to replicate molceule %i with atoms (%s) in the supercell? [y/n]: "%
-                        (mtype, ", ".join([rep.node[j]['element'] for j in rep.nodes()])))
+                #TODO(pboyd): change back when done screening ESPs of CoRE MOFs for Daniele
+                #response = input("Would you like to replicate molceule %i with atoms (%s) in the supercell? [y/n]: "%
+                #        (mtype, ", ".join([rep.node[j]['element'] for j in rep.nodes()])))
+                response = 'y'
                 if response in ['y', 'Y', 'yes']:
                     for m in self.molecule_types[mtype]:
                         self.subgraphs[m].build_supercell(supercell, self.cell, track_molecule=True, molecule_len=molcount)

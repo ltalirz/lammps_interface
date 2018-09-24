@@ -2546,6 +2546,8 @@ class UFF(ForceField):
                     dat['force_field_type'] = dat['element']
                     if dat['element'] == "F":
                         dat['force_field_type'] += "_"
+                    elif dat['element'] == "I":
+                        dat['force_field_type'] += "_"
                 elif dat['element'] == "Li":
                     dat['force_field_type'] = dat['element']
                 else:
@@ -3150,6 +3152,8 @@ class Dreiding(ForceField):
                     dat['force_field_type'] = dat['element']
                     if dat['element'] == "F":
                         dat['force_field_type'] += "_"
+                    elif dat['element'] == "I":
+                        dat['force_field_type'] += "_"
                 else:
                     ffs = list(DREIDING_DATA.keys())
                     for j in ffs:
@@ -3684,6 +3688,8 @@ class UFF4MOF(ForceField):
                     dat['force_field_type'] = dat['element']
                     if dat['element'] == "F":
                         dat['force_field_type'] += "_"
+                    elif dat['element'] == "I":
+                        dat['force_field_type'] += "_"
                 elif dat['element'] in metals:
                     if len(dat['element']) == 1:
                         fftype = dat['element'] + "_"
@@ -4075,6 +4081,8 @@ class TraPPE(ForceField):
                 elif dat['element'] in halides:
                     dat['force_field_type'] = dat['element']
                     if dat['element'] == "F":
+                        dat['force_field_type'] += "_"
+                    elif dat['element'] == "I":
                         dat['force_field_type'] += "_"
                 else:
                     ffs = list(DREIDING_DATA.keys())
