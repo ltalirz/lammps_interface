@@ -4768,12 +4768,13 @@ def write_PDB(graph, cell):
     correctly.
 
     """
-    pdbfile=open("%s.pdb"%(graph.name), "w")
+    pdbfile=open("%s.debug.pdb"%(graph.name), "w")
 
     # remark section
-    pdbfile.writelines("%6s %3i  Lammps intervace v.%i. Created on %s"%("REMARK",1,0,get_time()))
+    pdbfile.writelines("%6s %3i PDB file created by Lammps intervace v.%i\n"%("REMARK", 1, 0))
+    pdbfile.writelines("%6s %3i Created on %s\n"%("REMARK",2,get_time()))
     # write crystallographic data 
-    pdbfile.writelines("%6s%9.3f%9.3f%9.3f%7.2f%7.2f%7.2f %11s%%4i\n"%(
+    pdbfile.writelines("%6s%9.3f%9.3f%9.3f%7.2f%7.2f%7.2f %11s%4i\n"%(
         "CRYST1",cell.a, cell.b, cell.c, cell.alpha, cell.beta, cell.gamma,"P1",1))
     conect_string = ""
     for node, d in graph.nodes(data=True):  # nx2.1
@@ -4786,7 +4787,7 @@ def write_PDB(graph, cell):
         except:
             label = "%i%s"%(node,d['element'])
         cart = d['cartesian_coordinates']
-        pdbfile.writelines("%6s%5i %4s%1s%3s% 1s%3i%1s   %8.3f%8.3f%8.3f%6.2f%6.2f%-2s%2.1f\n"
+        pdbfile.writelines("%-6s%5i %4s%1s%3s% 1s%3i%1s   %8.3f%8.3f%8.3f%6.2f%6.2f          %2s%2s\n"
                                %("ATOM",        # 1 - 6: ATOM
                                   node,         # 7 - 11: atom number
                                   label,        # 13 - 16: atom name
@@ -4801,12 +4802,11 @@ def write_PDB(graph, cell):
                                   1.0,          # 55 - 60: occupancy
                                   0.0,          # 61 - 66: temperature factor
                                   d['element'], # 77 - 78: element symbol (left justified)
-                                  d['charge'],  # 79 - 80: charge on atom.
+                                  "  ",         # 79 - 80: charge on atom.
                                   ))
         # list bonded atoms, 4 per line.
 
-        num_lines = int(len(graph.neighbours(node))/4.)
-        neighbs = sorted(graph.neighbours(node), reverse=True)
+        neighbs = sorted(graph.neighbors(node), reverse=True)
         remove = []
         # delete connected atoms that cross periodic boundary, cause vis software for 
         # pdb files suck.
@@ -4816,6 +4816,8 @@ def write_PDB(graph, cell):
                 remove.append(idx)
         for i in sorted(remove, reverse=True):
             del neighbs[i]
+
+        num_lines = math.ceil(len(neighbs)/4.)
 
         for i in range(num_lines):
             try:
@@ -4836,18 +4838,19 @@ def write_PDB(graph, cell):
                 neighbour4 = "%5s"%(" ")
 
             
-            conect_string += "%6s%5s%5s%5s%5s%5s\n"
-            %("CONECT",                         # 1 - 6: CONECT
+            conect_string += "%6s%5s%5s%5s%5s%5s\n"%(
+              "CONECT",                         # 1 - 6: CONECT
               node,                             # 7 - 11: atom serial number
               neighbour1,                       # 12 - 16: serial number of bonded atom
               neighbour2,                       # 17 - 21: serial number of bonded atom
               neighbour3,                       # 22 - 26: serial number of bonded atom
               neighbour4,                       # 27 - 31: serial number of bonded atom
               )
-    pdbfile.writlines("%6s%5i\n"%("TER", graph.number_of_nodes() + 1))
+    pdbfile.writelines("%6s%5i\n"%("TER", graph.number_of_nodes() + 1))
     pdbfile.writelines(conect_string)
     pdbfile.writelines("END")
     pdbfile.close()
+    print('Output file written to %s.debug.pdb'%graph.name)
 
 def write_RASPA_CIF(graph, cell, classifier=0):
     """
@@ -5207,8 +5210,8 @@ class Cell(object):
     @property
     def volume(self):
         """Calculate cell volume a.bxc."""
-        b_cross_c = cross(self.cell[1], self.cell[2])
-        return dot(self.cell[0], b_cross_c)
+        b_cross_c = np.cross(self.cell[1], self.cell[2])
+        return np.dot(self.cell[0], b_cross_c)
 
     def get_cell(self):
         """Get the 3x3 vector cell representation."""
@@ -5309,11 +5312,11 @@ class Cell(object):
     @property
     def minimum_width(self):
         """The shortest perpendicular distance within the cell."""
-        a_cross_b = cross(self.cell[0], self.cell[1])
-        b_cross_c = cross(self.cell[1], self.cell[2])
-        c_cross_a = cross(self.cell[2], self.cell[0])
+        a_cross_b = np.cross(self.cell[0], self.cell[1])
+        b_cross_c = np.cross(self.cell[1], self.cell[2])
+        c_cross_a = np.cross(self.cell[2], self.cell[0])
 
-        volume = dot(self.cell[0], b_cross_c)
+        volume = np.dot(self.cell[0], b_cross_c)
 
         return volume / min(np.linalg.norm(b_cross_c), np.linalg.norm(c_cross_a), np.linalg.norm(a_cross_b))
 
