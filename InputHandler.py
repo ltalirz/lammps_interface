@@ -38,6 +38,13 @@ class Options(object):
                                  " Necessary for debugging purposes, this"+
                                  " file can show the user how the structure "+
                                  "has been interpreted by the program.")
+        parser.add_argument("-p", "--outputpdb",
+                            action="store_true",
+                            dest="output_pdb",
+                            help="Write a .pdb file for visualization."+
+                                 " Necessary for debugging purposes, this"+
+                                 " file can show the user how the structure "+
+                                 "has been interpreted by the program.")
 
         parser.add_argument("-or", "--outputraspa",
                             action="store_true",

@@ -5,7 +5,7 @@ from scipy.spatial import distance
 import math
 import shlex
 import re
-from CIFIO import CIF
+from CIFIO import CIF, get_time
 from atomic import METALS, MASS, COVALENT_RADII
 from copy import copy
 from mof_sbus import InorganicCluster, OrganicCluster
@@ -4761,6 +4761,93 @@ def write_CIF(G, cell, bond_block=True,descriptor="debug",relabel=True):
     file = open("%s.cif"%c.name, "w")
     file.writelines(str(c))
     file.close()
+
+def write_PDB(graph, cell):
+    """
+    Program to write pdb file from structure graph. Doing this because MS v. 6 doesn't do the CONECT lines
+    correctly.
+
+    """
+    pdbfile=open("%s.pdb"%(graph.name), "w")
+
+    # remark section
+    pdbfile.writelines("%6s %3i  Lammps intervace v.%i. Created on %s"%("REMARK",1,0,get_time()))
+    # write crystallographic data 
+    pdbfile.writelines("%6s%9.3f%9.3f%9.3f%7.2f%7.2f%7.2f %11s%%4i\n"%(
+        "CRYST1",cell.a, cell.b, cell.c, cell.alpha, cell.beta, cell.gamma,"P1",1))
+    conect_string = ""
+    for node, d in graph.nodes(data=True):  # nx2.1
+        # 55 - 60 - occupancy
+        # 61 - 66 temperature factor
+        # 77 - 78 element symbol (left justified)
+        # 79 - 80 charge on atom.
+        try:
+            label = "%s"%(d['ciflabel'])
+        except:
+            label = "%i%s"%(node,d['element'])
+        cart = d['cartesian_coordinates']
+        pdbfile.writelines("%6s%5i %4s%1s%3s% 1s%3i%1s   %8.3f%8.3f%8.3f%6.2f%6.2f%-2s%2.1f\n"
+                               %("ATOM",        # 1 - 6: ATOM
+                                  node,         # 7 - 11: atom number
+                                  label,        # 13 - 16: atom name
+                                  " ",          # 17: alternate location id. ????
+                                  "MOL",        # 18 - 20: residue name
+                                  " ",          # 22: chainId?
+                                  2,            # 23 - 26: residue sequence number
+                                  " ",          # 27: code for insertion of residues
+                                  cart[0],      # 31 - 38: real 8.3 x
+                                  cart[1],      # 39 - 46: real 8.3 y
+                                  cart[2],      # 47 - 54: real 8.3 z
+                                  1.0,          # 55 - 60: occupancy
+                                  0.0,          # 61 - 66: temperature factor
+                                  d['element'], # 77 - 78: element symbol (left justified)
+                                  d['charge'],  # 79 - 80: charge on atom.
+                                  ))
+        # list bonded atoms, 4 per line.
+
+        num_lines = int(len(graph.neighbours(node))/4.)
+        neighbs = sorted(graph.neighbours(node), reverse=True)
+        remove = []
+        # delete connected atoms that cross periodic boundary, cause vis software for 
+        # pdb files suck.
+        for idx,n in enumerate(neighbs):
+            bonddata = graph.get_edge_data(node,n)
+            if bonddata['symflag'] != '.':
+                remove.append(idx)
+        for i in sorted(remove, reverse=True):
+            del neighbs[i]
+
+        for i in range(num_lines):
+            try:
+                neighbour1 = "%5i"%(neighbs.pop())
+            except IndexError:
+                neighbour1 = "%5s"%(" ")
+            try:
+                neighbour2 = "%5i"%(neighbs.pop())
+            except IndexError:
+                neighbour2 = "%5s"%(" ")
+            try:
+                neighbour3 = "%5i"%(neighbs.pop())
+            except IndexError:
+                neighbour3 = "%5s"%(" ")
+            try:
+                neighbour4 = "%5i"%(neighbs.pop())
+            except IndexError:
+                neighbour4 = "%5s"%(" ")
+
+            
+            conect_string += "%6s%5s%5s%5s%5s%5s\n"
+            %("CONECT",                         # 1 - 6: CONECT
+              node,                             # 7 - 11: atom serial number
+              neighbour1,                       # 12 - 16: serial number of bonded atom
+              neighbour2,                       # 17 - 21: serial number of bonded atom
+              neighbour3,                       # 22 - 26: serial number of bonded atom
+              neighbour4,                       # 27 - 31: serial number of bonded atom
+              )
+    pdbfile.writlines("%6s%5i\n"%("TER", graph.number_of_nodes() + 1))
+    pdbfile.writelines(conect_string)
+    pdbfile.writelines("END")
+    pdbfile.close()
 
 def write_RASPA_CIF(graph, cell, classifier=0):
     """

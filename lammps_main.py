@@ -14,7 +14,7 @@ import networkx as nx
 import ForceFields
 import itertools
 import operator
-from structure_data import from_CIF, write_CIF, clean, MolecularGraph
+from structure_data import from_CIF, write_CIF, write_PDB, clean, MolecularGraph
 from structure_data import write_RASPA_CIF, write_RASPA_sim_files, MDMC_config
 from lammps_potentials import PairPotential
 from CIFIO import CIF
@@ -2068,6 +2068,10 @@ def main():
     if options.output_cif:
         print("CIF file requested. Exiting...")
         write_CIF(graph, cell)
+        sys.exit()
+    if options.output_pdb:
+        print("PDB file requested. Exiting...")
+        write_PDB(graph, cell)
         sys.exit()
 
     sim.write_lammps_files()
